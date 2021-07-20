@@ -5,12 +5,14 @@
 target/
 target-grunt/
 node_modules/
+bower_components/
 node/
 /build/
 
 # ignore Eclipse project data
 .project
 .classpath
+.factorypath
 .metadata/
 .settings/
 .recommenders/
@@ -18,6 +20,9 @@ node/
 # ignore NetBeans project data
 */nbproject/*
 */nb-configuration.xml
+
+# ignore VSCode project data
+.vscode/
 
 # ingore OS artifacts
 .DS_Store
@@ -31,16 +36,13 @@ node/
 /.m2/
 /settings.xml
 
-# Ignore mkdocs sites
+# Ignore mkdocs sites and python virtualenv (docs/guides/readme.md)
 docs/guides/*/site
+docs/guides/venv
 
 # Ignore Makefiles
 # Sometimes they help, but they should never be tracked
 Makefile
-/modules/admin-ui/bower_components/
-
-# Ignore package-lock.json
-/modules/admin-ui/package-lock.json
 
 # Ignore OS artifacts
 .DS_Store

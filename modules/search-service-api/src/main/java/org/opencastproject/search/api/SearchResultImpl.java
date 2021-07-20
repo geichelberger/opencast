@@ -22,8 +22,12 @@
 
 package org.opencastproject.search.api;
 
-import org.apache.commons.io.IOUtils;
+import org.opencastproject.util.XmlSafeParser;
 
+import org.apache.commons.io.IOUtils;
+import org.xml.sax.SAXException;
+
+import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,8 +41,6 @@ import javax.xml.bind.annotation.XmlAttribute;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.XmlType;
-import javax.xml.transform.Source;
-import javax.xml.transform.stream.StreamSource;
 
 /**
  * The search result represents a set of result items that has been compiled as a result for a search operation.
@@ -69,10 +71,11 @@ public class SearchResultImpl implements SearchResult {
   public static SearchResultImpl valueOf(InputStream xml) {
     try {
       Unmarshaller unmarshaller = context.createUnmarshaller();
-      Source source = new StreamSource(xml);
-      return unmarshaller.unmarshal(source, SearchResultImpl.class).getValue();
+      return unmarshaller.unmarshal(XmlSafeParser.parse(xml), SearchResultImpl.class).getValue();
     } catch (JAXBException e) {
       throw new IllegalStateException(e.getLinkedException() != null ? e.getLinkedException() : e);
+    } catch (IOException | SAXException e) {
+      throw new IllegalStateException(e);
     } finally {
       IOUtils.closeQuietly(xml);
     }
@@ -117,8 +120,9 @@ public class SearchResultImpl implements SearchResult {
    */
   public SearchResultImpl(String query) {
     this();
-    if (query == null)
+    if (query == null) {
       throw new IllegalArgumentException("Query cannot be null");
+    }
     this.query = query;
   }
 
@@ -138,8 +142,9 @@ public class SearchResultImpl implements SearchResult {
    *          the item to add
    */
   public void addItem(SearchResultItemImpl item) {
-    if (item == null)
+    if (item == null) {
       throw new IllegalArgumentException("Parameter item cannot be null");
+    }
     resultSet.add(item);
   }
 
@@ -243,8 +248,9 @@ public class SearchResultImpl implements SearchResult {
    * @see org.opencastproject.search.api.SearchResult#getPage()
    */
   public long getPage() {
-    if (limit != 0)
+    if (limit != 0) {
       return offset / limit;
+    }
     return 0;
   }
 

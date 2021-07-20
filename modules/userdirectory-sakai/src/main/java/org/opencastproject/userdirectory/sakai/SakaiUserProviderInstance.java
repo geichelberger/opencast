@@ -31,6 +31,7 @@ import org.opencastproject.security.api.Role;
 import org.opencastproject.security.api.RoleProvider;
 import org.opencastproject.security.api.User;
 import org.opencastproject.security.api.UserProvider;
+import org.opencastproject.util.XmlSafeParser;
 
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
@@ -69,7 +70,6 @@ import javax.management.InstanceNotFoundException;
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
 import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
 
 /**
  * A UserProvider that reads user roles from Sakai.
@@ -149,8 +149,6 @@ public class SakaiUserProviderInstance implements UserProvider, RoleProvider, Ca
     this.userPattern = userPattern;
     this.instructorRoles = instructorRoles;
 
-    JaxbOrganization jaxbOrganization = JaxbOrganization.fromOrganization(organization);
-
     logger.info("Creating new SakaiUserProviderInstance(pid={}, url={}, cacheSize={}, cacheExpiration={})",
                  pid, url, cacheSize, cacheExpiration);
 
@@ -215,6 +213,17 @@ public class SakaiUserProviderInstance implements UserProvider, RoleProvider, Ca
   @Override
   public User loadUser(String userName) {
     logger.debug("loaduser(" + userName + ")");
+
+    try {
+      if ((userPattern != null) && !userName.matches(userPattern)) {
+        logger.debug("load user {} failed regexp {}", userName, userPattern);
+        return null;
+      }
+    } catch (PatternSyntaxException e) {
+      logger.warn("Invalid regular expression for user pattern {} - disabling checks", userPattern);
+      userPattern = null;
+    }
+
     requests.incrementAndGet();
     try {
       Object user = cache.getUnchecked(userName);
@@ -310,8 +319,7 @@ public class SakaiUserProviderInstance implements UserProvider, RoleProvider, Ca
 
       logger.debug("Returning JaxbRoles: " + roles);
 
-      // JaxbUser(String userName, String password, String name, String email, String provider, boolean canLogin, JaxbOrganization organization, Set<JaxbRole> roles)
-      User user = new JaxbUser(userName, null, displayName, email, PROVIDER_NAME, true, jaxbOrganization, roles);
+      User user = new JaxbUser(userName, null, displayName, email, PROVIDER_NAME, jaxbOrganization, roles);
 
       cache.put(userName, user);
       logger.debug("Returning user {}", userName);
@@ -420,8 +428,7 @@ public class SakaiUserProviderInstance implements UserProvider, RoleProvider, Ca
       String xml = IOUtils.toString(new BufferedInputStream(connection.getInputStream()));
       logger.debug(xml);
 
-      DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
-      DocumentBuilder parser = documentBuilderFactory.newDocumentBuilder();
+      DocumentBuilder parser = XmlSafeParser.newDocumentBuilderFactory().newDocumentBuilder();
 
       Document document = parser.parse(new org.xml.sax.InputSource(new StringReader(xml)));
 
@@ -479,8 +486,7 @@ public class SakaiUserProviderInstance implements UserProvider, RoleProvider, Ca
       logger.debug(xml);
 
       // Parse the document
-      DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
-      DocumentBuilder parser = documentBuilderFactory.newDocumentBuilder();
+      DocumentBuilder parser = XmlSafeParser.newDocumentBuilderFactory().newDocumentBuilder();
       Document document = parser.parse(new org.xml.sax.InputSource(new StringReader(xml)));
       Element root = document.getDocumentElement();
 
@@ -591,13 +597,6 @@ public class SakaiUserProviderInstance implements UserProvider, RoleProvider, Ca
   }
 
   // RoleProvider methods
-
-   @Override
-   public Iterator<Role> getRoles() {
-
-     // We won't ever enumerate all Sakai sites, so return an empty list here
-     return Collections.emptyIterator();
-   }
 
    @Override
    public List<Role> getRolesForUser(String userName) {

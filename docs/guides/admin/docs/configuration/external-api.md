@@ -6,7 +6,7 @@ External API, you need to configure a user that is authorized to do so.
 
 Perform the following steps to get the External API running:
 
-1. Enable basic authentication (see section Authentication) 
+1. Enable basic authentication (see section Authentication)
 2. Create a new user or choose an existing user (administrative user interface)
 3. Authorize the user to access the External API (see section Authorization)
 4. Test whether access works (see section Testing)
@@ -14,8 +14,8 @@ Perform the following steps to get the External API running:
 Authentication
 --------------
 
-The External API currenlty only supports basic authentication. To enable basic authentication, uncomment the following
-blocks in `/etc/security/mh_default.org`:
+The External API currently only supports basic authentication. To enable basic authentication, uncomment the following
+blocks in `/etc/security/mh_default_org.xml`:
 
     <!-- Basic authentication
     <sec:custom-filter after="BASIC_AUTH_FILTER" ref="basicAuthenticationFilter" />
@@ -63,15 +63,13 @@ directly in the Opencast administrative user interface.
 |ROLE_API_EVENTS_ACL_VIEW          |GET         |/api/events/\*/acl                                            |
 |ROLE_API_EVENTS_ACL_EDIT          |PUT<br>POST |/api/events/\*/acl<br>/api/events/\*/acl/\*                   |
 |ROLE_API_EVENTS_ACL_DELETE        |DELETE      |/api/events/\*/acl/\*/\*                                      |
-|ROLE_API_EVENTS_ATTACHMENTS_VIEW  |GET         |/api/events/\*/attachments<br>/api/events/\*/attachments/\*   |
-|ROLE_API_EVENTS_COMMENTS_VIEW     |GET         |/api/events/\*/comments<br>/api/events/\*/comments/\*         |
-|ROLE_API_EVENTS_COMMENTS_EDIT     |PUT<br>POST |/api/events/\*/comments/\*<br>/api/events/\*/comments         |
-|ROLE_API_EVENTS_COMMENTS_DELETE   |DELETE      |/api/events/\*/comments/\*                                    |
 |ROLE_API_EVENTS_MEDIA_VIEW        |GET         |/api/events/\*/media<br>/api/events/\*/media/\*               |
 |ROLE_API_EVENTS_METADATA_VIEW     |GET         |/api/events/\*/metadata<br>/api/events/\*/metadata/\*         |
 |ROLE_API_EVENTS_METADATA_EDIT     |PUT         |/api/events/\*/metadata<br>/api/events/\*/metadata/\*         |
 |ROLE_API_EVENTS_METADATA_DELETE   |DELETE      |/api/events/\*/metadata<br>/api/events/\*/metadata/\*         |
 |ROLE_API_EVENTS_PUBLICATIONS_VIEW |GET         |/api/events/\*/publications<br>/api/events/\*/publications/\* |
+|ROLE_API_EVENTS_SCHEDULING_EDIT   |PUT         |/api/events/\*/scheduling                                     |
+|ROLE_API_EVENTS_SCHEDULING_VIEW   |GET         |/api/events/\*/scheduling                                     |
 
 **Series API**
 
@@ -89,6 +87,12 @@ directly in the Opencast administrative user interface.
 |ROLE_API_SERIES_PROPERTIES_EDIT |PUT    |/api/series/\*/properties                             |
 |ROLE_API_SERIES_DELETE          |DELETE |/api/series/\*                                        |
 
+**Statistics API**
+
+|ROLE                            |METHOD | URL                                                      |
+|--------------------------------|-------|----------------------------------------------------------|
+|ROLE_API_STATISTICS_VIEW        |GET    |/api/statistics/providers<br>/api/statistics/providers/\* |
+|ROLE_API_STATISTICS_VIEW        |POST   |/api/statistics/data/query                                |
 
 **Groups API**
 
@@ -105,11 +109,27 @@ directly in the Opencast administrative user interface.
 |-----------------------|-------|-------------------|
 |ROLE_API_SECURITY_EDIT |POST   |/api/security/sign |
 
+**Agents API**
+
+|ROLE                         |METHOD | URL                           |
+|-----------------------------|-------|-------------------------------|
+|ROLE_API_CAPTURE_AGENTS_VIEW |GET    |/api/agents</br>/api/agents/\* |
+
 **Administrative API**
 
 |ROLE       |METHOD | URL               |
 |-----------|-------|-------------------|
 |ROLE_ADMIN |POST   |/api/recreateIndex |
+
+**Workflow API**
+
+|ROLE                                |METHOD | URL                                                      |
+|------------------------------------|-------|----------------------------------------------------------|
+|ROLE_API_WORKFLOW_INSTANCE_CREATE   |POST   |/api/workflow                                             |
+|ROLE_API_WORKFLOW_INSTANCE_VIEW     |GET    |/api/workflow<br>/api/workflow/\*                         |
+|ROLE_API_WORKFLOW_INSTANCE_EDIT     |PUT    |/api/workflow/\*                                          |
+|ROLE_API_WORKFLOW_INSTANCE_DELETE   |DELETE |/api/workflow/\*                                          |
+|ROLE_API_WORKFLOW_DEFINITION_VIEW   |GET    |/api/workflow-definitions<br>/api/workflow-definitions/\* |
 
 **User- and Role-switching**
 
@@ -131,7 +151,7 @@ Accessing Distribution Artefacts
 A major use case of the External API is to provide External Applications secure access to distribution artefacts.
 
 For this purpose, Opencast comes with a special workflow operation: WOH publish-configure
-(see [ConfigurablePublishWorkflowOperationHandler](../workflowoperationhandlers/publishconfigure-woh.md))
+(see [ConfigurablePublishWorkflowOperationHandler](../workflowoperationhandlers/publish-configure-woh.md))
 creates publication elements that do not just contain a single URL to the publication channel,
 but also contain URLs for each of the attachments and tracks that have been published.
 

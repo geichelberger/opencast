@@ -32,6 +32,7 @@ import org.opencastproject.mediapackage.MediaPackage;
 import org.opencastproject.mediapackage.MediaPackageElementFlavor;
 import org.opencastproject.util.NotFoundException;
 import org.opencastproject.workflow.api.AbstractWorkflowOperationHandler;
+import org.opencastproject.workflow.api.ConfiguredTagsAndFlavors;
 import org.opencastproject.workflow.api.WorkflowInstance;
 import org.opencastproject.workflow.api.WorkflowOperationException;
 import org.opencastproject.workflow.api.WorkflowOperationResult;
@@ -52,8 +53,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.SortedMap;
-import java.util.TreeMap;
 
 /**
  * Workflow operation handler for importing workflow properties.
@@ -61,7 +60,6 @@ import java.util.TreeMap;
 public class ImportWorkflowPropertiesWOH extends AbstractWorkflowOperationHandler {
 
   /* Configuration options */
-  private static final SortedMap<String, String> CONFIG_OPTIONS;
   public static final String SOURCE_FLAVOR_PROPERTY = "source-flavor";
   public static final String KEYS_PROPERTY = "keys";
 
@@ -70,30 +68,19 @@ public class ImportWorkflowPropertiesWOH extends AbstractWorkflowOperationHandle
   /* Service references */
   private Workspace workspace;
 
-  static {
-    CONFIG_OPTIONS = new TreeMap<String, String>();
-    CONFIG_OPTIONS.put(SOURCE_FLAVOR_PROPERTY,
-            "Flavor of the attachment that contains the serialized workflow instance properties");
-    CONFIG_OPTIONS.put(KEYS_PROPERTY,
-            "The workflow property keys to retrieve (comma separated list). If the option has not been specified, all keys will be retrieved");
-  }
-
   /** OSGi DI */
   void setWorkspace(Workspace workspace) {
     this.workspace = workspace;
   }
 
   @Override
-  public SortedMap<String, String> getConfigurationOptions() {
-    return CONFIG_OPTIONS;
-  }
-
-  @Override
   public WorkflowOperationResult start(WorkflowInstance wi, JobContext context) throws WorkflowOperationException {
     logger.info("Start importing workflow properties for workflow {}", wi);
-    final String sourceFlavor = getConfig(wi, SOURCE_FLAVOR_PROPERTY);
+    ConfiguredTagsAndFlavors tagsAndFlavors = getTagsAndFlavors(wi,
+        Configuration.none, Configuration.one, Configuration.none, Configuration.none);
+    final MediaPackageElementFlavor sourceFlavor = tagsAndFlavors.getSingleSrcFlavor();
     Opt<Attachment> propertiesElem = loadPropertiesElementFromMediaPackage(
-            MediaPackageElementFlavor.parseFlavor(sourceFlavor), wi);
+            sourceFlavor, wi);
     if (propertiesElem.isSome()) {
       Properties properties = loadPropertiesFromXml(workspace, propertiesElem.get().getURI());
       final Set<String> keys = $(getOptConfig(wi, KEYS_PROPERTY)).bind(Strings.splitCsv).toSet();

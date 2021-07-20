@@ -36,6 +36,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Dictionary;
+import java.util.Enumeration;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -140,33 +141,36 @@ public class UrlSigningFilter implements Filter, ManagedService {
           return;
         case BadRequest:
           logger.debug(
-                  "Unable to process httpRequest '{}' because it was rejected as a Bad Request, usually a problem with query string: {}",
-                  httpRequest.getRequestURL(), resourceRequest.getRejectionReason());
+              "Unable to process httpRequest '{}' because it was rejected as a Bad Request, "
+                  + "usually a problem with query string: {}",
+              httpRequest.getRequestURL(), resourceRequest.getRejectionReason());
           httpResponse.sendError(HttpServletResponse.SC_BAD_REQUEST);
           return;
         case Forbidden:
           logger.debug(
-                  "Unable to process httpRequest '{}' because is was rejected as Forbidden, usually a problem with making policy matching the signature: {}",
-                  httpRequest.getRequestURL(), resourceRequest.getRejectionReason());
+              "Unable to process httpRequest '{}' because is was rejected as Forbidden, usually a "
+                  + "problem with making policy matching the signature: {}",
+              httpRequest.getRequestURL(), resourceRequest.getRejectionReason());
           httpResponse.sendError(HttpServletResponse.SC_FORBIDDEN);
           return;
         case Gone:
           logger.debug("Unable to process httpRequest '{}' because is was rejected as Gone: {}",
-                  httpRequest.getRequestURL(), resourceRequest.getRejectionReason());
+              httpRequest.getRequestURL(), resourceRequest.getRejectionReason());
           httpResponse.sendError(HttpServletResponse.SC_GONE);
           return;
         default:
           logger.error(
-                  "Unable to process httpRequest '{}' because is was rejected as status {} which is not a status we should be handling here. This must be due to a code change and is a bug.: {}",
-                  httpRequest.getRequestURL(), resourceRequest.getStatus(), resourceRequest.getRejectionReason());
+              "Unable to process httpRequest '{}' because is was rejected as status {} which is "
+                  + "not a status we should be handling here. This must be due to a code change "
+                  + "and is a bug.: {}",
+              httpRequest.getRequestURL(), resourceRequest.getStatus(), resourceRequest.getRejectionReason());
           httpResponse.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
           return;
 
       }
     } catch (UrlSigningException e) {
-      logger.error("Unable to verify request for '{}' with query string '{}' from host '{}' because: {}",
-              httpRequest.getRequestURL(), httpRequest.getQueryString(), httpRequest.getRemoteAddr(),
-              ExceptionUtils.getStackTrace(e));
+      logger.error("Unable to verify request for '{}' with query string '{}' from host '{}' because:",
+              httpRequest.getRequestURL(), httpRequest.getQueryString(), httpRequest.getRemoteAddr(), e);
       httpResponse.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
               String.format("%s is unable to verify request for '%s' with query string '%s' from host '%s' because: %s",
                       getName(), httpRequest.getRequestURL(), httpRequest.getQueryString(), httpRequest.getRemoteAddr(),
@@ -189,7 +193,7 @@ public class UrlSigningFilter implements Filter, ManagedService {
   }
 
   @Override
-  public void updated(Dictionary properties) throws ConfigurationException {
+  public void updated(Dictionary<String, ?> properties) throws ConfigurationException {
     logger.info("Updating UrlSigningFilter");
 
     Option<String> enableFilterConfig = OsgiUtil.getOptCfg(properties, ENABLE_FILTER_CONFIG_KEY);
@@ -203,8 +207,9 @@ public class UrlSigningFilter implements Filter, ManagedService {
     } else {
       enabled = true;
       logger.info(
-              "The UrlSigningFilter is enabled by default. Use the '{}' property in its properties file to enable or disable it.",
-              ENABLE_FILTER_CONFIG_KEY);
+          "The UrlSigningFilter is enabled by default. Use the '{}' property in its properties "
+              + "file to enable or disable it.",
+          ENABLE_FILTER_CONFIG_KEY);
     }
 
     Option<String> strictFilterConfig = OsgiUtil.getOptCfg(properties, STRICT_FILTER_CONFIG_KEY);
@@ -218,8 +223,9 @@ public class UrlSigningFilter implements Filter, ManagedService {
     } else {
       strict = true;
       logger.info(
-              "The UrlSigningFilter is using strict checking of resource URLs by default. Use the '{}' property in its properties file to enable or disable it.",
-              STRICT_FILTER_CONFIG_KEY);
+          "The UrlSigningFilter is using strict checking of resource URLs by default. Use the "
+              + "'{}' property in its properties file to enable or disable it.",
+          STRICT_FILTER_CONFIG_KEY);
     }
 
     // Clear the current set of keys
@@ -230,24 +236,25 @@ public class UrlSigningFilter implements Filter, ManagedService {
       return;
     }
 
-    String urlRegularExpression = null;
-    int i = 1;
-    while (true) {
-      // Create the configuration prefixes
-      urlRegularExpression = new StringBuilder(URL_REGEX_PREFIX).append(".").append(i).toString();
-      // Read the url regular expression
-      String urlRegularExpressionValue = StringUtils.trimToNull((String) properties.get(urlRegularExpression));
-      logger.debug("Looking for configuration of {} and found '{}'", urlRegularExpression, urlRegularExpressionValue);
+    Enumeration<String> propertyKeys = properties.keys();
+    while (propertyKeys.hasMoreElements()) {
+      String propertyKey = propertyKeys.nextElement();
+      if (!propertyKey.startsWith(URL_REGEX_PREFIX)) {
+        continue;
+      }
+
+      String urlRegularExpression = StringUtils.trimToNull((String) properties.get(propertyKey));
+      logger.debug("Looking for configuration of {} and found '{}'", propertyKey, urlRegularExpression);
       // Has the url signing provider been fully configured
-      if (urlRegularExpressionValue == null) {
+      if (urlRegularExpression == null) {
         logger.debug(
-                "Unable to configure url regular expression with id '{}' because it is missing. Stopping to look for new keys.",
-                urlRegularExpression);
+            "Unable to configure url regular expression with id '{}' because it is missing. "
+                + "Stopping to look for new keys.",
+            propertyKey);
         break;
       }
 
-      urlRegularExpressions.add(urlRegularExpressionValue);
-      i++;
+      urlRegularExpressions.add(urlRegularExpression);
     }
 
     if (urlRegularExpressions.size() == 0) {

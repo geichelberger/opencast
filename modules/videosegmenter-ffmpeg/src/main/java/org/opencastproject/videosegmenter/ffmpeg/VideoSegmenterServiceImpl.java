@@ -50,9 +50,6 @@ import org.opencastproject.videosegmenter.api.VideoSegmenterException;
 import org.opencastproject.videosegmenter.api.VideoSegmenterService;
 import org.opencastproject.workspace.api.Workspace;
 
-import com.google.common.io.LineReader;
-
-import org.apache.commons.lang3.StringUtils;
 import org.osgi.service.cm.ConfigurationException;
 import org.osgi.service.cm.ManagedService;
 import org.osgi.service.component.ComponentContext;
@@ -84,7 +81,7 @@ import java.util.regex.Pattern;
  * </pre>
  */
 public class VideoSegmenterServiceImpl extends AbstractJobProducer implements
-VideoSegmenterService, ManagedService {
+    VideoSegmenterService, ManagedService {
 
   /** Resulting collection in the working file repository */
   public static final String COLLECTION_ID = "videosegments";
@@ -148,8 +145,8 @@ VideoSegmenterService, ManagedService {
   /** Default value for the option whether segments numbers depend on track duration */
   public static final boolean DEFAULT_DURATION_DEPENDENT = false;
 
-  /** The load introduced on the system by creating a caption job */
-  public static final float DEFAULT_SEGMENTER_JOB_LOAD = 1.0f;
+  /** The load introduced on the system by a segmentation job */
+  public static final float DEFAULT_SEGMENTER_JOB_LOAD = 0.3f;
 
   /** The key to look for in the service configuration file to override the DEFAULT_CAPTION_JOB_LOAD */
   public static final String SEGMENTER_JOB_LOAD_KEY = "job.load.videosegmenter";
@@ -159,7 +156,7 @@ VideoSegmenterService, ManagedService {
 
   /** The logging facility */
   protected static final Logger logger = LoggerFactory
-    .getLogger(VideoSegmenterServiceImpl.class);
+      .getLogger(VideoSegmenterServiceImpl.class);
 
   /** Number of pixels that may change between two frames without considering them different */
   protected float changesThreshold = DEFAULT_CHANGES_THRESHOLD;
@@ -312,7 +309,8 @@ VideoSegmenterService, ManagedService {
       }
     }
 
-    segmenterJobLoad = LoadUtil.getConfiguredLoadValue(properties, SEGMENTER_JOB_LOAD_KEY, DEFAULT_SEGMENTER_JOB_LOAD, serviceRegistry);
+    segmenterJobLoad = LoadUtil.getConfiguredLoadValue(
+        properties, SEGMENTER_JOB_LOAD_KEY, DEFAULT_SEGMENTER_JOB_LOAD, serviceRegistry);
   }
 
   /**
@@ -321,7 +319,7 @@ VideoSegmenterService, ManagedService {
    * @see org.opencastproject.videosegmenter.api.VideoSegmenterService#segment(org.opencastproject.mediapackage.Track)
    */
   public Job segment(Track track) throws VideoSegmenterException,
-         MediaPackageException {
+          MediaPackageException {
     try {
       return serviceRegistry.createJob(JOB_TYPE,
           Operation.Segment.toString(),
@@ -342,7 +340,7 @@ VideoSegmenterService, ManagedService {
    * @throws VideoSegmenterException
    */
   protected Catalog segment(Job job, Track track)
-    throws VideoSegmenterException, MediaPackageException {
+          throws VideoSegmenterException, MediaPackageException {
 
     // Make sure the element can be analyzed using this analysis
     // implementation
@@ -367,9 +365,10 @@ VideoSegmenterService, ManagedService {
             "Error reading the video file in the workspace", e);
       }
 
-      if (track.getDuration() == null)
+      if (track.getDuration() == null) {
         throw new MediaPackageException("Track " + track
             + " does not have a duration");
+      }
       logger.info("Track {} loaded, duration is {} s", mediaUrl,
           track.getDuration() / 1000);
 
@@ -433,12 +432,12 @@ VideoSegmenterService, ManagedService {
         // calculate errors for "normal" and filtered segmentation
         // and compare them to find better optimization.
         // "normal"
-        OptimizationStep currentStep = new OptimizationStep(stabilityThreshold,
-                changesThresholdLocal, segments.size(), prefNumberLocal, mpeg7, segments);
+        OptimizationStep currentStep = new OptimizationStep(changesThresholdLocal, segments.size(), prefNumberLocal,
+            mpeg7, segments);
         // filtered
         LinkedList<Segment> segmentsNew = new LinkedList<Segment>();
         OptimizationStep currentStepFiltered = new OptimizationStep(
-                stabilityThreshold, changesThresholdLocal, 0,
+                changesThresholdLocal, 0,
                 prefNumberLocal, filterSegmentation(segments, track, segmentsNew, stabilityThreshold * 1000), segments);
         currentStepFiltered.setSegmentNumAndRecalcErrors(segmentsNew.size());
 
@@ -515,11 +514,11 @@ VideoSegmenterService, ManagedService {
                 // if the error is bigger than one, double the changes threshold, because multiplying
                 // with a large error can yield a much too high changes threshold
                 } else {
-                changesThresholdLocal *= 2;
+                  changesThresholdLocal *= 2;
                 }
               }
             } else {
-                changesThresholdLocal /= 2;
+              changesThresholdLocal /= 2;
             }
 
             logger.debug("onesided optimization yields new changesThreshold = {}", changesThresholdLocal);
@@ -595,8 +594,8 @@ VideoSegmenterService, ManagedService {
 
 
       Catalog mpeg7Catalog = (Catalog) MediaPackageElementBuilderFactory
-        .newInstance().newElementBuilder()
-        .newElement(Catalog.TYPE, MediaPackageElements.SEGMENTS);
+          .newInstance().newElementBuilder()
+          .newElement(Catalog.TYPE, MediaPackageElements.SEGMENTS);
       URI uri;
       try {
         uri = workspace.putInCollection(COLLECTION_ID, job.getId()
@@ -629,37 +628,35 @@ VideoSegmenterService, ManagedService {
    * @param changesThreshold the changesThreshold that is used as option for the FFmpeg call
    * @return a list of the resulting segments
    * @throws IOException
+   * @throws VideoSegmenterException
    */
-  protected LinkedList<Segment> runSegmentationFFmpeg(Track track, Video videoContent, File mediaFile,
-          float changesThreshold) throws IOException {
+  private LinkedList<Segment> runSegmentationFFmpeg(Track track, Video videoContent, File mediaFile,
+          float changesThreshold) throws IOException, VideoSegmenterException {
 
-    String[] command = new String[] { binary, "-nostats", "-i",
-      mediaFile.getAbsolutePath().replaceAll(" ", "\\ "),
-      "-filter:v", "select=gt(scene\\," + changesThreshold + "),showinfo",
-      "-f", "null", "-"
+    String[] command = new String[] {
+        binary,
+        "-nostats", "-nostdin",
+        "-i", mediaFile.getAbsolutePath(),
+        "-filter:v", "select=gt(scene\\," + changesThreshold + "),showinfo",
+        "-f", "null",
+        "-"
     };
-    String commandline = StringUtils.join(command, " ");
 
-    logger.info("Running {}", commandline);
+    logger.info("Detecting video segments using command: {}", (Object) command);
 
     ProcessBuilder pbuilder = new ProcessBuilder(command);
-    List<String> segmentsStrings = new LinkedList<String>();
+    List<String> segmentsStrings = new LinkedList<>();
     Process process = pbuilder.start();
-    BufferedReader reader = new BufferedReader(
-            new InputStreamReader(process.getErrorStream()));
-    try {
-      LineReader lr = new LineReader(reader);
-      String line = lr.readLine();
+    try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+      String line = reader.readLine();
       while (null != line) {
         if (line.startsWith("[Parsed_showinfo")) {
           segmentsStrings.add(line);
         }
-        line = lr.readLine();
+        line = reader.readLine();
       }
     } catch (IOException e) {
       logger.error("Error executing ffmpeg: {}", e.getMessage());
-    } finally {
-      reader.close();
     }
 
     // [Parsed_showinfo_1 @ 0x157fb40] n:0 pts:12 pts_time:12 pos:227495
@@ -667,7 +664,7 @@ VideoSegmenterService, ManagedService {
     // plane_checksum:[8DF39EA9]
 
     int segmentcount = 1;
-    LinkedList<Segment> segments = new LinkedList<Segment>();
+    LinkedList<Segment> segments = new LinkedList<>();
 
     if (segmentsStrings.size() == 0) {
       Segment s = videoContent.getTemporalDecomposition()
@@ -680,17 +677,28 @@ VideoSegmenterService, ManagedService {
       Pattern pattern = Pattern.compile("pts_time\\:\\d+(\\.\\d+)?");
       for (String seginfo : segmentsStrings) {
         Matcher matcher = pattern.matcher(seginfo);
-        String time = "0";
+        String time = "";
         while (matcher.find()) {
           time = matcher.group().substring(9);
         }
-        endtime = (long)(Float.parseFloat(time) * 1000);
+        if ("".equals(time)) {
+          // continue if the showinfo does not contain any time information. This may happen since the FFmpeg showinfo
+          // filter is used for multiple purposes.
+          continue;
+        }
+        try {
+          endtime = Math.round(Float.parseFloat(time) * 1000);
+        } catch (NumberFormatException e) {
+          logger.error("Unable to parse FFmpeg output, likely FFmpeg version mismatch!", e);
+          throw new VideoSegmenterException(e);
+        }
         long segmentLength = endtime - starttime;
         if (1000 * stabilityThresholdPrefilter < segmentLength) {
           Segment segment = videoContent.getTemporalDecomposition()
               .createSegment("segment-" + segmentcount);
           segment.setMediaTime(new MediaRelTimeImpl(starttime,
               endtime - starttime));
+          logger.debug("Created segment {} at start time {} with duration {}", segmentcount, starttime, endtime);
           segments.add(segment);
           segmentcount++;
           starttime = endtime;
@@ -699,12 +707,13 @@ VideoSegmenterService, ManagedService {
       // Add last segment
       Segment s = videoContent.getTemporalDecomposition()
           .createSegment("segment-" + segmentcount);
-      s.setMediaTime(new MediaRelTimeImpl(endtime, track
-          .getDuration() - endtime));
+      s.setMediaTime(new MediaRelTimeImpl(starttime, track.getDuration() - starttime));
+      logger.debug("Created segment {} at start time {} with duration {}", segmentcount, starttime,
+              track.getDuration() - endtime);
       segments.add(s);
     }
 
-   logger.info("Segmentation of {} yields {} segments",
+    logger.info("Segmentation of {} yields {} segments",
            mediaFile.toURI().toURL(), segments.size());
 
     return segments;
@@ -725,7 +734,7 @@ VideoSegmenterService, ManagedService {
       switch (op) {
         case Segment:
           Track track = (Track) MediaPackageElementParser
-            .getFromXml(arguments.get(0));
+              .getFromXml(arguments.get(0));
           Catalog catalog = segment(job, track);
           return MediaPackageElementParser.getAsXml(catalog);
         default:
@@ -928,8 +937,8 @@ VideoSegmenterService, ManagedService {
     // add last segment separately to make sure the last segment ends exactly at the end of the track
     Segment s = videoContent.getTemporalDecomposition()
           .createSegment("segment-" + prefNumber);
-      s.setMediaTime(new MediaRelTimeImpl(currentSegStart, track.getDuration() - currentSegStart));
-      segmentsNew.add(s);
+    s.setMediaTime(new MediaRelTimeImpl(currentSegStart, track.getDuration() - currentSegStart));
+    segmentsNew.add(s);
 
     return mpeg7;
   }
@@ -953,7 +962,7 @@ VideoSegmenterService, ManagedService {
   protected void setMpeg7CatalogService(
       Mpeg7CatalogService mpeg7CatalogService) {
     this.mpeg7CatalogService = mpeg7CatalogService;
-      }
+  }
 
   /**
    * Sets the receipt service

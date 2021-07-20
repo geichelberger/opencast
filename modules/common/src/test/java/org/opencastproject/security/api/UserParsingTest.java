@@ -24,6 +24,8 @@ package org.opencastproject.security.api;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
+import org.opencastproject.util.XmlSafeParser;
+
 import org.apache.commons.io.IOUtils;
 import org.junit.Before;
 import org.junit.Test;
@@ -32,7 +34,6 @@ import java.util.HashSet;
 import java.util.Set;
 
 import javax.xml.bind.JAXBContext;
-import javax.xml.transform.stream.StreamSource;
 
 /**
  * Tests JAXB un/marshalling of the user
@@ -52,15 +53,15 @@ public class UserParsingTest {
 
   @Test
   public void testUnmarshalUser() throws Exception {
-    Set<JaxbRole> roles = new HashSet<JaxbRole>();
+    Set<JaxbRole> roles = new HashSet<>();
     roles.add(new JaxbRole("ROLE_USER", ORGANIZATION));
     roles.add(new JaxbRole("SERIES_1_ADMIN", ORGANIZATION));
     roles.add(new JaxbRole("ROLE_COURSE_ADMIN", ORGANIZATION));
 
     JaxbUser expectedUser = new JaxbUser("admin", "123456", "test", ORGANIZATION, roles);
 
-    StreamSource streamSource = new StreamSource(getClass().getResourceAsStream(USER_XML_FILE));
-    JaxbUser user = jaxbContext.createUnmarshaller().unmarshal(streamSource, JaxbUser.class).getValue();
+    JaxbUser user = jaxbContext.createUnmarshaller().unmarshal(XmlSafeParser.parse(
+                            getClass().getResourceAsStream(USER_XML_FILE)), JaxbUser.class).getValue();
 
     assertEquals(expectedUser.getUsername(), user.getUsername());
     assertNull(user.getPassword());

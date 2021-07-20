@@ -20,17 +20,23 @@
  */
 package org.opencastproject.publication.oaipmh.remote;
 
+import static java.lang.String.format;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 import org.opencastproject.job.api.Job;
 import org.opencastproject.job.api.JobParser;
 import org.opencastproject.mediapackage.MediaPackage;
+import org.opencastproject.mediapackage.MediaPackageElement;
+import org.opencastproject.mediapackage.MediaPackageElementFlavor;
+import org.opencastproject.mediapackage.MediaPackageElementParser;
 import org.opencastproject.mediapackage.MediaPackageException;
 import org.opencastproject.mediapackage.MediaPackageParser;
+import org.opencastproject.mediapackage.Publication;
 import org.opencastproject.publication.api.OaiPmhPublicationService;
 import org.opencastproject.publication.api.PublicationException;
 import org.opencastproject.serviceregistry.api.RemoteBase;
 
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
@@ -39,7 +45,9 @@ import org.apache.http.message.BasicNameValuePair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.charset.Charset;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 
@@ -56,14 +64,19 @@ public class OaiPmhPublicationServiceRemoteImpl extends RemoteBase implements Oa
   }
 
   @Override
-  public Job publish(MediaPackage mediaPackage, String channel, Set<String> downloadIds, Set<String> streamingIds,
-          boolean checkAvailability) throws PublicationException, MediaPackageException {
+  public Job publish(
+      MediaPackage mediaPackage,
+      String repository,
+      Set<String> downloadIds,
+      Set<String> streamingIds,
+      boolean checkAvailability
+  ) throws PublicationException, MediaPackageException {
     final String mediapackageXml = MediaPackageParser.getAsXml(mediaPackage);
     final List<BasicNameValuePair> params = new ArrayList<BasicNameValuePair>();
     params.add(new BasicNameValuePair("mediapackage", mediapackageXml));
-    params.add(new BasicNameValuePair("channel", channel));
-    params.add(new BasicNameValuePair("downloadElementIds", StringUtils.join(downloadIds, ";;")));
-    params.add(new BasicNameValuePair("streamingElementIds", StringUtils.join(streamingIds, ";;")));
+    params.add(new BasicNameValuePair("channel", repository));
+    params.add(new BasicNameValuePair("downloadElementIds", StringUtils.join(downloadIds, SEPARATOR)));
+    params.add(new BasicNameValuePair("streamingElementIds", StringUtils.join(streamingIds, SEPARATOR)));
     params.add(new BasicNameValuePair("checkAvailability", Boolean.toString(checkAvailability)));
     final HttpPost post = new HttpPost();
     HttpResponse response = null;
@@ -71,13 +84,13 @@ public class OaiPmhPublicationServiceRemoteImpl extends RemoteBase implements Oa
       post.setEntity(new UrlEncodedFormEntity(params, UTF_8));
       response = getResponse(post);
       if (response != null) {
-        logger.info("Publishing media package '{}' to OAI-PMH channel '{}'", mediaPackage, channel);
+        logger.info("Publishing media package {} to OAI-PMH channel {} using a remote publication service",
+                mediaPackage, repository);
         try {
           return JobParser.parseJob(response.getEntity().getContent());
         } catch (Exception e) {
           throw new PublicationException(
-                  "Unable to publish media package '" + mediaPackage + "' using a remote OAI-PMH publication service",
-                  e);
+              "Unable to publish media package '" + mediaPackage + "' using a remote OAI-PMH publication service", e);
         }
       }
     } catch (Exception e) {
@@ -91,11 +104,106 @@ public class OaiPmhPublicationServiceRemoteImpl extends RemoteBase implements Oa
   }
 
   @Override
-  public Job retract(MediaPackage mediaPackage, String elementId) throws PublicationException {
+  public Job replace(
+      MediaPackage mediaPackage,
+      String repository,
+      Set<? extends MediaPackageElement> downloadElements,
+      Set<? extends MediaPackageElement> streamingElements,
+      Set<MediaPackageElementFlavor> retractDownloadFlavors,
+      Set<MediaPackageElementFlavor> retractStreamingFlavors,
+      Set<? extends Publication> publications,
+      boolean checkAvailability
+  ) throws PublicationException {
+    HttpResponse response = null;
+    try {
+      final String mediapackageXml = MediaPackageParser.getAsXml(mediaPackage);
+      final String downloadElementsXml = MediaPackageElementParser.getArrayAsXml(downloadElements);
+      final String streamingElementsXml = MediaPackageElementParser.getArrayAsXml(streamingElements);
+      final String retractDownloadFlavorsString = StringUtils.join(retractDownloadFlavors, SEPARATOR);
+      final String retractStreamingFlavorsString = StringUtils.join(retractStreamingFlavors, SEPARATOR);
+      final String publicationsXml = MediaPackageElementParser.getArrayAsXml(publications);
+      final List<BasicNameValuePair> params = Arrays.asList(
+              new BasicNameValuePair("mediapackage", mediapackageXml),
+              new BasicNameValuePair("channel", repository),
+              new BasicNameValuePair("downloadElements", downloadElementsXml),
+              new BasicNameValuePair("streamingElements", streamingElementsXml),
+              new BasicNameValuePair("retractDownloadFlavors", retractDownloadFlavorsString),
+              new BasicNameValuePair("retractStreamingFlavors", retractStreamingFlavorsString),
+              new BasicNameValuePair("publications", publicationsXml),
+              new BasicNameValuePair("checkAvailability", Boolean.toString(checkAvailability)));
+      final HttpPost post = new HttpPost("replace");
+      post.setEntity(new UrlEncodedFormEntity(params, UTF_8));
+      response = getResponse(post);
+      if (response != null) {
+        logger.info("Replace media package {} in OAI-PMH channel {} using a remote publication service", mediaPackage,
+            repository);
+
+        return JobParser.parseJob(response.getEntity().getContent());
+      }
+    } catch (final Exception e) {
+      throw new PublicationException(
+              "Unable to replace media package " + mediaPackage + " using a remote OAI-PMH publication service.", e);
+    } finally {
+      closeConnection(response);
+    }
+    throw new PublicationException(
+            "Unable to replace media package " + mediaPackage + " using a remote OAI-PMH publication service.");
+  }
+
+  @Override
+  public Publication replaceSync(
+      MediaPackage mediaPackage,
+      String repository,
+      Set<? extends MediaPackageElement> downloadElements,
+      Set<? extends MediaPackageElement> streamingElements,
+      Set<MediaPackageElementFlavor> retractDownloadFlavors,
+      Set<MediaPackageElementFlavor> retractStreamingFlavors,
+      Set<? extends Publication> publications,
+      boolean checkAvailability
+  ) throws PublicationException {
+    HttpResponse response = null;
+    try {
+      final String mediapackageXml = MediaPackageParser.getAsXml(mediaPackage);
+      final String downloadElementsXml = MediaPackageElementParser.getArrayAsXml(downloadElements);
+      final String streamingElementsXml = MediaPackageElementParser.getArrayAsXml(streamingElements);
+      final String retractDownloadFlavorsString = StringUtils.join(retractDownloadFlavors, SEPARATOR);
+      final String retractStreamingFlavorsString = StringUtils.join(retractStreamingFlavors, SEPARATOR);
+      final String publicationsXml = MediaPackageElementParser.getArrayAsXml(publications);
+      final List<BasicNameValuePair> params = Arrays.asList(
+          new BasicNameValuePair("mediapackage", mediapackageXml),
+          new BasicNameValuePair("channel", repository),
+          new BasicNameValuePair("downloadElements", downloadElementsXml),
+          new BasicNameValuePair("streamingElements", streamingElementsXml),
+          new BasicNameValuePair("retractDownloadFlavors", retractDownloadFlavorsString),
+          new BasicNameValuePair("retractStreamingFlavors", retractStreamingFlavorsString),
+          new BasicNameValuePair("publications", publicationsXml),
+          new BasicNameValuePair("checkAvailability", Boolean.toString(checkAvailability)));
+      final HttpPost post = new HttpPost("replacesync");
+      post.setEntity(new UrlEncodedFormEntity(params, UTF_8));
+      response = getResponse(post);
+      if (response != null) {
+        logger.info("Replace media package {} in OAI-PMH channel {} using a remote publication service", mediaPackage,
+            repository);
+
+        final String xml = IOUtils.toString(response.getEntity().getContent(), Charset.forName("utf-8"));
+        return (Publication) MediaPackageElementParser.getFromXml(xml);
+      }
+    } catch (final Exception e) {
+      throw new PublicationException(
+          "Unable to replace media package " + mediaPackage + " using a remote OAI-PMH publication service.", e);
+    } finally {
+      closeConnection(response);
+    }
+    throw new PublicationException(
+        "Unable to replace media package " + mediaPackage + " using a remote OAI-PMH publication service.");
+  }
+
+  @Override
+  public Job retract(MediaPackage mediaPackage, String repository) throws PublicationException {
     String mediapackageXml = MediaPackageParser.getAsXml(mediaPackage);
     List<BasicNameValuePair> params = new ArrayList<BasicNameValuePair>();
     params.add(new BasicNameValuePair("mediapackage", mediapackageXml));
-    params.add(new BasicNameValuePair("elementId", elementId));
+    params.add(new BasicNameValuePair("channel", repository));
     HttpPost post = new HttpPost("/retract");
     HttpResponse response = null;
     post.setEntity(new UrlEncodedFormEntity(params, UTF_8));
@@ -103,21 +211,59 @@ public class OaiPmhPublicationServiceRemoteImpl extends RemoteBase implements Oa
       response = getResponse(post);
       Job receipt = null;
       if (response != null) {
-        logger.info("Retracting {} from OAI-PMH", mediaPackage);
+        logger.info("Retracting {} from OAI-PMH channel {} using a remote publication service",
+                mediaPackage.getIdentifier().toString(), repository);
         try {
           receipt = JobParser.parseJob(response.getEntity().getContent());
           return receipt;
         } catch (Exception e) {
-          throw new PublicationException(
-                  "Unable to retract media package '" + mediaPackage + "' using a remote OAI-PMH publication service",
-                  e);
+          throw new PublicationException(format(
+              "Unable to retract media package %s from OAI-PMH channel %s using a remote publication service",
+              mediaPackage.getIdentifier().toString(), repository), e);
         }
       }
     } finally {
       closeConnection(response);
     }
-    throw new PublicationException(
-            "Unable to retract media package " + mediaPackage + " using a remote OAI-PMH publication service proxy");
+    throw new PublicationException(format(
+        "Unable to retract media package %s from OAI-PMH channel %s using a remote publication service",
+        mediaPackage.getIdentifier().toString(), repository));
   }
 
+  @Override
+  public Job updateMetadata(
+      MediaPackage mediaPackage,
+      String repository,
+      Set<String> flavors,
+      Set<String> tags,
+      boolean checkAvailability
+  ) throws PublicationException {
+    final String mediapackageXml = MediaPackageParser.getAsXml(mediaPackage);
+    final List<BasicNameValuePair> params = new ArrayList<>();
+    params.add(new BasicNameValuePair("mediapackage", mediapackageXml));
+    params.add(new BasicNameValuePair("channel", repository));
+    params.add(new BasicNameValuePair("flavors", StringUtils.join(flavors, SEPARATOR)));
+    params.add(new BasicNameValuePair("tags", StringUtils.join(tags, SEPARATOR)));
+    params.add(new BasicNameValuePair("checkAvailability", Boolean.toString(checkAvailability)));
+    final HttpPost post = new HttpPost("/updateMetadata");
+    HttpResponse response = null;
+    try {
+      post.setEntity(new UrlEncodedFormEntity(params, UTF_8));
+      response = getResponse(post);
+      if (response != null) {
+        logger.info("Update media package {} metadata in OAI-PMH channel {} using a remote publication service",
+            mediaPackage.getIdentifier().toString(), repository);
+        return JobParser.parseJob(response.getEntity().getContent());
+      }
+    } catch (Exception e) {
+      throw new PublicationException(format(
+          "Unable to update media package %s metadata in OAI-PMH repository %s using a remote publication service.",
+          mediaPackage.getIdentifier().toString(), repository), e);
+    } finally {
+      closeConnection(response);
+    }
+    throw new PublicationException(format(
+        "Unable to update media package %s metadata in OAI-PMH repository %s using a remote publication service.",
+        mediaPackage.getIdentifier().toString(), repository));
+  }
 }

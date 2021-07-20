@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <artifactId>opencast-kernel</artifactId>
   <name>Opencast :: kernel</name>
@@ -7,7 +7,7 @@
   <parent>
     <groupId>org.opencastproject</groupId>
     <artifactId>base</artifactId>
-    <version>5-SNAPSHOT</version>
+    <version>11-SNAPSHOT</version>
     <relativePath>../../pom.xml</relativePath>
   </parent>
   <properties>
@@ -52,31 +52,20 @@
       <artifactId>commons-lang3</artifactId>
     </dependency>
     <dependency>
-      <groupId>commons-collections</groupId>
-      <artifactId>commons-collections</artifactId>
-    </dependency>
-    <dependency>
       <groupId>javax.servlet</groupId>
       <artifactId>javax.servlet-api</artifactId>
     </dependency>
     <dependency>
-      <groupId>javax.xml.bind</groupId>
-      <artifactId>jaxb-api</artifactId>
+      <groupId>jakarta.xml.bind</groupId>
+      <artifactId>jakarta.xml.bind-api</artifactId>
     </dependency>
     <dependency>
       <groupId>org.codehaus.jettison</groupId>
       <artifactId>jettison</artifactId>
-      <version>1.3.1</version>
-      <exclusions>
-        <exclusion>
-          <groupId>stax</groupId>
-          <artifactId>stax-api</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.springframework</groupId>
-      <artifactId>org.springframework.web</artifactId>
+      <artifactId>spring-web</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.servicemix.bundles</groupId>
@@ -84,31 +73,37 @@
     </dependency>
     <dependency>
       <groupId>org.springframework.security</groupId>
-      <artifactId>org.springframework.security.core</artifactId>
+      <artifactId>spring-security-core</artifactId>
     </dependency>
     <dependency>
       <groupId>org.springframework.security</groupId>
-      <artifactId>org.springframework.security.web</artifactId>
+      <artifactId>spring-security-web</artifactId>
     </dependency>
     <dependency>
       <groupId>org.springframework.security.oauth</groupId>
       <artifactId>spring-security-oauth</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.springframework.security</groupId>
-      <artifactId>spring-security-ldap</artifactId>
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.httpcomponents</groupId>
+          <artifactId>httpclient</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.springframework.osgi</groupId>
       <artifactId>org.springframework.osgi.core</artifactId>
     </dependency>
     <dependency>
-      <groupId>net.sourceforge.nekohtml</groupId>
-      <artifactId>com.springsource.org.cyberneko.html</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.apache.httpcomponents</groupId>
       <artifactId>httpclient-osgi</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>jakarta.ws.rs</groupId>
+      <artifactId>jakarta.ws.rs-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.hamcrest</groupId>
+      <artifactId>hamcrest</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.cxf</groupId>
@@ -128,22 +123,6 @@
     <dependency>
       <groupId>org.apache.cxf</groupId>
       <artifactId>cxf-rt-frontend-jaxrs</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.ops4j.pax.web</groupId>
-      <artifactId>pax-web-api</artifactId>
-      <version>${pax.web.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.jboss.security</groupId>
-      <artifactId>jboss-xacml</artifactId>
-      <version>2.0.5.final</version>
-      <exclusions>
-        <exclusion>
-          <groupId>apache-xerces</groupId>
-          <artifactId>xml-apis</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
     <dependency>
       <groupId>com.entwinemedia.common</groupId>
@@ -182,7 +161,11 @@
     </dependency>
     <dependency>
       <groupId>org.eclipse.persistence</groupId>
-      <artifactId>javax.persistence</artifactId>
+      <artifactId>jakarta.persistence</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.httpcomponents</groupId>
+      <artifactId>httpcore-osgi</artifactId>
     </dependency>
     <!-- Logging -->
     <dependency>
@@ -193,19 +176,14 @@
     <!-- Testing -->
     <!-- REST test environment -->
     <dependency>
-      <groupId>com.jayway.restassured</groupId>
+      <groupId>io.rest-assured</groupId>
+      <artifactId>json-path</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.rest-assured</groupId>
       <artifactId>rest-assured</artifactId>
-      <version>2.4.0</version>
-      <exclusions>
-        <exclusion>
-          <groupId>org.hamcrest</groupId>
-          <artifactId>hamcrest-core</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.hamcrest</groupId>
-          <artifactId>hamcrest-library</artifactId>
-        </exclusion>
-      </exclusions>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>
@@ -233,28 +211,31 @@
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>org.eclipse.persistence</groupId>
-      <artifactId>org.eclipse.persistence.asm</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.eclipse.persistence</groupId>
-      <artifactId>org.eclipse.persistence.antlr</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
       <groupId>com.h2database</groupId>
       <artifactId>h2</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>com.mchange</groupId>
-      <artifactId>c3p0</artifactId>
+      <groupId>org.opencastproject</groupId>
+      <artifactId>opencast-rest-test-environment</artifactId>
+      <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
   </dependencies>
   <build>
     <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <extensions>true</extensions>
+        <configuration>
+          <ignoredUnusedDeclaredDependencies>
+            <!-- provide a logger for tests -->
+            <ignoredUnusedDeclaredDependency>org.slf4j:slf4j-log4j12</ignoredUnusedDeclaredDependency>
+            <ignoredUnusedDeclaredDependency>com.h2database:h2</ignoredUnusedDeclaredDependency>
+          </ignoredUnusedDeclaredDependencies>
+        </configuration>
+      </plugin>
       <plugin>
         <groupId>de.empulse.eclipselink</groupId>
         <artifactId>staticweave-maven-plugin</artifactId>
@@ -271,12 +252,7 @@
               spring-security-oauth;inline=true,
               jboss-xacml;inline=true
             </Embed-Dependency>
-            <Private-Package>
-              org.jboss.security.xacml.core,
-              org.jboss.security.xacml.core.model.policy,
-            </Private-Package>
             <Import-Package>
-              !org.jboss.security.xacml.sunxacml.*,
               !org.springframework.jdbc.core.*,
               !org.springframework.security.core.codec.*,
               !org.w3c.dom.*,
@@ -314,7 +290,6 @@
               org.opencastproject.kernel.scanner;version=${project.version},
               org.opencastproject.kernel.security;version=${project.version},
               org.opencastproject.kernel.security.persistence;version=${project.version},
-              org.opencastproject.kernel.userdirectory;version=${project.version},
               org.opencastproject.kernel.bundleinfo;version=${project.version},
             </Export-Package>
             <_exportcontents>
@@ -323,26 +298,18 @@
             <Service-Component>
               OSGI-INF/bundle-info.xml,
               OSGI-INF/cleansessions.xml,
-              OSGI-INF/http-client-factory.xml,
-              OSGI-INF/http-client.xml,
               OSGI-INF/http-context.xml,
               OSGI-INF/https-filter.xml,
               OSGI-INF/jsonp.xml,
-              OSGI-INF/organization-directory-service.xml,
-              OSGI-INF/organization-persistence.xml,
               OSGI-INF/organization-filter.xml,
-              OSGI-INF/organization-role-provider.xml,
-              OSGI-INF/custom-role-provider.xml,
               OSGI-INF/current-job-filter.xml,
-              OSGI-INF/pingback.xml,
               OSGI-INF/rest.xml,
               OSGI-INF/security-filter.xml,
-              OSGI-INF/security-service.xml,
+              OSGI-INF/security-oauth.xml,
               OSGI-INF/smtp-service.xml,
               OSGI-INF/remote-user-and-role-filter.xml,
               OSGI-INF/security-config-scanner.xml,
-              OSGI-INF/transparentproxy-filter.xml,
-              OSGI-INF/user-and-role-directory-service.xml
+              OSGI-INF/transparentproxy-filter.xml
             </Service-Component>
             <Meta-Persistence>
               META-INF/persistence.xml

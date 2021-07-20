@@ -26,7 +26,7 @@ import javax.ws.rs.Path;
 
 /** OSGi bound implementation. */
 @Path("/")
-public class OsgiAssetManagerRestEndpoint extends AbstractAssetManagerRestEndpoint {
+public class OsgiAssetManagerRestEndpoint extends AbstractTieredStorageAssetManagerRestEndpoint {
   private AssetManager assetManager;
 
   @Override public AssetManager getAssetManager() {

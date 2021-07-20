@@ -27,16 +27,20 @@ import com.entwinemedia.fn.Stream;
 import com.entwinemedia.fn.data.Opt;
 
 /**
- * The result of a {@link ASelectQuery}. Each record represents a matching snapshot of a media package.
- * Its purpose is to group the various data that is associated with a media package and to support their partial loading.
+ * The result of a {@link ASelectQuery}. Each record represents a matching
+ * snapshot of a media package. Its purpose is to group the various data that is
+ * associated with a media package and to support their partial loading.
  */
 public interface ARecord {
+  /** Get the snapshot ID.  This is from the underlying DTO, and thus may be null. */
+  long getSnapshotId();
   /** Get the media package ID. */
   String getMediaPackageId();
 
   /**
-   * Get all properties associated with an episode. If the stream contains any properties also depends on
-   * the query specification. If it has not been specified to fetch properties the stream is definitely empty.
+   * Get all properties associated with an episode. If the stream contains any
+   * properties also depends on the query specification. If it has not been
+   * specified to fetch properties the stream is definitely empty.
    * <p>
    * Please note that properties are not versioned but stored per episode.
    */

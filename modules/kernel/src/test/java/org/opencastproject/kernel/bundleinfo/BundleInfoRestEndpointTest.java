@@ -21,8 +21,8 @@
 
 package org.opencastproject.kernel.bundleinfo;
 
-import static com.jayway.restassured.RestAssured.expect;
-import static com.jayway.restassured.RestAssured.given;
+import static io.restassured.RestAssured.expect;
+import static io.restassured.RestAssured.given;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.hasItems;
 import static org.hamcrest.CoreMatchers.not;
@@ -31,24 +31,24 @@ import static org.hamcrest.collection.IsMapContaining.hasKey;
 import static org.junit.Assert.assertEquals;
 import static org.opencastproject.kernel.bundleinfo.BundleInfoImpl.bundleInfo;
 import static org.opencastproject.kernel.bundleinfo.BundleInfoRestEndpoint.bundleInfoJson;
-import static org.opencastproject.rest.RestServiceTestEnv.localhostRandomPort;
-import static org.opencastproject.rest.RestServiceTestEnv.testEnvForClasses;
+import static org.opencastproject.test.rest.RestServiceTestEnv.localhostRandomPort;
+import static org.opencastproject.test.rest.RestServiceTestEnv.testEnvForClasses;
 import static org.opencastproject.util.ReflectionUtil.run;
 import static org.opencastproject.util.data.Option.none;
 import static org.opencastproject.util.data.Option.some;
 
-import org.opencastproject.rest.RestServiceTestEnv;
+import org.opencastproject.test.rest.RestServiceTestEnv;
 import org.opencastproject.util.data.Option;
 import org.opencastproject.util.persistence.PersistenceEnv;
 import org.opencastproject.util.persistence.PersistenceEnvs;
-
-import com.jayway.restassured.path.json.JsonPath;
 
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
+
+import io.restassured.path.json.JsonPath;
 
 /**
  * Note that the Jersey implementation serializes number values as strings in JSON so the respective tests test for both

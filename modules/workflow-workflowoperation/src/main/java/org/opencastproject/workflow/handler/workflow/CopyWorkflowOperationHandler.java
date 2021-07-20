@@ -34,6 +34,7 @@ import org.opencastproject.util.NotFoundException;
 import org.opencastproject.util.UrlSupport;
 import org.opencastproject.util.data.Option;
 import org.opencastproject.workflow.api.AbstractWorkflowOperationHandler;
+import org.opencastproject.workflow.api.ConfiguredTagsAndFlavors;
 import org.opencastproject.workflow.api.WorkflowInstance;
 import org.opencastproject.workflow.api.WorkflowOperationException;
 import org.opencastproject.workflow.api.WorkflowOperationInstance;
@@ -49,14 +50,12 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collection;
-import java.util.SortedMap;
-import java.util.TreeMap;
+import java.util.List;
 
 /**
  * Workflow operation handler for copying video data through NFS
  */
 public class CopyWorkflowOperationHandler extends AbstractWorkflowOperationHandler {
-
   /** Configuration key for the \"tag\" of the track to use as a source input */
   public static final String OPT_SOURCE_TAGS = "source-tags";
 
@@ -68,17 +67,6 @@ public class CopyWorkflowOperationHandler extends AbstractWorkflowOperationHandl
 
   /** Configuration key for the name of the target file */
   public static final String OPT_TARGET_FILENAME = "target-filename";
-
-  /** The configuration options for this handler */
-  public static final SortedMap<String, String> CONFIG_OPTIONS;
-
-  static {
-    CONFIG_OPTIONS = new TreeMap<String, String>();
-    CONFIG_OPTIONS.put(OPT_SOURCE_TAGS, "The \"tag\" of the track to use as a source input");
-    CONFIG_OPTIONS.put(OPT_SOURCE_FLAVORS, "The \"flavor\" of the track to use as a source input");
-    CONFIG_OPTIONS.put(OPT_TARGET_DIRECTORY, "The directory where the file must be delivered");
-    CONFIG_OPTIONS.put(OPT_TARGET_FILENAME, "The optional name of the target file");
-  }
 
   /** The logging facility */
   private static final Logger logger = LoggerFactory.getLogger(CopyWorkflowOperationHandler.class);
@@ -108,8 +96,10 @@ public class CopyWorkflowOperationHandler extends AbstractWorkflowOperationHandl
     WorkflowOperationInstance currentOperation = workflowInstance.getCurrentOperation();
 
     // Check which tags have been configured
-    String sourceTagsOption = StringUtils.trimToNull(currentOperation.getConfiguration(OPT_SOURCE_TAGS));
-    String sourceFlavorsOption = StringUtils.trimToNull(currentOperation.getConfiguration(OPT_SOURCE_FLAVORS));
+    ConfiguredTagsAndFlavors tagsAndFlavors = getTagsAndFlavors(workflowInstance,
+        Configuration.many, Configuration.many, Configuration.none, Configuration.none);
+    List<String> sourceTagsOption = tagsAndFlavors.getSrcTags();
+    List<MediaPackageElementFlavor> sourceFlavorsOption = tagsAndFlavors.getSrcFlavors();
     String targetDirectoryOption = StringUtils.trimToNull(currentOperation.getConfiguration(OPT_TARGET_DIRECTORY));
     Option<String> targetFilenameOption = Option.option(StringUtils.trimToNull(currentOperation
             .getConfiguration(OPT_TARGET_FILENAME)));
@@ -125,7 +115,7 @@ public class CopyWorkflowOperationHandler extends AbstractWorkflowOperationHandl
     AbstractMediaPackageElementSelector<MediaPackageElement> elementSelector = new SimpleElementSelector();
 
     // Make sure either one of tags or flavors are provided
-    if (StringUtils.isBlank(sourceTagsOption) && StringUtils.isBlank(sourceFlavorsOption)) {
+    if (sourceTagsOption.isEmpty() && sourceFlavorsOption.isEmpty()) {
       logger.info("No source tags or flavors have been specified, not matching anything");
       return createResult(mediaPackage, Action.CONTINUE);
     }
@@ -135,16 +125,16 @@ public class CopyWorkflowOperationHandler extends AbstractWorkflowOperationHandl
       throw new WorkflowOperationException("No target directory has been set for the copy operation!");
 
     // Select the source flavors
-    for (String flavor : asList(sourceFlavorsOption)) {
+    for (MediaPackageElementFlavor flavor : sourceFlavorsOption) {
       try {
-        elementSelector.addFlavor(MediaPackageElementFlavor.parseFlavor(flavor));
+        elementSelector.addFlavor(flavor);
       } catch (IllegalArgumentException e) {
         throw new WorkflowOperationException("Source flavor '" + flavor + "' is malformed");
       }
     }
 
     // Select the source tags
-    for (String tag : asList(sourceTagsOption)) {
+    for (String tag : sourceTagsOption) {
       elementSelector.addTag(tag);
     }
 

@@ -29,6 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.jms.Connection;
@@ -53,7 +54,7 @@ public class MessageBaseFacility {
 
   /** Default Broker URL */
   private static final String ACTIVEMQ_DEFAULT_URL
-    = "failover://(tcp://localhost:61616)?initialReconnectDelay=2000&maxReconnectDelay=60000";
+      = "failover://(tcp://127.0.0.1:61616)?initialReconnectDelay=2000&maxReconnectDelay=60000";
 
   /** The logging facility */
   private static final Logger logger = LoggerFactory.getLogger(MessageBaseFacility.class);
@@ -105,6 +106,7 @@ public class MessageBaseFacility {
     try {
       /* Create a ConnectionFactory for establishing connections to the Active MQ broker */
       ActiveMQConnectionFactory connectionFactory = new ActiveMQConnectionFactory(url);
+      connectionFactory.setTrustedPackages(Collections.singletonList("org.opencastproject.message.broker.api"));
       if (StringUtils.isNotBlank(username) && StringUtils.isNotBlank(password)) {
         connectionFactory.setUserName(username);
         connectionFactory.setPassword(password);
@@ -170,7 +172,7 @@ public class MessageBaseFacility {
         }
       } catch (JMSException e) {
         if (verbose) {
-          logger.error("Error while trying to close producer: {}", e);
+          logger.error("Error while trying to close producer:", e);
         }
       }
       producer = null;
@@ -181,7 +183,7 @@ public class MessageBaseFacility {
         }
       } catch (JMSException e) {
         if (verbose) {
-          logger.error("Error while trying to close session: {}", e);
+          logger.error("Error while trying to close session:", e);
         }
       }
       session = null;
@@ -192,7 +194,7 @@ public class MessageBaseFacility {
         }
       } catch (JMSException e) {
         if (verbose) {
-          logger.error("Error while trying to close session: {}", e);
+          logger.error("Error while trying to close session:", e);
         }
       }
       connection = null;

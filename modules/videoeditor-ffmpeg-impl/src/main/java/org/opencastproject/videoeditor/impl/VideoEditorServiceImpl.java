@@ -30,8 +30,7 @@ import org.opencastproject.mediapackage.MediaPackageElementFlavor;
 import org.opencastproject.mediapackage.MediaPackageElementParser;
 import org.opencastproject.mediapackage.MediaPackageException;
 import org.opencastproject.mediapackage.Track;
-import org.opencastproject.mediapackage.identifier.IdBuilder;
-import org.opencastproject.mediapackage.identifier.IdBuilderFactory;
+import org.opencastproject.mediapackage.identifier.IdImpl;
 import org.opencastproject.security.api.OrganizationDirectoryService;
 import org.opencastproject.security.api.SecurityService;
 import org.opencastproject.security.api.UserDirectoryService;
@@ -53,6 +52,7 @@ import org.opencastproject.videoeditor.ffmpeg.FFmpegEdit;
 import org.opencastproject.workspace.api.Workspace;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
 import org.osgi.service.cm.ConfigurationException;
 import org.osgi.service.cm.ManagedService;
@@ -84,7 +84,7 @@ public class VideoEditorServiceImpl extends AbstractJobProducer implements Video
 
   public static final String JOB_LOAD_KEY = "job.load.videoeditor";
 
-  private static final float DEFAULT_JOB_LOAD = 2.0f;
+  private static final float DEFAULT_JOB_LOAD = 0.8f;
 
   private float jobload = DEFAULT_JOB_LOAD;
 
@@ -108,10 +108,6 @@ public class VideoEditorServiceImpl extends AbstractJobProducer implements Video
    * Reference to the workspace service
    */
   private Workspace workspace = null;
-  /**
-   * Id builder used to create ids for encoded tracks
-   */
-  private final IdBuilder idBuilder = IdBuilderFactory.newInstance().newIdBuilder();
   /**
    * Reference to the receipt service
    */
@@ -209,7 +205,8 @@ public class VideoEditorServiceImpl extends AbstractJobProducer implements Video
     // create working directory
     File tempDirectory = new File(new File(workspace.rootDirectory()), "editor");
     tempDirectory = new File(tempDirectory, Long.toString(job.getId()));
-    String filename = String.format("%s-%s%s", sourceTrackFlavor, sourceFile.getName(), outputFileExtension);
+    String filename = String.format("%s-%s%s", sourceTrackFlavor,
+        FilenameUtils.removeExtension(sourceFile.getName()), outputFileExtension);
     File outputPath = new File(tempDirectory, filename);
 
     if (!outputPath.getParentFile().exists()) {
@@ -287,7 +284,7 @@ public class VideoEditorServiceImpl extends AbstractJobProducer implements Video
       }
 
       // create Track for edited file
-      String newTrackId = idBuilder.createNew().toString();
+      String newTrackId = IdImpl.fromUUID().toString();
       InputStream in = new FileInputStream(outputPath);
       try {
         newTrackURI = workspace.putInCollection(COLLECTION_ID,
@@ -301,9 +298,9 @@ public class VideoEditorServiceImpl extends AbstractJobProducer implements Video
 
       // inspect new Track
       try {
-          inspectionJob = inspect(job,newTrackURI);
+        inspectionJob = inspect(job,newTrackURI);
       } catch (MediaInspectionException e) {
-          throw new ProcessFailedException("Media inspection of " + newTrackURI + " failed", e);
+        throw new ProcessFailedException("Media inspection of " + newTrackURI + " failed", e);
       }
       Track editedTrack = (Track) MediaPackageElementParser.getFromXml(inspectionJob.getPayload());
       logger.info("Finished editing track {}", editedTrack);
@@ -329,7 +326,7 @@ public class VideoEditorServiceImpl extends AbstractJobProducer implements Video
   protected Job inspect(Job job, URI workspaceURI) throws MediaInspectionException, ProcessFailedException {
     Job inspectionJob;
     try {
-        inspectionJob = inspectionService.inspect(workspaceURI);
+      inspectionJob = inspectionService.inspect(workspaceURI);
     } catch (MediaInspectionException e) {
       incident().recordJobCreationIncident(job, e);
       throw new MediaInspectionException("Media inspection of " + workspaceURI + " failed", e);
@@ -360,8 +357,9 @@ public class VideoEditorServiceImpl extends AbstractJobProducer implements Video
     while (!ll.isEmpty()) { // Check that 2 consecutive segments from same src are at least 2 secs apart
       if (ll.peek() != null) {
         nextclip = ll.pop();  // check next consecutive segment
-        if ((nextclip.getSrc() == clip.getSrc()) && (nextclip.getStart() - clip.getEnd()) < 2) { // collapse two segments into one
-          clip.setEnd(nextclip.getEnd());                             // by using inpt of seg 1 and outpoint of seg 2
+        // collapse two segments into one
+        if ((nextclip.getSrc() == clip.getSrc()) && (nextclip.getStart() - clip.getEnd()) < 2) {
+          clip.setEnd(nextclip.getEnd());   // by using inpt of seg 1 and outpoint of seg 2
         } else {
           clips.add(clip);   // keep last segment
           clip = nextclip;   // check next segment

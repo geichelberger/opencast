@@ -29,21 +29,22 @@ import static org.opencastproject.util.data.functions.Strings.trimToNone;
 import static org.opencastproject.workflow.handler.distribution.EngagePublicationChannel.CHANNEL_ID;
 
 import org.opencastproject.distribution.api.DistributionException;
-import org.opencastproject.distribution.api.DistributionService;
 import org.opencastproject.distribution.api.DownloadDistributionService;
+import org.opencastproject.distribution.api.StreamingDistributionService;
 import org.opencastproject.job.api.Job;
 import org.opencastproject.job.api.JobContext;
 import org.opencastproject.mediapackage.Attachment;
+import org.opencastproject.mediapackage.Catalog;
 import org.opencastproject.mediapackage.MediaPackage;
 import org.opencastproject.mediapackage.MediaPackageElement;
 import org.opencastproject.mediapackage.MediaPackageElementFlavor;
 import org.opencastproject.mediapackage.MediaPackageElementParser;
-import org.opencastproject.mediapackage.MediaPackageElements;
 import org.opencastproject.mediapackage.MediaPackageException;
 import org.opencastproject.mediapackage.MediaPackageReference;
 import org.opencastproject.mediapackage.MediaPackageReferenceImpl;
 import org.opencastproject.mediapackage.Publication;
 import org.opencastproject.mediapackage.PublicationImpl;
+import org.opencastproject.mediapackage.Track;
 import org.opencastproject.mediapackage.selector.SimpleElementSelector;
 import org.opencastproject.mediapackage.track.TrackImpl;
 import org.opencastproject.search.api.SearchException;
@@ -51,7 +52,7 @@ import org.opencastproject.search.api.SearchQuery;
 import org.opencastproject.search.api.SearchResult;
 import org.opencastproject.search.api.SearchService;
 import org.opencastproject.security.api.Organization;
-import org.opencastproject.security.api.SecurityService;
+import org.opencastproject.security.api.OrganizationDirectoryService;
 import org.opencastproject.security.api.UnauthorizedException;
 import org.opencastproject.serviceregistry.api.ServiceRegistryException;
 import org.opencastproject.util.MimeTypes;
@@ -75,16 +76,16 @@ import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
-import java.util.SortedMap;
-import java.util.TreeMap;
 import java.util.UUID;
-
+import java.util.stream.Collectors;
 
 /**
  * The workflow definition for handling "engage publication" operations
@@ -96,7 +97,7 @@ public class PublishEngageWorkflowOperationHandler extends AbstractWorkflowOpera
 
   /** Configuration properties id */
   private static final String ENGAGE_URL_PROPERTY = "org.opencastproject.engage.ui.url";
-  private static final String STREAMING_URL_PROPERTY = "org.opencastproject.streaming.url";
+  private static final String STREAMING_PUBLISH_PROPERTY = "org.opencastproject.publish.streaming.formats";
 
   /** Workflow configuration option keys */
   private static final String DOWNLOAD_SOURCE_FLAVORS = "download-source-flavors";
@@ -109,12 +110,15 @@ public class PublishEngageWorkflowOperationHandler extends AbstractWorkflowOpera
   private static final String STREAMING_TARGET_SUBFLAVOR = "streaming-target-subflavor";
   private static final String CHECK_AVAILABILITY = "check-availability";
   private static final String STRATEGY = "strategy";
+  private static final String MERGE_FORCE_FLAVORS = "merge-force-flavors";
 
-  /** The default path to the player **/
-  protected static final String DEFAULT_PLAYER_PATH = "/engage/ui/watch.html";
+  private static final String MERGE_FORCE_FLAVORS_DEFAULT = "dublincore/*,security/*";
+
+  /** Path the REST endpoint which will re-direct users to the currently configured video player **/
+  static final String PLAYER_PATH = "/play/";
 
   /** The streaming distribution service */
-  private DistributionService streamingDistributionService = null;
+  private StreamingDistributionService streamingDistributionService = null;
 
   /** The download distribution service */
   private DownloadDistributionService downloadDistributionService = null;
@@ -125,11 +129,10 @@ public class PublishEngageWorkflowOperationHandler extends AbstractWorkflowOpera
   /** The server url */
   private URL serverUrl;
 
-  /** To get the tenant path to the player URL **/
-  private SecurityService securityService;
+  private OrganizationDirectoryService organizationDirectoryService = null;
 
-  /** Whether to distribute to streaming server */
-  private boolean distributeStreaming = false;
+  /** Which streaming formats should be published automatically */
+  private List<String> publishedStreamingFormats = null;
 
   /**
    * Callback for the OSGi declarative services configuration.
@@ -137,7 +140,7 @@ public class PublishEngageWorkflowOperationHandler extends AbstractWorkflowOpera
    * @param streamingDistributionService
    *          the streaming distribution service
    */
-  protected void setStreamingDistributionService(DistributionService streamingDistributionService) {
+  protected void setStreamingDistributionService(StreamingDistributionService streamingDistributionService) {
     this.streamingDistributionService = streamingDistributionService;
   }
 
@@ -162,32 +165,18 @@ public class PublishEngageWorkflowOperationHandler extends AbstractWorkflowOpera
     this.searchService = searchService;
   }
 
-  /** The configuration options for this handler */
-  private static final SortedMap<String, String> CONFIG_OPTIONS;
-
-  static {
-    CONFIG_OPTIONS = new TreeMap<String, String>();
-    CONFIG_OPTIONS.put(DOWNLOAD_SOURCE_FLAVORS,
-            "Distribute any mediapackage elements with one of these (comma separated) flavors to download");
-    CONFIG_OPTIONS.put(STREAMING_TARGET_SUBFLAVOR,
-            "Target subflavor for elements that have been distributed for downloads");
-    CONFIG_OPTIONS.put(DOWNLOAD_SOURCE_TAGS,
-            "Distribute any mediapackage elements with one of these (comma separated) tags to download.");
-    CONFIG_OPTIONS.put(DOWNLOAD_TARGET_TAGS,
-            "Add all of these comma separated tags to elements that have been distributed for download.");
-    CONFIG_OPTIONS.put(STREAMING_SOURCE_FLAVORS,
-            "Distribute any mediapackage elements with one of these (comma separated) flavors to streaming");
-    CONFIG_OPTIONS.put(STREAMING_TARGET_SUBFLAVOR,
-            "Target subflavor for elements that have been distributed for streaming");
-    CONFIG_OPTIONS.put(STREAMING_SOURCE_TAGS,
-            "Distribute any mediapackage elements with one of these (comma separated) tags to streaming.");
-    CONFIG_OPTIONS.put(STREAMING_TARGET_TAGS,
-            "Add all of these comma separated tags to elements that have been distributed for download.");
-    CONFIG_OPTIONS.put(CHECK_AVAILABILITY,
-            "( true | false ) defaults to true. Check if the distributed download artifact is available at its URL");
-    CONFIG_OPTIONS.put(STRATEGY,
-            "Strategy if there is an existing Publication");
+  public void setOrganizationDirectoryService(OrganizationDirectoryService organizationDirectoryService) {
+    this.organizationDirectoryService = organizationDirectoryService;
   }
+
+  /** Supported streaming formats */
+  private static final Set<TrackImpl.StreamingProtocol> STREAMING_FORMATS = new HashSet<>(Arrays.asList(
+          TrackImpl.StreamingProtocol.RTMP,
+          TrackImpl.StreamingProtocol.RTMPE,
+          TrackImpl.StreamingProtocol.HLS,
+          TrackImpl.StreamingProtocol.DASH,
+          TrackImpl.StreamingProtocol.HDS,
+          TrackImpl.StreamingProtocol.SMOOTH));
 
   @Override
   protected void activate(ComponentContext cc) {
@@ -196,25 +185,10 @@ public class PublishEngageWorkflowOperationHandler extends AbstractWorkflowOpera
 
     // Get configuration
     serverUrl = UrlSupport.url(bundleContext.getProperty(SERVER_URL_PROPERTY));
-    distributeStreaming = StringUtils.isNotBlank(bundleContext.getProperty(STREAMING_URL_PROPERTY));
+    publishedStreamingFormats = Arrays.asList(Optional.ofNullable(StringUtils.split(
+            bundleContext.getProperty(STREAMING_PUBLISH_PROPERTY), ",")).orElse(new String[0]));
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * @see org.opencastproject.workflow.api.WorkflowOperationHandler#getConfigurationOptions()
-   */
-  @Override
-  public SortedMap<String, String> getConfigurationOptions() {
-    return CONFIG_OPTIONS;
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * @see org.opencastproject.workflow.api.WorkflowOperationHandler#start(org.opencastproject.workflow.api.WorkflowInstance,
-   *      JobContext)
-   */
   @Override
   public WorkflowOperationResult start(final WorkflowInstance workflowInstance, JobContext context)
           throws WorkflowOperationException {
@@ -233,6 +207,8 @@ public class PublishEngageWorkflowOperationHandler extends AbstractWorkflowOpera
     String streamingSourceFlavors = StringUtils.trimToEmpty(op.getConfiguration(STREAMING_SOURCE_FLAVORS));
     String streamingTargetSubflavor = StringUtils.trimToNull(op.getConfiguration(STREAMING_TARGET_SUBFLAVOR));
     String republishStrategy = StringUtils.trimToEmpty(op.getConfiguration(STRATEGY));
+    String mergeForceFlavorsStr = StringUtils.trimToEmpty(
+            StringUtils.defaultString(op.getConfiguration(MERGE_FORCE_FLAVORS), MERGE_FORCE_FLAVORS_DEFAULT));
 
     boolean checkAvailability = option(op.getConfiguration(CHECK_AVAILABILITY)).bind(trimToNone).map(toBool)
             .getOrElse(true);
@@ -246,9 +222,14 @@ public class PublishEngageWorkflowOperationHandler extends AbstractWorkflowOpera
 
     if (sourceDownloadTags.length == 0 && sourceDownloadFlavors.length == 0 && sourceStreamingTags.length == 0
             && sourceStreamingFlavors.length == 0) {
-      logger.warn("No tags or flavors have been specified, so nothing will be published to the engage publication channel");
+      logger.warn("No tags or flavors have been specified, so nothing will be published to the "
+          + "engage publication channel");
       return createResult(mediaPackage, Action.CONTINUE);
     }
+
+    // Parse forced flavors
+    List<MediaPackageElementFlavor> mergeForceFlavors = Arrays.stream(StringUtils.split(mergeForceFlavorsStr, ", "))
+            .map(MediaPackageElementFlavor::parseFlavor).collect(Collectors.toList());
 
     // Parse the download target flavor
     MediaPackageElementFlavor downloadSubflavor = null;
@@ -304,18 +285,6 @@ public class PublishEngageWorkflowOperationHandler extends AbstractWorkflowOpera
         streamingElementIds.add(elem.getIdentifier());
       }
 
-      // Also distribute the security configuration
-      // -----
-      // This was removed in the meantime by a fix for MH-8515, but could now be used again.
-      // -----
-      Attachment[] securityAttachments = mediaPackage.getAttachments(MediaPackageElements.XACML_POLICY);
-      if (securityAttachments != null && securityAttachments.length > 0) {
-        for (Attachment a : securityAttachments) {
-          downloadElementIds.add(a.getIdentifier());
-          streamingElementIds.add(a.getIdentifier());
-        }
-      }
-
       removePublicationElement(mediaPackage);
       switch (republishStrategy) {
         case ("merge"):
@@ -329,13 +298,14 @@ public class PublishEngageWorkflowOperationHandler extends AbstractWorkflowOpera
       //distribute Elements
       try {
         if (downloadElementIds.size() > 0) {
-          Job job = downloadDistributionService.distribute(CHANNEL_ID, mediaPackage, downloadElementIds, checkAvailability);
+          Job job = downloadDistributionService.distribute(
+              CHANNEL_ID, mediaPackage, downloadElementIds, checkAvailability);
           if (job != null) {
             jobs.add(job);
           }
         }
 
-        if (distributeStreaming) {
+        if (streamingDistributionService != null && streamingDistributionService.publishToStreaming()) {
           for (String elementId : streamingElementIds) {
             Job job = streamingDistributionService.distribute(CHANNEL_ID, mediaPackage, elementId);
             if (job != null) {
@@ -353,8 +323,9 @@ public class PublishEngageWorkflowOperationHandler extends AbstractWorkflowOpera
       }
 
       // Wait until all distribution jobs have returned
-      if (!waitForStatus(jobs.toArray(new Job[jobs.size()])).isSuccess())
+      if (!waitForStatus(jobs.toArray(new Job[jobs.size()])).isSuccess()) {
         throw new WorkflowOperationException("One of the distribution jobs did not complete successfully");
+      }
 
       logger.debug("Distribute of mediapackage {} completed", mediaPackage);
 
@@ -368,9 +339,10 @@ public class PublishEngageWorkflowOperationHandler extends AbstractWorkflowOpera
         switch (republishStrategy) {
           case ("merge"):
             // merge() returns merged mediapackage or null mediaPackage is not published
-            mediaPackageForSearch = merge(mediaPackageForSearch);
+            mediaPackageForSearch = merge(mediaPackageForSearch, mergeForceFlavors);
             if (mediaPackageForSearch == null) {
-              logger.info("Skipping republish for {} since it is not currently published", mediaPackage.getIdentifier().toString());
+              logger.info("Skipping republish for {} since it is not currently published",
+                  mediaPackage.getIdentifier().toString());
               return createResult(mediaPackage, Action.SKIP);
             }
             break;
@@ -378,21 +350,27 @@ public class PublishEngageWorkflowOperationHandler extends AbstractWorkflowOpera
           // nothing to do here
         }
 
-        if (!isPublishable(mediaPackageForSearch))
-          throw new WorkflowOperationException("Media package does not meet criteria for publication");
+        // Check that the media package meets the criteria for publication
+        if (isBlank(mediaPackageForSearch.getTitle())) {
+          throw new WorkflowOperationException("Media package does not meet publication criteria: Missing title");
+        }
+        if (!mediaPackageForSearch.hasTracks()) {
+          throw new WorkflowOperationException("Media package does not meet publication criteria: No tracks selected");
+        }
 
         logger.info("Publishing media package {} to search index", mediaPackageForSearch);
 
-        URL engageBaseUrl = null;
-        engageUrlString = StringUtils.trimToNull(workflowInstance.getOrganization().getProperties()
-                .get(ENGAGE_URL_PROPERTY));
+        URL engageBaseUrl;
+        Organization organization = organizationDirectoryService.getOrganization(workflowInstance.getOrganizationId());
+        engageUrlString = StringUtils.trimToNull(organization.getProperties().get(ENGAGE_URL_PROPERTY));
         if (engageUrlString != null) {
           engageBaseUrl = new URL(engageUrlString);
         } else {
           engageBaseUrl = serverUrl;
           logger.info(
-                  "Using 'server.url' as a fallback for the non-existing organization level key '{}' for the publication url",
-                  ENGAGE_URL_PROPERTY);
+              "Using 'server.url' as a fallback for the non-existing organization level key '{}' "
+                  + "for the publication url",
+              ENGAGE_URL_PROPERTY);
         }
 
         // create the publication URI (used by Admin UI for event details link)
@@ -402,6 +380,25 @@ public class PublishEngageWorkflowOperationHandler extends AbstractWorkflowOpera
         Publication publicationElement = PublicationImpl.publication(UUID.randomUUID().toString(), CHANNEL_ID,
                 engageUri, MimeTypes.parseMimeType("text/html"));
         mediaPackage.add(publicationElement);
+
+        // create publication URI for streaming
+        if (streamingDistributionService != null
+            && streamingDistributionService.publishToStreaming()
+            && !publishedStreamingFormats.isEmpty()) {
+          for (Track track : mediaPackageForSearch.getTracks()) {
+            String mimeType = track.getMimeType().toString();
+            if (isStreamingFormat(track) && (publishedStreamingFormats.contains(mimeType)
+                    || publishedStreamingFormats.contains("*"))) {
+              publicationElement.addTrack(track);
+            }
+          }
+          for (Attachment attachment : mediaPackageForSearch.getAttachments()) {
+            publicationElement.addAttachment(attachment);
+          }
+          for (Catalog catalog : mediaPackageForSearch.getCatalogs()) {
+            publicationElement.addCatalog(catalog);
+          }
+        }
 
         // Adding media package to the search index
         Job publishJob = null;
@@ -423,11 +420,12 @@ public class PublishEngageWorkflowOperationHandler extends AbstractWorkflowOpera
         logger.error("{} is malformed: {}", ENGAGE_URL_PROPERTY, engageUrlString);
         throw new WorkflowOperationException(e);
       } catch (Throwable t) {
-        if (t instanceof WorkflowOperationException)
+        if (t instanceof WorkflowOperationException) {
           throw (WorkflowOperationException) t;
-        else
+        } else {
           throw new WorkflowOperationException(t);
         }
+      }
     } catch (Exception e) {
       if (e instanceof WorkflowOperationException) {
         throw (WorkflowOperationException) e;
@@ -444,18 +442,8 @@ public class PublishEngageWorkflowOperationHandler extends AbstractWorkflowOpera
    * @param mp
    * @return the assembled player URI for this mediapackage
    */
-  protected URI createEngageUri(URI engageUri, MediaPackage mp) {
-    String playerPath = null;
-    String configedPlayerPath = null;
-    // Use the current user's organizational information for the player path
-    Organization currentOrg = securityService.getOrganization();
-    if (currentOrg != null) {
-      configedPlayerPath = StringUtils
-              .trimToNull(currentOrg.getProperties().get(ConfigurablePublishWorkflowOperationHandler.PLAYER_PROPERTY));
-    }
-    // If not configuration, use a default path
-    playerPath = configedPlayerPath != null ? configedPlayerPath : DEFAULT_PLAYER_PATH;
-    return URIUtils.resolve(engageUri, playerPath + "?id=" + mp.getIdentifier().compact());
+  URI createEngageUri(URI engageUri, MediaPackage mp) {
+    return URIUtils.resolve(engageUri, PLAYER_PATH + mp.getIdentifier().toString());
   }
 
   /**
@@ -493,8 +481,9 @@ public class PublishEngageWorkflowOperationHandler extends AbstractWorkflowOpera
       Job job = serviceRegistry.getJob(entry.getId());
 
       // If there is no payload, then the item has not been distributed.
-      if (job.getPayload() == null)
+      if (job.getPayload() == null) {
         continue;
+      }
 
       List <MediaPackageElement> distributedElements = null;
       try {
@@ -505,8 +494,9 @@ public class PublishEngageWorkflowOperationHandler extends AbstractWorkflowOpera
 
       // If the job finished successfully, but returned no new element, the channel simply doesn't support this
       // kind of element. So we just keep on looping.
-      if (distributedElements == null || distributedElements.size() < 1)
+      if (distributedElements == null || distributedElements.size() < 1) {
         continue;
+      }
 
       for (MediaPackageElement distributedElement : distributedElements) {
 
@@ -548,9 +538,11 @@ public class PublishEngageWorkflowOperationHandler extends AbstractWorkflowOpera
           }
         }
 
-        if (isStreamingFormat(distributedElement))
-            applyTags(distributedElement, streamingTargetTags);
-        else applyTags(distributedElement, downloadTargetTags);
+        if (isStreamingFormat(distributedElement)) {
+          applyTags(distributedElement, streamingTargetTags);
+        } else {
+          applyTags(distributedElement, downloadTargetTags);
+        }
 
         // Add the new element to the mediapackage
         mp.add(distributedElement);
@@ -570,20 +562,24 @@ public class PublishEngageWorkflowOperationHandler extends AbstractWorkflowOpera
     // Translate references to the distributed artifacts
     for (MediaPackageElement element : mp.getElements()) {
 
-      if (removals.contains(element))
+      if (removals.contains(element)) {
         continue;
+      }
 
       // Is the element referencing anything?
       MediaPackageReference reference = element.getReference();
-      if (reference == null)
+      if (reference == null) {
         continue;
+      }
 
       // See if the element has been distributed
       String distributedElementId = distributedElementIds.get(reference.getIdentifier());
-      if (distributedElementId == null)
+      if (distributedElementId == null) {
         continue;
+      }
 
-      MediaPackageReference translatedReference = new MediaPackageReferenceImpl(mp.getElementById(distributedElementId));
+      MediaPackageReference translatedReference
+          = new MediaPackageReferenceImpl(mp.getElementById(distributedElementId));
       if (reference.getProperties() != null) {
         translatedReference.getProperties().putAll(reference.getProperties());
       }
@@ -602,20 +598,12 @@ public class PublishEngageWorkflowOperationHandler extends AbstractWorkflowOpera
 
   /**
    * Checks if the MediaPackage track transport protocol is a streaming format protocol
-   * @param element The MediapackageElement to analyze
+   * @param element The MediaPackageElement to analyze
    * @return true if it is a TrackImpl and has a streaming protocol as transport
    */
   private boolean isStreamingFormat(MediaPackageElement element) {
-    if (element instanceof TrackImpl) {
-      if (TrackImpl.StreamingProtocol.RTMP.equals(((TrackImpl) element).getTransport())
-          || TrackImpl.StreamingProtocol.RTMPE.equals(((TrackImpl) element).getTransport())
-          || TrackImpl.StreamingProtocol.HLS.equals(((TrackImpl) element).getTransport())
-          || TrackImpl.StreamingProtocol.DASH.equals(((TrackImpl) element).getTransport())
-          || TrackImpl.StreamingProtocol.HDS.equals(((TrackImpl) element).getTransport())
-          || TrackImpl.StreamingProtocol.SMOOTH.equals(((TrackImpl) element).getTransport()))
-        return true;
-    }
-    return false;
+    return element instanceof TrackImpl
+            && STREAMING_FORMATS.contains(((TrackImpl) element).getTransport());
   }
 
   /**
@@ -627,19 +615,6 @@ public class PublishEngageWorkflowOperationHandler extends AbstractWorkflowOpera
     for (String tag : tags) {
       element.addTag(tag);
     }
-  }
-
-  /** Media package must meet these criteria in order to be published. */
-  private boolean isPublishable(MediaPackage mp) {
-    boolean hasTitle = !isBlank(mp.getTitle());
-    if (!hasTitle)
-      logger.warn("Media package does not meet criteria for publication: There is no title");
-
-    boolean hasTracks = mp.hasTracks();
-    if (!hasTracks)
-      logger.warn("Media package does not meet criteria for publication: There are no tracks");
-
-    return hasTitle && hasTracks;
   }
 
   protected MediaPackage getDistributedMediapackage(String mediaPackageID) throws WorkflowOperationException {
@@ -670,12 +645,11 @@ public class PublishEngageWorkflowOperationHandler extends AbstractWorkflowOpera
    * @return merged mediapackage or null if a published medipackage was not found
    * @throws WorkflowOperationException
    */
-  protected MediaPackage merge(MediaPackage mediaPackageForSearch) throws WorkflowOperationException {
-    MediaPackage mergedMediaPackage = null;
-    mergedMediaPackage = mergePackages(mediaPackageForSearch,
-            getDistributedMediapackage(mediaPackageForSearch.toString()));
-
-    return mergedMediaPackage;
+  protected MediaPackage merge(MediaPackage mediaPackageForSearch, List<MediaPackageElementFlavor> forceFlavors)
+          throws WorkflowOperationException {
+    return mergePackages(mediaPackageForSearch,
+            getDistributedMediapackage(mediaPackageForSearch.toString()),
+            forceFlavors);
   }
 
   /**
@@ -693,19 +667,26 @@ public class PublishEngageWorkflowOperationHandler extends AbstractWorkflowOpera
    *          the mediapackage that is currently published
    * @return the merged mediapackage
    */
-  protected MediaPackage mergePackages(MediaPackage updatedMp, MediaPackage publishedMp) {
-    if (publishedMp == null)
+  protected MediaPackage mergePackages(MediaPackage updatedMp, MediaPackage publishedMp,
+          List<MediaPackageElementFlavor> forceFlavors) {
+    if (publishedMp == null) {
       return updatedMp;
+    }
 
     MediaPackage mergedMediaPackage = (MediaPackage) updatedMp.clone();
     for (MediaPackageElement element : publishedMp.elements()) {
       String type = element.getElementType().toString().toLowerCase();
       if (updatedMp.getElementsByFlavor(element.getFlavor()).length == 0) {
+        if (forceFlavors.stream().anyMatch((f) -> element.getFlavor().matches(f))) {
+          logger.info("Forcing removal of {} {} due to the absence of a new element with flavor {}",
+                  type, element.getIdentifier(), element.getFlavor().toString());
+          continue;
+        }
         logger.info("Merging {} '{}' into the updated mediapackage", type, element.getIdentifier());
         mergedMediaPackage.add((MediaPackageElement) element.clone());
       } else {
-        logger.info(String.format("Overwriting existing %s '%s' with '%s' in the updated mediapackage",
-                type, element.getIdentifier(), updatedMp.getElementsByFlavor(element.getFlavor())[0].getIdentifier()));
+        logger.info("Overwriting existing {} '{}' with '{}' in the updated mediapackage",
+                type, element.getIdentifier(), updatedMp.getElementsByFlavor(element.getFlavor())[0].getIdentifier());
 
       }
     }
@@ -725,7 +706,6 @@ public class PublishEngageWorkflowOperationHandler extends AbstractWorkflowOpera
  * Removes every Publication for Searchindex from Mediapackage
  * Removes Mediapackage from Searchindex
    * @param mediaPackage Mediapackage
-   * @param mediaPackageForSearch Mediapackage prepared for searchIndex
    * @throws WorkflowOperationException
    */
   private void retractFromEngage(MediaPackage mediaPackage) throws WorkflowOperationException {
@@ -740,15 +720,17 @@ public class PublishEngageWorkflowOperationHandler extends AbstractWorkflowOpera
         }
         //bulk retraction
         if (elementIds.size() > 0) {
-          Job  retractDownloadDistributionJob = downloadDistributionService.retract(CHANNEL_ID, distributedMediaPackage, elementIds);
+          Job  retractDownloadDistributionJob
+              = downloadDistributionService.retract(CHANNEL_ID, distributedMediaPackage, elementIds);
           if (retractDownloadDistributionJob != null) {
             jobs.add(retractDownloadDistributionJob);
           }
         }
 
-        if (distributeStreaming) {
+        if (streamingDistributionService.publishToStreaming()) {
           for (MediaPackageElement element : distributedMediaPackage.getElements()) {
-            Job retractStreamingJob = streamingDistributionService.retract(CHANNEL_ID, distributedMediaPackage, element.getIdentifier());
+            Job retractStreamingJob
+                = streamingDistributionService.retract(CHANNEL_ID, distributedMediaPackage, element.getIdentifier());
             if (retractStreamingJob != null) {
               jobs.add(retractStreamingJob);
             }
@@ -756,7 +738,8 @@ public class PublishEngageWorkflowOperationHandler extends AbstractWorkflowOpera
         }
 
         Job deleteSearchJob = null;
-        logger.info("Retracting already published Elements for Mediapackage: {}", mediaPackage.getIdentifier().toString());
+        logger.info("Retracting already published Elements for Mediapackage: {}",
+            mediaPackage.getIdentifier().toString());
         deleteSearchJob = searchService.delete(mediaPackage.getIdentifier().toString());
         if (deleteSearchJob != null) {
           jobs.add(deleteSearchJob);
@@ -774,10 +757,4 @@ public class PublishEngageWorkflowOperationHandler extends AbstractWorkflowOpera
       logger.error("Retraction failed of Mediapackage: { }", mediaPackage.getIdentifier().toString(), ex);
     }
   }
-
-  /** OSGi DI */
-  protected void setSecurityService(SecurityService securityService) {
-    this.securityService = securityService;
-  }
-
 }

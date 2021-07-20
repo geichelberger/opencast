@@ -20,19 +20,17 @@
  */
 package org.opencastproject.assetmanager.impl.persistence;
 
-import static java.lang.String.format;
-
 import org.opencastproject.assetmanager.api.Availability;
 import org.opencastproject.assetmanager.api.Property;
 import org.opencastproject.assetmanager.api.PropertyId;
+import org.opencastproject.assetmanager.api.Snapshot;
 import org.opencastproject.assetmanager.impl.PartialMediaPackage;
 import org.opencastproject.assetmanager.impl.VersionImpl;
 import org.opencastproject.assetmanager.impl.persistence.AssetDtos.Full;
 import org.opencastproject.assetmanager.impl.persistence.AssetDtos.Medium;
 import org.opencastproject.mediapackage.MediaPackageElement;
 import org.opencastproject.util.persistencefn.PersistenceEnv;
-import org.opencastproject.util.persistencefn.PersistenceUtil;
-import org.opencastproject.util.persistencefn.PersistenceUtil.DatabaseVendor;
+import org.opencastproject.util.persistencefn.PersistenceEnvs;
 import org.opencastproject.util.persistencefn.Queries;
 
 import com.entwinemedia.fn.Fn;
@@ -47,15 +45,17 @@ import com.mysema.query.jpa.impl.JPAQueryFactory;
 import com.mysema.query.jpa.impl.JPAUpdateClause;
 import com.mysema.query.types.expr.BooleanExpression;
 
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.sql.DatabaseMetaData;
 import java.util.Date;
+import java.util.List;
 
 import javax.annotation.ParametersAreNonnullByDefault;
 import javax.inject.Provider;
 import javax.persistence.EntityManager;
+import javax.persistence.EntityManagerFactory;
 
 /**
  * Data access object.
@@ -67,9 +67,16 @@ public class Database implements EntityPaths {
   public static final JPQLTemplates TEMPLATES = EclipseLinkTemplates.DEFAULT;
 
   private final PersistenceEnv penv;
+  private final EntityManagerFactory entityManagerFactory;
 
-  public Database(PersistenceEnv penv) {
-    this.penv = penv;
+  public Database(EntityManagerFactory emf, PersistenceEnv persistenceEnv) {
+    penv = persistenceEnv;
+    entityManagerFactory = emf;
+  }
+
+  public Database(EntityManagerFactory emf) {
+    penv = PersistenceEnvs.mk(emf);
+    entityManagerFactory = emf;
   }
 
   /**
@@ -89,40 +96,12 @@ public class Database implements EntityPaths {
     });
   }
 
-  public <A> A runSql(final Sql<A> sql) {
-    return penv.tx(new Fn<EntityManager, A>() {
-      @Override public A apply(EntityManager em) {
-        for (DatabaseMetaData md : PersistenceUtil.getDatabaseMetadata(em)) {
-          final DatabaseVendor vendor = PersistenceUtil.getVendor(md);
-          switch (vendor) {
-            case H2:
-              return sql.h2(em);
-            case MYSQL:
-              return sql.mysql(em);
-            case POSTGRES:
-              return sql.postgres(em);
-            default:
-              throw new UnsupportedOperationException("Unsupported database vendor " + vendor);
-          }
-        }
-        logger.warn("Cannot determine database vendor, trying H2");
-        return sql.h2(em);
-      }
-    });
-  }
-
-  public interface Sql<A> {
-    A h2(EntityManager em);
-    A mysql(EntityManager em);
-    A postgres(EntityManager em);
-  }
-
   public void logQuery(JPAQuery q) {
-    logger.debug(format("\n---\nQUERY\n%s\n---", q.toString()));
+    logger.debug("\n---\nQUERY\n{}\n---", q);
   }
 
   public void logDelete(String queryName, JPADeleteClause q) {
-    logger.debug(format("\n---\nDELETE %s\n%s\n---", queryName, q.toString()));
+    logger.debug("\n---\nDELETE {}\n{}\n---", queryName, q);
   }
 
   /**
@@ -188,6 +167,7 @@ public class Database implements EntityPaths {
           final Date archivalDate,
           final VersionImpl version,
           final Availability availability,
+          final String storageId,
           final String owner) {
     final SnapshotDto snapshotDto = SnapshotDto.mk(
             pmp.getMediaPackage(),
@@ -195,6 +175,7 @@ public class Database implements EntityPaths {
             orgId,
             archivalDate,
             availability,
+            storageId,
             owner);
     return penv.tx(new Fn<EntityManager, SnapshotDto>() {
       @Override public SnapshotDto apply(EntityManager em) {
@@ -204,9 +185,10 @@ public class Database implements EntityPaths {
         for (MediaPackageElement e : pmp.getElements()) {
           final AssetDto a = AssetDto.mk(
                   e.getIdentifier(),
-                  snapshotDto.getId(),
+                  snapshotDto,
                   e.getChecksum().toString(),
                   Opt.nul(e.getMimeType()),
+                  storageId,
                   e.getSize());
           em.persist(a);
         }
@@ -215,14 +197,58 @@ public class Database implements EntityPaths {
     });
   }
 
+  public void setStorageLocation(Snapshot snapshot, final String storageId) {
+    setStorageLocation(
+        VersionImpl.mk(snapshot.getVersion()),
+        snapshot.getMediaPackage().getIdentifier().toString(),
+        storageId
+    );
+  }
+
+  public void setStorageLocation(final VersionImpl version, final String mpId, final String storageId) {
+    penv.tx(new Fx<EntityManager>() {
+      @Override public void apply(EntityManager em) {
+        final QSnapshotDto q = QSnapshotDto.snapshotDto;
+        final QAssetDto a = QAssetDto.assetDto;
+        //Update the snapshot
+        new JPAUpdateClause(em, q, TEMPLATES)
+                .where(q.version.eq(version.value()).and(q.mediaPackageId.eq(mpId)))
+                .set(q.storageId, storageId)
+                .execute();
+        //Get the snapshot (to get its database ID)
+        Opt<SnapshotDtos.Medium> s = getSnapshot(version, mpId);
+        //Update the assets
+        new JPAUpdateClause(em, a, TEMPLATES)
+                .where(a.snapshot.id.eq(s.get().getSnapshotDto().getId()))
+                .set(a.storageId, storageId)
+                .execute();
+      }
+    }.toFn());
+  }
+
+  public void setAssetStorageLocation(final VersionImpl version, final String mpId, final String mpeId,
+          final String storageId) {
+    penv.tx(new Fx<EntityManager>() {
+      @Override
+      public void apply(EntityManager em) {
+        final QAssetDto a = QAssetDto.assetDto;
+        Opt<SnapshotDtos.Medium> s = getSnapshot(version, mpId);
+        // Update the asset store id
+        new JPAUpdateClause(em, a, TEMPLATES)
+                .where(a.snapshot.id.eq(s.get().getSnapshotDto().getId()).and(a.mediaPackageElementId.eq(mpeId)))
+                .set(a.storageId, storageId).execute();
+      }
+    }.toFn());
+  }
+
   public void setAvailability(final VersionImpl version, final String mpId, final Availability availability) {
     penv.tx(new Fx<EntityManager>() {
       @Override public void apply(EntityManager em) {
         final QSnapshotDto q = QSnapshotDto.snapshotDto;
         new JPAUpdateClause(em, q, TEMPLATES)
-        .where(q.version.eq(version.value()).and(q.mediaPackageId.eq(mpId)))
-        .set(q.availability, availability.name())
-        .execute();
+            .where(q.version.eq(version.value()).and(q.mediaPackageId.eq(mpId)))
+            .set(q.availability, availability.name())
+            .execute();
       }
     }.toFn());
   }
@@ -236,15 +262,29 @@ public class Database implements EntityPaths {
     return penv.tx(new Fn<EntityManager, Opt<AssetDtos.Medium>>() {
       @Override public Opt<AssetDtos.Medium> apply(EntityManager em) {
         final QAssetDto assetDto = QAssetDto.assetDto;
-        final QSnapshotDto snapshotDto = QSnapshotDto.snapshotDto;
         final Tuple result = AssetDtos.baseJoin(em)
-                .where(snapshotDto.mediaPackageId.eq(mpId)
+                .where(assetDto.snapshot.mediaPackageId.eq(mpId)
                                .and(assetDto.mediaPackageElementId.eq(mpeId))
-                               .and(snapshotDto.version.eq(version.value())))
+                               .and(assetDto.snapshot.version.eq(version.value())))
                         // if no version has been specified make sure to get the latest by ordering
-                .orderBy(snapshotDto.version.desc())
+                .orderBy(assetDto.snapshot.version.desc())
                 .uniqueResult(Medium.select);
-        return Opt.nul(result).map(Medium.fromTuple);
+        return Opt.nul(result).map(AssetDtos.Medium.fromTuple);
+      }
+    });
+  }
+
+  public Opt<SnapshotDtos.Medium> getSnapshot(final VersionImpl version, final String mpId) {
+    return penv.tx(new Fn<EntityManager, Opt<SnapshotDtos.Medium>>() {
+      @Override public Opt<SnapshotDtos.Medium> apply(EntityManager em) {
+        final QSnapshotDto snapshotDto = QSnapshotDto.snapshotDto;
+        final Tuple result = SnapshotDtos.baseQuery(em)
+                .where(snapshotDto.mediaPackageId.eq(mpId)
+                  .and(snapshotDto.version.eq(version.value())))
+                // if no version has been specified make sure to get the latest by ordering
+                .orderBy(snapshotDto.version.desc())
+                .uniqueResult(SnapshotDtos.Medium.select);
+        return Opt.nul(result).map(SnapshotDtos.Medium.fromTuple);
       }
     });
   }
@@ -252,7 +292,96 @@ public class Database implements EntityPaths {
   public Opt<AssetDtos.Full> findAssetByChecksum(final String checksum) {
     return penv.tx(new Fn<EntityManager, Opt<AssetDtos.Full>>() {
       @Override public Opt<AssetDtos.Full> apply(EntityManager em) {
-        final Tuple result = AssetDtos.baseJoin(em).where(QAssetDto.assetDto.checksum.eq(checksum)).singleResult(Full.select);
+        final Tuple result = AssetDtos.baseJoin(em)
+            .where(QAssetDto.assetDto.checksum.eq(checksum))
+            .singleResult(Full.select);
+        return Opt.nul(result).map(Full.fromTuple);
+      }
+    });
+  }
+
+  /**
+   * Delete all properties for a given media package identifier
+   *
+   * @param mediaPackageId
+   *          Media package identifier
+   * @return Number of deleted rows
+   */
+  public int deleteProperties(final String mediaPackageId) {
+    return PropertyDto.delete(entityManagerFactory.createEntityManager(), mediaPackageId);
+  }
+
+  /**
+   * Delete all properties for a given media package identifier and namespace.
+   *
+   * @param mediaPackageId
+   *          Media package identifier
+   * @param namespace
+   *          A namespace prefix to use for deletion
+   * @return Number of deleted rows
+   */
+  public int deleteProperties(final String mediaPackageId, final String namespace) {
+    if (StringUtils.isBlank(namespace)) {
+      return PropertyDto.delete(entityManagerFactory.createEntityManager(), mediaPackageId);
+    }
+    return PropertyDto.delete(entityManagerFactory.createEntityManager(), mediaPackageId, namespace);
+  }
+
+  /**
+   * Check if any snapshot with the given media package identifier exists.
+   *
+   * @param mediaPackageId
+   *          The media package identifier to check for
+   * @return If a snapshot exists for the given media package
+   */
+  public boolean snapshotExists(final String mediaPackageId) {
+    return SnapshotDto.exists(entityManagerFactory.createEntityManager(), mediaPackageId);
+  }
+
+  /**
+   * Check if any snapshot with the given media package identifier exists.
+   *
+   * @param mediaPackageId
+   *          The media package identifier to check for
+   * @param organization
+   *          The organization to filter for
+   * @return If a snapshot exists for the given media package
+   */
+  public boolean snapshotExists(final String mediaPackageId, final String organization) {
+    return SnapshotDto.exists(entityManagerFactory.createEntityManager(), mediaPackageId, organization);
+  }
+
+  /**
+   * Select all properties for a specific media package.
+   *
+   * @param mediaPackageId
+   *          Media package identifier to check for
+   * @param namespace
+   *          Namespace to limit the search to
+   * @return List of properties
+   */
+  public List<Property> selectProperties(final String mediaPackageId, final String namespace) {
+    return PropertyDto.select(entityManagerFactory.createEntityManager(), mediaPackageId, namespace);
+  }
+
+  /**
+   * Count events with snapshots in the asset manager
+   *
+   * @param organization
+   *          An organization to count in
+   * @return Number of events
+   */
+  public long countEvents(final String organization) {
+    return SnapshotDto.countEvents(entityManagerFactory.createEntityManager(), organization);
+  }
+
+  public Opt<AssetDtos.Full> findAssetByChecksumAndStore(final String checksum, final String storeId) {
+    return penv.tx(new Fn<EntityManager, Opt<AssetDtos.Full>>() {
+      @Override
+      public Opt<AssetDtos.Full> apply(EntityManager em) {
+        final Tuple result = AssetDtos.baseJoin(em)
+                .where(QAssetDto.assetDto.checksum.eq(checksum).and(QAssetDto.assetDto.storageId.eq(storeId)))
+                .singleResult(Full.select);
         return Opt.nul(result).map(Full.fromTuple);
       }
     });
@@ -266,7 +395,8 @@ public class Database implements EntityPaths {
     if (a != null) {
       return a;
     } else {
-      throw new RuntimeException("Used DTO outside of a persistence context or the DTO has not been assigned an ID yet.");
+      throw new RuntimeException(
+          "Used DTO outside of a persistence context or the DTO has not been assigned an ID yet.");
     }
   }
 }

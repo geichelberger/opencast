@@ -34,7 +34,6 @@ import org.opencastproject.mediapackage.MediaPackageElementParser;
 import org.opencastproject.mediapackage.MediaPackageException;
 import org.opencastproject.mediapackage.Track;
 import org.opencastproject.serviceregistry.api.ServiceRegistry;
-import org.opencastproject.util.MimeTypes;
 import org.opencastproject.workflow.api.WorkflowInstance.WorkflowState;
 import org.opencastproject.workflow.api.WorkflowInstanceImpl;
 import org.opencastproject.workflow.api.WorkflowOperationException;
@@ -123,7 +122,6 @@ public class ImageToVideoWorkflowOperationHandlerTest {
     String targetTags = "engage,rss";
     Map<String, String> configurations = new HashMap<String, String>();
     configurations.put("source-flavor", "image/intro");
-    configurations.put("source-tag", "intro");
     configurations.put("target-tags", targetTags);
     configurations.put("target-flavor", "video/intro");
     configurations.put("profile", "image-movie");
@@ -152,7 +150,7 @@ public class ImageToVideoWorkflowOperationHandlerTest {
 
     try {
       // run the operation handler
-      WorkflowOperationResult result = getWorkflowOperationResult(mp, configurations);
+      getWorkflowOperationResult(mp, configurations);
       Assert.fail();
     } catch (WorkflowOperationException e) {
       Assert.assertNotNull("Duration is required!", e);
@@ -165,7 +163,6 @@ public class ImageToVideoWorkflowOperationHandlerTest {
     EasyMock.expect(profile.getIdentifier()).andReturn(PROFILE_ID);
     EasyMock.expect(profile.getApplicableMediaType()).andReturn(MediaType.Image);
     EasyMock.expect(profile.getOutputType()).andReturn(MediaType.AudioVisual);
-    EasyMock.expect(profile.getMimeType()).andReturn(MimeTypes.MPEG4.toString()).times(2);
     EasyMock.replay(profile);
 
     // set up mock composer service

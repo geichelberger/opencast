@@ -21,17 +21,14 @@
 
 package org.opencastproject.mediapackage;
 
-import static com.entwinemedia.fn.Prelude.chuck;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 import static org.opencastproject.util.IoSupport.withResource;
 import static org.opencastproject.util.data.Collections.list;
-import static org.opencastproject.util.data.Option.option;
 import static org.opencastproject.util.data.functions.Booleans.not;
 import static org.opencastproject.util.data.functions.Options.sequenceOpt;
 import static org.opencastproject.util.data.functions.Options.toOption;
 
-import org.opencastproject.fun.juc.Immutables;
 import org.opencastproject.util.data.Effect;
 import org.opencastproject.util.data.Function;
 import org.opencastproject.util.data.Option;
@@ -40,13 +37,12 @@ import com.entwinemedia.fn.data.Opt;
 import com.entwinemedia.fn.fns.Strings;
 
 import org.apache.commons.io.FilenameUtils;
-import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.util.Collections;
 import java.util.List;
 
 /** Utility class used for media package handling. */
@@ -149,58 +145,6 @@ public final class MediaPackageSupport {
     }
   }
 
-  public static InputStream getJsonInputStream(MediaPackage mp) {
-    return getInputStream(MediaPackageParser.getAsJSON(mp));
-  }
-
-  public static InputStream getXmlInputStream(MediaPackage mp) {
-    return getInputStream(MediaPackageParser.getAsXml(mp));
-  }
-
-  public static InputStream getJsonInputStream(XMLCatalog catalog) {
-    try {
-      return getInputStream(catalog.toJson());
-    } catch (IOException e) {
-      return chuck(e);
-    }
-  }
-
-  public static InputStream getXmlInputStream(XMLCatalog catalog) {
-    try {
-      return getInputStream(catalog.toXmlString());
-    } catch (IOException e) {
-      return chuck(e);
-    }
-  }
-
-  /**
-   * Get a UTF-8 encoded input stream.
-   */
-  private static InputStream getInputStream(String s) {
-    try {
-      return IOUtils.toInputStream(s, "UTF-8");
-    } catch (IOException e) {
-      return chuck(e);
-    }
-  }
-
-  /** Immutable modification of a media package. */
-  public static MediaPackage modify(MediaPackage mp, Effect<MediaPackage> e) {
-    final MediaPackage clone = (MediaPackage) mp.clone();
-    e.apply(clone);
-    return clone;
-  }
-
-  /**
-   * Immutable modification of a media package element. Attention: The returned element loses its media package
-   * membership (see {@link org.opencastproject.mediapackage.AbstractMediaPackageElement#clone()})
-   */
-  public static <A extends MediaPackageElement> A modify(A mpe, Effect<A> e) {
-    final A clone = (A) mpe.clone();
-    e.apply(clone);
-    return clone;
-  }
-
   /**
    * Create a copy of the given media package.
    * <p>
@@ -209,11 +153,6 @@ public final class MediaPackageSupport {
    */
   public static MediaPackage copy(MediaPackage mp) {
     return (MediaPackage) mp.clone();
-  }
-
-  /** Create a copy of the given media package element. */
-  public static MediaPackageElement copy(MediaPackageElement mpe) {
-    return (MediaPackageElement) mpe.clone();
   }
 
   /** Update a mediapackage element of a mediapackage. Mutates <code>mp</code>. */
@@ -232,55 +171,10 @@ public final class MediaPackageSupport {
     };
   }
 
-  public static void removeElements(List<MediaPackageElement> es, MediaPackage mp) {
-    for (MediaPackageElement e : es) {
-      mp.remove(e);
-    }
-  }
-
-  public static Effect<MediaPackage> removeElements(final List<MediaPackageElement> es) {
-    return new Effect<MediaPackage>() {
-      @Override
-      protected void run(MediaPackage mp) {
-        removeElements(es, mp);
-      }
-    };
-  }
-
-  /** Replaces all elements of <code>mp</code> with <code>es</code>. Mutates <code>mp</code>. */
-  public static void replaceElements(MediaPackage mp, List<MediaPackageElement> es) {
-    for (MediaPackageElement e : mp.getElements())
-      mp.remove(e);
-    for (MediaPackageElement e : es)
-      mp.add(e);
-  }
-
   public static final Function<MediaPackageElement, String> getMediaPackageElementId = new Function<MediaPackageElement, String>() {
     @Override
     public String apply(MediaPackageElement mediaPackageElement) {
       return mediaPackageElement.getIdentifier();
-    }
-  };
-
-  public static final Function<MediaPackageElement, Option<String>> getMediaPackageElementReferenceId = new Function<MediaPackageElement, Option<String>>() {
-    @Override
-    public Option<String> apply(MediaPackageElement mediaPackageElement) {
-      return option(mediaPackageElement.getReference()).map(getReferenceId);
-    }
-  };
-
-  public static final Function<MediaPackageReference, String> getReferenceId = new Function<MediaPackageReference, String>() {
-    @Override
-    public String apply(MediaPackageReference mediaPackageReference) {
-      return mediaPackageReference.getIdentifier();
-    }
-  };
-
-  /** Get the checksum from a media package element. */
-  public static final Function<MediaPackageElement, Option<String>> getChecksum = new Function<MediaPackageElement, Option<String>>() {
-    @Override
-    public Option<String> apply(MediaPackageElement mpe) {
-      return option(mpe.getChecksum().getValue());
     }
   };
 
@@ -306,26 +200,7 @@ public final class MediaPackageSupport {
         @Override
         public List<MediaPackageElement> apply(MediaPackageElement mpe) {
           // match is commutative
-          return flavor.matches(mpe.getFlavor()) ? list(mpe) : Immutables.<MediaPackageElement> nil();
-        }
-      };
-    }
-
-    public static Function<MediaPackageElement, List<MediaPackageElement>> byTags(final List<String> tags) {
-      return new Function<MediaPackageElement, List<MediaPackageElement>>() {
-        @Override
-        public List<MediaPackageElement> apply(MediaPackageElement mpe) {
-          return mpe.containsTag(tags) ? list(mpe) : Immutables.<MediaPackageElement> nil();
-        }
-      };
-    }
-
-    /** {@link MediaPackageElement#containsTag(java.util.Collection)} as a function. */
-    public static Function<MediaPackageElement, Boolean> ofTags(final List<String> tags) {
-      return new Function<MediaPackageElement, Boolean>() {
-        @Override
-        public Boolean apply(MediaPackageElement mpe) {
-          return mpe.containsTag(tags);
+          return flavor.matches(mpe.getFlavor()) ? Collections.singletonList(mpe) : Collections.emptyList();
         }
       };
     }
@@ -398,15 +273,6 @@ public final class MediaPackageSupport {
       };
     }
 
-    public static Function<MediaPackageElement, Boolean> hasTag(final String tag) {
-      return new Function<MediaPackageElement, Boolean>() {
-        @Override
-        public Boolean apply(MediaPackageElement mpe) {
-          return mpe.containsTag(tag);
-        }
-      };
-    }
-
     /**
      * Return true if the element has a flavor that matches <code>flavor</code>.
      *
@@ -422,45 +288,12 @@ public final class MediaPackageSupport {
       };
     }
 
-    /**
-     * Return true if the element has a flavor that matches any of the <code>flavors</code>.
-     *
-     * @see MediaPackageElementFlavor#matches(MediaPackageElementFlavor)
-     */
-    public static Function<MediaPackageElement, Boolean> matchesFlavorAny(final List<MediaPackageElementFlavor> flavors) {
-      return new Function<MediaPackageElement, Boolean>() {
-        @Override
-        public Boolean apply(MediaPackageElement mpe) {
-          for (MediaPackageElementFlavor f : flavors) {
-            if (f.matches(mpe.getFlavor())) {
-              return true;
-            }
-          }
-          return false;
-        }
-      };
-    }
-
     public static final Function<MediaPackageElementFlavor, Function<MediaPackageElement, Boolean>> matchesFlavor = new Function<MediaPackageElementFlavor, Function<MediaPackageElement, Boolean>>() {
       @Override
       public Function<MediaPackageElement, Boolean> apply(final MediaPackageElementFlavor flavor) {
         return matchesFlavor(flavor);
       }
     };
-
-    /** {@link MediaPackageElementFlavor#matches(MediaPackageElementFlavor)} as a function. */
-    public static Function<MediaPackageElementFlavor, Boolean> matches(final MediaPackageElementFlavor flavor) {
-      return new Function<MediaPackageElementFlavor, Boolean>() {
-        @Override
-        public Boolean apply(MediaPackageElementFlavor f) {
-          return f.matches(flavor);
-        }
-      };
-    }
-
-    public static final Function<MediaPackageElement, Boolean> isXACML = MediaPackageSupport.Filters
-            .matchesFlavorAny(list(MediaPackageElements.XACML_POLICY, MediaPackageElements.XACML_POLICY_EPISODE,
-                    MediaPackageElements.XACML_POLICY_SERIES));
 
     public static final Function<MediaPackageElement, Boolean> isEpisodeAcl = new Function<MediaPackageElement, Boolean>() {
       @Override
@@ -475,14 +308,6 @@ public final class MediaPackageSupport {
       public Boolean apply(MediaPackageElement mpe) {
         // match is commutative
         return MediaPackageElements.EPISODE.matches(mpe.getFlavor());
-      }
-    };
-
-    public static final Function<MediaPackageElement, Boolean> isSeriesDublinCore = new Function<MediaPackageElement, Boolean>() {
-      @Override
-      public Boolean apply(MediaPackageElement mpe) {
-        // match is commutative
-        return MediaPackageElements.SERIES.matches(mpe.getFlavor());
       }
     };
 
@@ -535,8 +360,6 @@ public final class MediaPackageSupport {
 
   /**
    * Function to extract the ID of a media package.
-   *
-   * @deprecated use {@link Fn#getId}
    */
   @Deprecated
   public static final Function<MediaPackage, String> getId = new Function<MediaPackage, String>() {
@@ -551,33 +374,5 @@ public final class MediaPackageSupport {
     private Fn() {
     }
 
-    /** Function to extract the ID of a media package. */
-    public static final Function<MediaPackage, String> getId = new Function<MediaPackage, String>() {
-      @Override
-      public String apply(MediaPackage mp) {
-        return mp.getIdentifier().toString();
-      }
-    };
-
-    public static final Function<MediaPackage, List<MediaPackageElement>> getElements = new Function<MediaPackage, List<MediaPackageElement>>() {
-      @Override
-      public List<MediaPackageElement> apply(MediaPackage a) {
-        return Immutables.list(a.getElements());
-      }
-    };
-
-    public static final Function<MediaPackage, List<Track>> getTracks = new Function<MediaPackage, List<Track>>() {
-      @Override
-      public List<Track> apply(MediaPackage a) {
-        return Immutables.list(a.getTracks());
-      }
-    };
-
-    public static final Function<MediaPackage, List<Publication>> getPublications = new Function<MediaPackage, List<Publication>>() {
-      @Override
-      public List<Publication> apply(MediaPackage a) {
-        return Immutables.list(a.getPublications());
-      }
-    };
   }
 }

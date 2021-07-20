@@ -28,16 +28,25 @@ import static org.junit.Assert.assertEquals;
 import static org.opencastproject.workflow.api.WorkflowOperationResult.Action.CONTINUE;
 import static org.opencastproject.workflow.impl.SecurityServiceStub.DEFAULT_ORG_ADMIN;
 
-import org.opencastproject.job.api.Job;
+import org.opencastproject.assetmanager.api.AssetManager;
+import org.opencastproject.assetmanager.api.Snapshot;
+import org.opencastproject.assetmanager.api.Version;
+import org.opencastproject.assetmanager.api.query.AQueryBuilder;
+import org.opencastproject.assetmanager.api.query.ARecord;
+import org.opencastproject.assetmanager.api.query.AResult;
+import org.opencastproject.assetmanager.api.query.ASelectQuery;
+import org.opencastproject.assetmanager.api.query.Predicate;
+import org.opencastproject.assetmanager.api.query.Target;
+import org.opencastproject.assetmanager.api.query.VersionField;
+import org.opencastproject.elasticsearch.api.SearchResult;
+import org.opencastproject.elasticsearch.index.AbstractSearchIndex;
+import org.opencastproject.elasticsearch.index.event.EventSearchQuery;
 import org.opencastproject.job.api.JobContext;
-import org.opencastproject.job.api.JobImpl;
 import org.opencastproject.mediapackage.DefaultMediaPackageSerializerImpl;
 import org.opencastproject.mediapackage.MediaPackage;
 import org.opencastproject.mediapackage.MediaPackageBuilder;
 import org.opencastproject.mediapackage.MediaPackageBuilderFactory;
-import org.opencastproject.mediapackage.MediaPackageException;
-import org.opencastproject.mediapackage.identifier.UUIDIdBuilderImpl;
-import org.opencastproject.message.broker.api.MessageSender;
+import org.opencastproject.mediapackage.identifier.IdImpl;
 import org.opencastproject.metadata.api.MediaPackageMetadataService;
 import org.opencastproject.security.api.AccessControlList;
 import org.opencastproject.security.api.AclScope;
@@ -48,35 +57,34 @@ import org.opencastproject.security.api.OrganizationDirectoryService;
 import org.opencastproject.security.api.SecurityService;
 import org.opencastproject.security.api.UserDirectoryService;
 import org.opencastproject.serviceregistry.api.IncidentService;
-import org.opencastproject.serviceregistry.api.ServiceRegistry;
-import org.opencastproject.serviceregistry.api.ServiceRegistryException;
 import org.opencastproject.serviceregistry.api.ServiceRegistryInMemoryImpl;
-import org.opencastproject.serviceregistry.impl.jpa.ServiceRegistrationJpaImpl;
-import org.opencastproject.util.ConfigurationException;
 import org.opencastproject.util.NotFoundException;
 import org.opencastproject.util.data.Tuple;
 import org.opencastproject.workflow.api.AbstractWorkflowOperationHandler;
 import org.opencastproject.workflow.api.RetryStrategy;
 import org.opencastproject.workflow.api.WorkflowDefinition;
 import org.opencastproject.workflow.api.WorkflowDefinitionImpl;
+import org.opencastproject.workflow.api.WorkflowIdentifier;
 import org.opencastproject.workflow.api.WorkflowInstance;
 import org.opencastproject.workflow.api.WorkflowInstance.WorkflowState;
-import org.opencastproject.workflow.api.WorkflowInstanceImpl;
 import org.opencastproject.workflow.api.WorkflowOperationDefinitionImpl;
 import org.opencastproject.workflow.api.WorkflowOperationException;
 import org.opencastproject.workflow.api.WorkflowOperationHandler;
 import org.opencastproject.workflow.api.WorkflowOperationInstance;
 import org.opencastproject.workflow.api.WorkflowOperationInstance.OperationState;
-import org.opencastproject.workflow.api.WorkflowOperationInstanceImpl;
 import org.opencastproject.workflow.api.WorkflowOperationResult;
 import org.opencastproject.workflow.api.WorkflowOperationResult.Action;
 import org.opencastproject.workflow.api.WorkflowParser;
 import org.opencastproject.workflow.api.WorkflowQuery;
 import org.opencastproject.workflow.api.WorkflowSet;
+import org.opencastproject.workflow.api.WorkflowStateException;
 import org.opencastproject.workflow.api.WorkflowStateListener;
 import org.opencastproject.workflow.handler.workflow.ErrorResolutionWorkflowOperationHandler;
 import org.opencastproject.workflow.impl.WorkflowServiceImpl.HandlerRegistration;
 import org.opencastproject.workspace.api.Workspace;
+
+import com.entwinemedia.fn.Stream;
+import com.entwinemedia.fn.data.Opt;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -84,7 +92,6 @@ import org.easymock.EasyMock;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.File;
@@ -92,15 +99,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.Date;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.SortedMap;
-import java.util.TreeMap;
 
 public class WorkflowServiceImplTest {
 
@@ -121,6 +125,7 @@ public class WorkflowServiceImplTest {
   private Workspace workspace = null;
   private ServiceRegistryInMemoryImpl serviceRegistry = null;
   private SecurityService securityService = null;
+  private DefaultOrganization organization = null;
 
   private File sRoot = null;
 
@@ -168,7 +173,7 @@ public class WorkflowServiceImplTest {
     service.addWorkflowDefinitionScanner(scanner);
 
     // security service
-    DefaultOrganization organization = new DefaultOrganization();
+    organization = new DefaultOrganization();
     securityService = createNiceMock(SecurityService.class);
     expect(securityService.getUser()).andReturn(SecurityServiceStub.DEFAULT_ORG_ADMIN).anyTimes();
     expect(securityService.getOrganization()).andReturn(organization).anyTimes();
@@ -181,6 +186,19 @@ public class WorkflowServiceImplTest {
             .anyTimes();
     replay(userDirectoryService);
     service.setUserDirectoryService(userDirectoryService);
+
+    {
+      // This is the asset manager the workflow service itself uses. Further below is the asset manager for the solr
+      // index.
+      final AssetManager assetManager = createNiceMock(AssetManager.class);
+      EasyMock.expect(assetManager.selectProperties(EasyMock.anyString(), EasyMock.anyString()))
+              .andReturn(Collections.emptyList())
+              .anyTimes();
+      EasyMock.expect(assetManager.getMediaPackage(EasyMock.anyString())).andReturn(Opt.none()).anyTimes();
+      EasyMock.expect(assetManager.snapshotExists(EasyMock.anyString())).andReturn(true).anyTimes();
+      EasyMock.replay(assetManager);
+      service.setAssetManager(assetManager);
+    }
 
     AuthorizationService authzService = createNiceMock(AuthorizationService.class);
     expect(authzService.getActiveAcl((MediaPackage) EasyMock.anyObject()))
@@ -210,12 +228,10 @@ public class WorkflowServiceImplTest {
 
     serviceRegistry = new ServiceRegistryInMemoryImpl(service, securityService, userDirectoryService,
             organizationDirectoryService, incidentService);
-    serviceRegistry.registerHost(REMOTE_HOST, REMOTE_HOST, Runtime.getRuntime().totalMemory(), Runtime.getRuntime().availableProcessors(), Runtime.getRuntime().availableProcessors());
+    serviceRegistry.registerHost(REMOTE_HOST, REMOTE_HOST, "remote", Runtime.getRuntime().totalMemory(), Runtime.getRuntime().
+            availableProcessors(), Runtime.getRuntime().availableProcessors());
     serviceRegistry.registerService(REMOTE_SERVICE, REMOTE_HOST, "/path", true);
     service.setWorkspace(workspace);
-
-    MessageSender messageSender = createNiceMock(MessageSender.class);
-    replay(messageSender);
 
     dao = new WorkflowServiceSolrIndex();
     dao.setServiceRegistry(serviceRegistry);
@@ -226,11 +242,19 @@ public class WorkflowServiceImplTest {
     dao.activate("System Admin");
     service.setDao(dao);
     service.setServiceRegistry(serviceRegistry);
-    service.setMessageSender(messageSender);
     service.activate(null);
 
     InputStream is = null;
     try {
+      is = WorkflowServiceImplTest.class.getResourceAsStream("/workflow-definition-exception-handler.xml");
+      WorkflowDefinition exceptionHandler = WorkflowParser.parseWorkflowDefinition(is);
+      IOUtils.closeQuietly(is);
+
+      /* The exception handler workflow definition needs to be registered as the reference to it in 
+         workflow-definition-3 will be checked */
+      scanner.putWorkflowDefinition(
+              new WorkflowIdentifier("exception-handler", securityService.getOrganization().getId()), exceptionHandler);
+
       is = WorkflowServiceImplTest.class.getResourceAsStream("/workflow-definition-1.xml");
       workingDefinition = WorkflowParser.parseWorkflowDefinition(is);
       IOUtils.closeQuietly(is);
@@ -247,11 +271,6 @@ public class WorkflowServiceImplTest {
       pausingWorkflowDefinition = WorkflowParser.parseWorkflowDefinition(is);
       IOUtils.closeQuietly(is);
 
-      service.registerWorkflowDefinition(workingDefinition);
-      service.registerWorkflowDefinition(failingDefinitionWithoutErrorHandler);
-      service.registerWorkflowDefinition(failingDefinitionWithErrorHandler);
-      service.registerWorkflowDefinition(pausingWorkflowDefinition);
-
       MediaPackageBuilder mediaPackageBuilder = MediaPackageBuilderFactory.newInstance().newMediaPackageBuilder();
       mediaPackageBuilder.setSerializer(new DefaultMediaPackageSerializerImpl(new File("target/test-classes")));
 
@@ -267,6 +286,45 @@ public class WorkflowServiceImplTest {
     } catch (Exception e) {
       Assert.fail(e.getMessage());
     }
+
+    AssetManager assetManager = EasyMock.createNiceMock(AssetManager.class);
+    Version version = EasyMock.createNiceMock(Version.class);
+    Snapshot snapshot = EasyMock.createNiceMock(Snapshot.class);
+    // Just needs to return a mp, not checking which one
+    EasyMock.expect(snapshot.getMediaPackage()).andReturn(mediapackage1).anyTimes();
+    EasyMock.expect(snapshot.getOrganizationId()).andReturn(organization.getId()).anyTimes();
+    EasyMock.expect(snapshot.getVersion()).andReturn(version).anyTimes();
+    ARecord aRec = EasyMock.createNiceMock(ARecord.class);
+    EasyMock.expect(aRec.getSnapshot()).andReturn(Opt.some(snapshot)).anyTimes();
+    Stream<ARecord> recStream = Stream.mk(aRec);
+    Predicate p = EasyMock.createNiceMock(Predicate.class);
+    EasyMock.expect(p.and(p)).andReturn(p).anyTimes();
+    AResult r = EasyMock.createNiceMock(AResult.class);
+    EasyMock.expect(r.getRecords()).andReturn(recStream).anyTimes();
+    Target t = EasyMock.createNiceMock(Target.class);
+    ASelectQuery selectQuery = EasyMock.createNiceMock(ASelectQuery.class);
+    EasyMock.expect(selectQuery.where(EasyMock.anyObject(Predicate.class))).andReturn(selectQuery).anyTimes();
+    EasyMock.expect(selectQuery.run()).andReturn(r).anyTimes();
+    AQueryBuilder query = EasyMock.createNiceMock(AQueryBuilder.class);
+    EasyMock.expect(query.snapshot()).andReturn(t).anyTimes();
+    EasyMock.expect(query.mediaPackageId(EasyMock.anyObject(String.class))).andReturn(p).anyTimes();
+    EasyMock.expect(query.select(EasyMock.anyObject(Target.class))).andReturn(selectQuery).anyTimes();
+    VersionField v = EasyMock.createNiceMock(VersionField.class);
+    EasyMock.expect(v.isLatest()).andReturn(p).anyTimes();
+    EasyMock.expect(query.version()).andReturn(v).anyTimes();
+    EasyMock.expect(assetManager.createQuery()).andReturn(query).anyTimes();
+    EasyMock.replay(assetManager, version, snapshot, aRec, p, r, t, selectQuery, query, v);
+    dao.setAssetManager(assetManager);
+
+    SearchResult result = EasyMock.createNiceMock(SearchResult.class);
+
+    final AbstractSearchIndex index = EasyMock.createNiceMock(AbstractSearchIndex.class);
+    EasyMock.expect(index.getIndexName()).andReturn("index").anyTimes();
+    EasyMock.expect(index.getByQuery(EasyMock.anyObject(EventSearchQuery.class))).andReturn(result).anyTimes();
+    EasyMock.replay(result, index);
+
+    service.setAdminUiIndex(index);
+    service.setExternalApiIndex(index);
   }
 
   @After
@@ -359,7 +417,7 @@ public class WorkflowServiceImplTest {
 
     // Create a child workflow with a wrong parent id
     try {
-      service.start(workingDefinition, mediapackage1, new Long(1876234678), null);
+      service.start(workingDefinition, mediapackage1, new Long(1876234678), Collections.emptyMap());
       Assert.fail("Workflows should not be started with bad parent IDs");
     } catch (NotFoundException e) {
     } // the exception is expected
@@ -503,7 +561,7 @@ public class WorkflowServiceImplTest {
       if (parentId == null) {
         instance = service.start(definition, mp);
       } else {
-        instance = service.start(definition, mp, parentId, null);
+        instance = service.start(definition, mp, parentId, Collections.emptyMap());
       }
       stateListener.wait();
     }
@@ -618,8 +676,6 @@ public class WorkflowServiceImplTest {
     def.setId("workflow-definition-1");
     def.setTitle("workflow-definition-1");
     def.setDescription("workflow-definition-1");
-    def.setPublished(true);
-    service.registerWorkflowDefinition(def);
 
     WorkflowOperationDefinitionImpl opDef = new WorkflowOperationDefinitionImpl("failOneTime", "fails once", null, true);
     def.add(opDef);
@@ -639,8 +695,6 @@ public class WorkflowServiceImplTest {
     def.setId("workflow-definition-1");
     def.setTitle("workflow-definition-1");
     def.setDescription("workflow-definition-1");
-    def.setPublished(true);
-    service.registerWorkflowDefinition(def);
 
     WorkflowOperationDefinitionImpl opDef = new WorkflowOperationDefinitionImpl("failOneTime", "fails once", null, true);
     opDef.setRetryStrategy(RetryStrategy.RETRY);
@@ -661,8 +715,6 @@ public class WorkflowServiceImplTest {
     def.setId("workflow-definition-1");
     def.setTitle("workflow-definition-1");
     def.setDescription("workflow-definition-1");
-    def.setPublished(true);
-    service.registerWorkflowDefinition(def);
 
     WorkflowOperationDefinitionImpl opDef = new WorkflowOperationDefinitionImpl("failOneTime", "fails once", null, true);
     opDef.setRetryStrategy(RetryStrategy.HOLD);
@@ -692,8 +744,6 @@ public class WorkflowServiceImplTest {
     def.setId("workflow-definition-1");
     def.setTitle("workflow-definition-1");
     def.setDescription("workflow-definition-1");
-    def.setPublished(true);
-    service.registerWorkflowDefinition(def);
 
     WorkflowOperationDefinitionImpl opDef = new WorkflowOperationDefinitionImpl("failTwice", "fails twice", null, true);
     opDef.setRetryStrategy(RetryStrategy.HOLD);
@@ -749,8 +799,6 @@ public class WorkflowServiceImplTest {
     def.setId("workflow-definition-1");
     def.setTitle("workflow-definition-1");
     def.setDescription("workflow-definition-1");
-    def.setPublished(true);
-    service.registerWorkflowDefinition(def);
 
     WorkflowOperationDefinitionImpl opDef = new WorkflowOperationDefinitionImpl("failTwice", "fails twice", null, true);
     opDef.setRetryStrategy(RetryStrategy.HOLD);
@@ -801,30 +849,6 @@ public class WorkflowServiceImplTest {
     Assert.assertTrue(failTwiceOperation.getFailedAttempts() == 2);
   }
 
-  @Test
-  @Ignore
-  public void testRetryStrategyFailover() throws Exception {
-    WorkflowDefinitionImpl def = new WorkflowDefinitionImpl();
-    def.setId("workflow-definition-1");
-    def.setTitle("workflow-definition-1");
-    def.setDescription("workflow-definition-1");
-    def.setPublished(true);
-    service.registerWorkflowDefinition(def);
-
-    WorkflowOperationDefinitionImpl opDef = new WorkflowOperationDefinitionImpl("failOnHost", "fails on host", null,
-            true);
-    opDef.setRetryStrategy(RetryStrategy.RETRY);
-    def.add(opDef);
-
-    MediaPackage mp = MediaPackageBuilderFactory.newInstance().newMediaPackageBuilder().createNew();
-
-    WorkflowInstance workflow = startAndWait(def, mp, WorkflowState.SUCCEEDED);
-
-    Assert.assertTrue(service.getWorkflowById(workflow.getId()).getOperations().get(0).getState() == OperationState.SUCCEEDED);
-    Assert.assertTrue(service.getWorkflowById(workflow.getId()).getOperations().get(0).getMaxAttempts() == 2);
-    Assert.assertTrue(service.getWorkflowById(workflow.getId()).getOperations().get(0).getFailedAttempts() == 1);
-  }
-
   /**
    * Starts many concurrent workflows to test DB deadlock.
    *
@@ -841,8 +865,8 @@ public class WorkflowServiceImplTest {
 
     for (int i = 0; i < count; i++) {
       MediaPackage mp = i % 2 == 0 ? mediapackage1 : mediapackage2;
-      mp.setIdentifier(new UUIDIdBuilderImpl().createNew());
-      instances.add(service.start(workingDefinition, mp, null));
+      mp.setIdentifier(IdImpl.fromUUID());
+      instances.add(service.start(workingDefinition, mp, Collections.emptyMap()));
     }
 
     while (stateListener.countStateChanges() < count) {
@@ -855,69 +879,8 @@ public class WorkflowServiceImplTest {
     Assert.assertEquals(count, stateListener.countStateChanges(WorkflowState.SUCCEEDED));
   }
 
-  private WorkflowInstanceImpl setupWorkflowInstanceImpl(long id, String operation, WorkflowState state, Date startDate)
-          throws ConfigurationException, MediaPackageException, NotFoundException, ServiceRegistryException {
-
-    Job job = new JobImpl(id);
-    job = serviceRegistry.updateJob(job);
-
-    MediaPackage mediapackage = MediaPackageBuilderFactory.newInstance().newMediaPackageBuilder().createNew();
-    mediapackage.setDate(startDate);
-    mediapackage.setDuration(7200L);
-
-    WorkflowOperationInstanceImpl workflowOperation = new WorkflowOperationInstanceImpl(operation,
-            OperationState.PAUSED);
-    workflowOperation.setId(id);
-
-    List<WorkflowOperationInstance> workflowOperationInstanceList = new LinkedList<WorkflowOperationInstance>();
-    workflowOperationInstanceList.add(workflowOperation);
-
-    WorkflowInstanceImpl workflowInstanceImpl = new WorkflowInstanceImpl();
-    workflowInstanceImpl.setMediaPackage(mediapackage);
-    workflowInstanceImpl.setState(state);
-    workflowInstanceImpl.setId(id);
-    workflowInstanceImpl.setOperations(workflowOperationInstanceList);
-    return workflowInstanceImpl;
-  }
-
-  private void setupJob(long id, String operation, ServiceRegistry mockServiceRegistry)
-          throws ServiceRegistryException, NotFoundException {
-    ServiceRegistrationJpaImpl serviceRegistrationJpaImpl = EasyMock.createMock(ServiceRegistrationJpaImpl.class);
-    expect(serviceRegistrationJpaImpl.getHost()).andReturn("http://localhost:8080");
-    expect(serviceRegistrationJpaImpl.getServiceType()).andReturn(operation);
-    replay(serviceRegistrationJpaImpl);
-    List<String> arguments = new LinkedList<String>();
-    arguments.add(Long.toString(id));
-
-    Job job = createNiceMock(Job.class);
-    expect(job.getId()).andStubReturn(id);
-    expect(job.getCreator()).andStubReturn(securityService.getUser().getUsername());
-    expect(job.getOrganization()).andStubReturn(securityService.getOrganization().getId());
-    expect(job.getOperation()).andStubReturn("RESUME");
-    expect(job.getArguments()).andStubReturn(arguments);
-    expect(job.isDispatchable()).andStubReturn(false);
-    expect(job.getStatus()).andStubReturn(Job.Status.INSTANTIATED);
-    replay(job);
-    expect(mockServiceRegistry.getJob(id)).andReturn(job).anyTimes();
-    expect(mockServiceRegistry.updateJob(job)).andReturn(job);
-  }
-
-  private void setupExceptionJob(long id, Exception e, ServiceRegistry mockServiceRegistry)
-          throws ServiceRegistryException, NotFoundException {
-    expect(mockServiceRegistry.getJob(id)).andThrow(e).anyTimes();
-  }
-
-  private OrganizationDirectoryService setupMockOrganizationDirectoryService() {
-    List<Organization> organizations = new LinkedList<Organization>();
-    organizations.add(securityService.getOrganization());
-    OrganizationDirectoryService orgDirService = EasyMock.createMock(OrganizationDirectoryService.class);
-    expect(orgDirService.getOrganizations()).andReturn(organizations).anyTimes();
-    replay(orgDirService);
-    return orgDirService;
-  }
-
   /**
-   * Test for {@link WorkflowServiceImpl#remove(long)}
+   * Test for {@link WorkflowServiceImpl#remove(long, boolean)}
    *
    * @throws Exception
    *           if anything fails
@@ -926,19 +889,51 @@ public class WorkflowServiceImplTest {
   public void testRemove() throws Exception {
     WorkflowInstance wi1 = startAndWait(workingDefinition, mediapackage1, WorkflowState.SUCCEEDED);
     WorkflowInstance wi2 = startAndWait(workingDefinition, mediapackage2, WorkflowState.SUCCEEDED);
+    WorkflowInstance wi3 = startAndWait(pausingWorkflowDefinition, mediapackage1, WorkflowState.PAUSED);
 
     // reload instances, because operations have no id before
     wi1 = service.getWorkflowById(wi1.getId());
     wi2 = service.getWorkflowById(wi2.getId());
 
     service.remove(wi1.getId());
-    assertEquals(1, service.getWorkflowInstances(new WorkflowQuery()).size());
+    assertEquals(2, service.getWorkflowInstances(new WorkflowQuery()).size());
     for (WorkflowOperationInstance op : wi1.getOperations()) {
       assertEquals(0, serviceRegistry.getChildJobs(op.getId()).size());
     }
 
-    service.remove(wi2.getId());
+    service.remove(wi2.getId(), false);
+    assertEquals(1, service.getWorkflowInstances(new WorkflowQuery()).size());
+
+    try {
+      service.remove(wi3.getId(), false);
+      Assert.fail("A paused workflow shouldn't be removed without using force");
+    } catch (WorkflowStateException e) {
+      assertEquals(1, service.getWorkflowInstances(new WorkflowQuery()).size());
+    }
+
+    try {
+      service.remove(wi3.getId(), true);
+      assertEquals(0, service.getWorkflowInstances(new WorkflowQuery()).size());
+    } catch (WorkflowStateException e) {
+      Assert.fail(e.getMessage());
+    }
+  }
+
+  @Test
+  public void testRemoveWithDeletedCreator() throws Exception {
+    WorkflowInstance wi1 = startAndWait(workingDefinition, mediapackage1, WorkflowState.SUCCEEDED);
+    // reload instances, because operations have no id before
+    wi1 = service.getWorkflowById(wi1.getId());
+
+    UserDirectoryService userDirectoryService = EasyMock.createMock(UserDirectoryService.class);
+    expect(userDirectoryService.loadUser((String) EasyMock.anyObject())).andReturn(null);
+    replay(userDirectoryService);
+    service.setUserDirectoryService(userDirectoryService);
+    service.remove(wi1.getId());
     assertEquals(0, service.getWorkflowInstances(new WorkflowQuery()).size());
+    for (WorkflowOperationInstance op : wi1.getOperations()) {
+      assertEquals(0, serviceRegistry.getChildJobs(op.getId()).size());
+    }
   }
 
   /**
@@ -966,10 +961,6 @@ public class WorkflowServiceImplTest {
   }
 
   class SucceedingWorkflowOperationHandler extends AbstractWorkflowOperationHandler {
-    @Override
-    public SortedMap<String, String> getConfigurationOptions() {
-      return new TreeMap<String, String>();
-    }
 
     @Override
     public String getId() {
@@ -989,11 +980,6 @@ public class WorkflowServiceImplTest {
   }
 
   class FailingWorkflowOperationHandler extends AbstractWorkflowOperationHandler {
-    @Override
-    public SortedMap<String, String> getConfigurationOptions() {
-      return new TreeMap<String, String>();
-    }
-
     @Override
     public String getId() {
       return this.getClass().getName();

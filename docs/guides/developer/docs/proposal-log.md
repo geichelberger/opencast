@@ -1,20 +1,515 @@
 Opencast Proposals
 ==================
 
-All important decisions for Opencast have to be made on list. To do that committers may send proposals (marked with
-`#proposal`) to list on which other committers may then vote. Opencast uses lazy consensus meaning that no response
-signals agreement. Apart from that committers may vote with:
+All important decisions for Opencast have to be made on list. For more details, please have a look at out [documentation
+about decision making](decision-making/index.md).
 
- - `+1` yes, agree - also willing to help bring about the proposed action
- - `+0` yes, agree - not willing or able to help bring about the proposed action
- - `-0` no, disagree - but will not oppose the action going forward
- - `-1` veto, disagree - opposes the action going forward and must propose an alternate action to address the issue or a
-   justification for not addressing the issue
-
-A proposal is accepted when no veto (`-1`) is voted within a time spawn of 72 hours (not counting weekends) after being sent to list.
+The following list contains a list of passed proposals for reference.
 
 Passed Proposals
 ----------------
+
+### Closing old Pull Requests
+Proposed by Katrin Ihler <ihler@elan-ev.de>, passed on Mon, 9 Mar 2021
+
+```no-highlight
+Hi everyone,
+
+I'd like to establish a rule for closing old pull requests, since we
+have some of those lying around for quite a while and I'd like a
+guideline. I propose the following:
+
+A pull request can be closed if neither the pull request creator nor
+another person working on the PR has addressed any review findings
+within 6 months. (Note that this is optional, so we don't _have_ to do it.)
+
+A review would be considered addressed if the PR is amended or the
+finding is disputed. So a discussion would also count, but something
+like "I don't have time for this right now" wouldn't.
+
+Closing a PR doesn't constitute a rejection, it can be re-opened at any
+time once the person responsible can give it attention again.
+
+As usual, if no one objects, this proposal passes after the next 72 hours.
+
+Best regards,
+
+Katrin
+```
+
+### Release Notes
+Proposed by Greg Logan <gregorydlogan@gmail.com>, passed on Tue, 26 Jan 2021
+
+```no-highlight
+Hi all,
+
+As discussed in the dev meeting, I'm going to #propose that new features (ie,
+things that should be listed in the release notes) should create a new file
+under docs/guides/admin/releasenotes containing at least one line regarding the
+change.  At release time, rather than the release managers combing through the
+commits we can just cat the files together and have something sane.
+
+Suggested format: A single line short description, unless that description
+exceeds 120 characters, in which case multiple lines wrapping at 120.  If for
+some reason your features require a larger blurb that's ok too - this should be
+rare, so the RMs can check and move things about.  We will be checking before
+we commit the tag anyway, right? :)
+
+Short example:
+
+- My spiffy new feature, which lets Opencast run on a 386 in 64k of RAM.
+
+
+Long example:
+
+- My short description
+
+My longer feature description
+---------------------------------------
+Lorem ipsum....
+
+
+Proposal passes EOD 2021-01-26 UTC-6
+
+G
+```
+
+
+### Release Process Update
+Proposed by Lars Kiesow <lkiesow@uos.de>, passed on Thu, 24 Dec 2020
+
+```no-highlight
+Hi everyone,
+based on the discussion on list and in the technical meeting, Lukas and
+I have created a proposal for changing our release process and applying
+a new set of rules. You might notice that we have deliberately not
+included all of what we discussed but hopefully only what can get
+consensus for now.
+
+Apart from some minor changes, the main difference in here is that we
+transition from making a distinction between feature and bug fix to
+defining a set of rules that hopefully ensure smooth minor updates.
+
+If this proposal passes, we can work for there and refine this but we
+hope that this is a good starting point.
+
+
+## Release Schedule
+
+- Major releases happen every half year
+- Minor stable releases are cut monthly monthly
+- Minor legacy releases are cut on demand
+- Urgent minor releases may be cut if necessary
+- Feature freeze for a major version should be about a month before the
+  release
+
+
+## Accepting patches for minor releases
+
+- All patches need to be discussed in the technical meeting
+    - Minor changes should not take much time
+    - Protects against problematic changes in minor releases
+    - Exceptions may be discussed if necessary (e.g. version bumps for
+      libraries on develop)
+- Patches for minor releases must not
+    - Modify any existing database tables
+    - Modify the indexes or otherwise cause re-indexing
+    - Require a different ActiveMQ configuration
+    - Modify existing translations
+- Patches for minor releases must
+    - Work with the same configuration within a major version
+
+
+## Be Pragmatic
+
+- If everything is broken, don't let rules hold you back…
+    - There is always a special case: If in doubt talk to the community
+      and find a solution that works.
+    - Communication is key: If you think you need to break a rule,
+      coordinate that with the community.
+
+
+## Additional suggestions
+
+- Patches should be applied to the latest release branch if possible
+    - Avoid the risk of breaking legacy due to less testing
+    - Avoid unnecessary merge conflicts
+- Patches should avoid unnecessarily large changes in any release branch
+
+
+As usual, if no one objects, this proposal passes in three days.
+
+Best regards,
+Lars
+```
+
+
+### Relocate build infrastructure to main repository
+Proposed by Lars Kiesow <lkiesow@uos.de>, passed on Thu, 17 Dec 2020
+
+```no-highlight
+Hi everyone,
+as you are all aware there are multiple community members working on
+and maintaining infrastructure for different binary builds. For
+example, Greg is doing the Debian packages.
+
+All these are currently maintained in separate repositories… somewhere.
+Greg and I would like to bring these back to the main repositories to
+not loose track of what's available and where things are living.
+
+But maintaining these sometimes requires quick actions and we cannot
+really create a pull request every time a release is cut and then wait
+a week or two before it's merged until we can release the packaged
+version.
+
+That is why I #propose to allow for maintainers of these areas to work
+on these directly without running through our usual pull request and
+review rules.
+
+For example, that could mean that I could quickly update the RPM spec
+file if necessary while I would not be allowed to just modify the
+codebase (e.g. modules/*) on my own.
+
+Initially, I #propose the following areas and maintainers:
+
+  Debian build architecture              Greg Logan
+  RPM build architecture                 Lars Kiesow
+  docs.opencast.org build architecture   Lars Kiesow
+
+This doesn't really change anything at the moment since we are already
+in control of these parts right now. The difference would be that it's
+not maintained somewhere any longer but everyone knows where to find
+things and (potentially) how contribute.
+
+Of course, we can extend this whenever we need to to include more/less
+scripts. Though I suggest that we keep this to what we officially
+support.
+
+As usual, this proposal passes unless someone vetos it in the next 72h.
+
+Best regards,
+Lars
+```
+
+
+### JDK Support
+Proposed by Greg Logan<gregorydlogan@gmail.com>, passed on Wed, 11 Nov 2020
+
+```no-highlight
+Hi all,
+
+We have some old rules[1] around which JDK is supported by which version of Opencast, but obviously they are somewhat out of date at this point.  With that in mind, here's what I'm proposing:
+
+Opencast 8: Formal support for JDK 8, and nothing else
+Opencast 9: Formal support for JDKs 8 and 11, with a provisional "it should work" for newer versions[2]
+Opencast 10: Formal support for JDK 11, with a provisional "it should work" for newer versions
+
+Going forward, I would like to see a given version of Opencast support the latest two LTS JDKs as a general rule.
+
+#proposal passes if no objections are raised by EOD 2020-11-11
+
+G
+
+1: https://docs.opencast.org/develop/developer/#proposal-log/#requiring-java-18-for-30
+2: Note that JDK 11 is currently broken, at least until https://github.com/opencast/opencast/pull/2009 gets merged
+```
+
+
+### OSGi Annotations and Configuration
+Proposed by Lars Kiesow <lkiesow@uos.de>, passed on Wed, 7 Oct 2020
+
+```no-highlight
+Hi everyone,
+I hereby #propose that for all new code added to opencast
+
+- OSGi annotations should be used instead of XML files for specifying
+  components and dependencies.
+
+  Reason: This is far less error prone. Even on today's Review Friday,
+  we had problems with the XML files again. No wonder if you write
+  these manually.
+
+
+- @Activate and @Modified should be used for reading and updating
+  configuration instead of implementing a Managed Service.
+
+  Reason: Managed services are usually unnecessary and often make
+  runtime updates to services problematic (see webinar below)
+
+If there is a reason to go against these rules, it must be clearly
+stated on a pull request.
+
+OSGi component annotation example:
+
+  https://vt.uos.de/e5msw
+
+
+If you want to know more about the service configuration and see
+annotations in action, watch the “Opencast OSGI Configuration“ webinar:
+
+  https://video.ethz.ch/events/opencast/webinars/7261ea70-ce36-4e17-8634-963966311028.html
+
+This proposal passes on Wednesday evening if no one objects.
+
+Best regards,
+Lars
+```
+
+
+### JPA, PostgreSQL and DDL-Scripts
+Proposed by Lars Kiesow <lkiesow@uos.de>, passed on Wed, 30 Oct 2019
+
+```no-highlight
+Hi everyone,
+
+  tl;dr – we want to replace the manually maintained database set-up
+  scripts with JPA's auto-generation capabilities, properly including
+  optimizations like indices, constraints, … while re-introducing
+  proper support for PostgreSQL.
+
+
+We recently looked into re-introducing proper PostgreSQL support for
+Opencast, updating the driver [1], … – thanks to Beuth University – One
+task left now is to properly initialize the database.
+
+While we could now write our own initialization script for PostgreSQL,
+much like `docs/scripts/ddl/mysql5.sql `, we would like to spare us as
+community the double-effort and instead tackle an alternative route we
+have been discussing in the community for a long time now: Making
+Opencast generate a proper database schema on its own.
+
+To give you a few more details, if you do not use the DDL scripts, but
+just configure a database and start Opencast, you will already see a
+database schema being auto-generated and everything (kind of) magically
+works.
+
+However, due to a mix of historical reasons and some deliberate
+negligence on our side as developers – why do the JPA stuff properly if
+we have to write the DDL script anyway – the auto-generated schema is
+problematic for production since a lot of optimization is missing.
+
+We did already take a look at this, evaluating the amount of work [2]
+and fixing a few of the problems [3] but there is much more work to do.
+The first pull request [2] also outlines in much more detail the
+current state, what the problems are and what we have to do …if you are
+interested.
+
+Now, finally, we would like to continue this work. First, we are
+seeking help from others, fixing the issues, but more importantly,
+testing the work with your database set-ups.
+
+Additionally, for us, this work only makes sense if we get a proper
+PostgreSQL support out of it. Overall, I hope this will make supporting
+all databases easier since we do not need to write set-up SQL anymore,
+but for now, we do still need to write upgrade SQL statements and
+officially re-adding support for PostreSQL, this means that we need to
+write upgrade scripts for that as well – we are looking into fixing
+that problem as well, but that's a separate project ;-)
+
+Does anyone have objections to this plan?
+Does anyone want to help (with development or testing)?
+
+Best regards,
+Lars
+
+[1] https://github.com/opencast/opencast/pull/1103
+[2] https://github.com/opencast/opencast/pull/1105
+[3] https://github.com/opencast/opencast/pull/1133
+```
+
+
+### Pull request reviews
+Proposed by Lars Kiesow <lkiesow@uos.de>, passed on Thu, 7 Feb 2019
+
+```no-highlight
+Hi everyone,
+right now, we have 43 open pull requests. 23 of these are open for over
+a month. 12 are open for over two month. I find this a bit problematic.
+
+That is why I #propose to relax the requirement of reviewers as follows:
+
+  Pull requests with no major modification and no review for over a
+  month may be reviewed by developers from the same or related
+  organizations.
+
+
+Reasoning:
+
+I find our review process to be very valuable since it prevents a lot
+of bugs from getting into the code base in the first place. The state
+of develop is proof that it works great: Most of the time, you can spin
+up develop and use it without major issues. This state is completely
+different from Opencast develop back in 1.4 days.
+
+Nevertheless, it also puts a burden on the community since it sometimes
+makes it very hard to fix problems. Not only do you need to write the
+patch, but you also need to find someone completely unrelated to review
+this. This can be quite hard in some scenarios. Example: SWITCH tasks
+me with fixing a bug. This means that SWITCH is out of the loop for
+reviews and ELAN e.V. is out as well. But not only that. We are related
+to Osnabrück University so e.g. Rüdiger cannot review my patch and also
+e.g. Michael is working for plapadoo and ELAN so he is out as well. In
+short: ~80% of the regular reviewers are forbidden from taking the
+review.
+
+This example shows that our current rules can be problematic. This is
+not generally the case, but this can be the case.
+
+Going back to the original reasoning for this rule, it was an
+intentional decision to prevent a specific institution from just
+forcing code into Opencast without community involvement by creating a
+pull request and having a colleague simply merge it.
+
+Lifting the embargo after a month should have more or less the same
+effect. The community has a month to notice and complain about any
+given patch. Hence, no institution should be able to just push any code
+into Opencast. If no one complained or commented for a month to raise
+their concerns, it's unlikely that anyone really objects to the change
+and it just becomes a matter of a technical review (does the code
+have any problems). For that, any second developer should hopefully
+suffice.
+
+Please let me know if you have any objections to this change.
+As usual, this proposal will pass in 72h if no one objects.
+
+Best regards,
+Lars
+```
+
+
+### Automate translation merges
+Proposed by Lars Kiesow <lkiesow@uos.de>, passed on Wed, 29 Sept 2018
+
+```no-highlight
+Hi everyone,
+a few weeks ago we discussed on the technical meeting that it would be
+great if we could automatically merge back translations on a regular
+basis.
+
+That is why I hereby #propose:
+
+  Updates to translations for existing languages may be pushed into
+  Opencast's repository automatically.
+
+Note that adding or removing languages will still need a regular pull
+request and a review
+
+If this proposal passes, I can implement the automation.
+
+–Lars
+```
+
+
+### No more merge tickets
+Proposed by Lars Kiesow <lkiesow@uos.de>, passed on Thu, 17 May 2018
+
+```no-highlight
+Hi everyone,
+
+  tl;dr
+  I hereby #propose to drop the practice of keeping a Jira ticket for
+  synchronizing merges
+
+Today we had a short internal discussion about Opencast's merge tickets
+where we found that all of us here at Osnabrück think that we should
+drop the practice of keeping them.
+
+The original goal for those was to prevent two developers to merge
+things simultaneously causing conflicts for each other. Nowadays most
+people use Github's merge button anyway which makes this far less
+problematic since developers do not need to keep track of the upstream
+branch but can just merge which will just magically work as long as
+there is no conflict.
+
+Some people still merge via command line but they are usually those who
+can handle conflicts anyway ;-)
+
+What also plays into this proposal is that we do not have that many
+merges. So this is not that big a problem in the first place. And for
+the few occasions where there are many merges (e.g. I remember some
+merge sprints before a feature freeze) we always coordinated those
+efforts anyway (who is taking which review, what's the progress, …) so
+that not having a merge ticket wouldn't be a problem here either.
+
+From experience I can say that even for cutting a release I probably
+could have worked without a merge ticket with no problem: I pulled the
+version I was cutting into my local branch anyway, so I could work
+there and additional merges would not have interfered.
+
+Finally, if there is a rare case where it actually makes sense to block
+a branch, I deem us flexible enough to shout out on list, which may even
+work better since the message is not drowned by hundreds of similar
+messages :)
+
+Best regards,
+Lars
+```
+
+
+### Migrate Docker Images to Quay.io
+Proposed by Matthias Neugebauer <matthias.neugebauer@uni-muenster.de>, passed on Tue, 1 May 2018
+
+```no-highlight
+Hi,
+
+as you might have noticed, there are currently no images available on Docker Hub
+for Opencast 4.3. The problem is, that Docker Hub itself uses an old version of
+Docker to build new images (version 17.06.1 is from mid 2017). When Opencast 4.3
+was released, I prepared new Dockerfiles and also fixed an issue that resulted
+in unnecessary large images. Now the problem is, that this requires (only for
+building images) a feature that was only added to Docker 17.09 in September
+2017. In addition, I found Docker Hub to be really slow and unreliable. Builds
+start minutes after triggering and take a long time to complete. And there are
+times when nearly all builds simply fail, e.g. because the base image could not
+be downloaded or the machine used for building run out of disk space. All things
+that should not happen leaving me quite frustrated with Docker Hub.
+
+While Docker Hub is the "official" (more like default) image registry, there
+exist multiple alternatives. Quay (https://quay.io/), for example, is another
+bigger registry now run by CoreOS (owned by Red Hat). The service is free for
+public images and offers some additional features compared to Docker Hub (e.g.
+image vulnerability scanning). In my initial tests, I was really pleased. I
+don't know what they are doing, but image builds start quick and take under 6
+minutes! My local builds take 15-20 minutes :D
+
+To come to the point: I herby #propose to further test out Quay and, if this
+service performs well, migrate the Docker images to this registry. For the
+tests, I would need to connect the opencast-docker repository to Quay, for which
+I don't have the permissions. Also, the migration would leave the already
+existing images on Docker Hub, but users would be advised to use the new
+repository ("quay.io/opencast/allinone" instead of "opencast/allinone").
+
+Best regards
+Matthias
+```
+
+
+### Drop Undocumented Workflow Handler
+Proposed by Lars Kiesow <lkiesow@uos.de>, passed on Fri, 10 Nov 2017
+
+```no-highlight
+Hi,
+lately I discovered a couple of undocumented and probably unused
+workflow operation handler, for example the 'failing' operation to name
+one of them. All of these are not really useful in their current
+undocumented form. That is why I hereby #propose to
+
+  drop all workflow operation handler still undocumented at the end of
+  the year.
+
+If this proposal passes, I will create and publish a list of all
+operations which would be dropped in their current state. If someone
+still wants to keep any of them, the only thing they need to do is to
+write a short documentation page for those operations. A task easily
+done.
+
+That way we may get rid of some unused, unnecessary old operations
+while ensuring that all of the actually useful ones are documented and
+thus usable without special inner knowledge of Opencast.
+
+Regards,
+Lars
+```
 
 ### Changing Translation Sources
 Proposed by Sven Stauber <sven.stauber@switch.ch>, passed on December 20, 2017
@@ -22,9 +517,12 @@ Proposed by Sven Stauber <sven.stauber@switch.ch>, passed on December 20, 2017
 ```no-highlight
 Dear Opencast Developers
 
-I hereby #propose to add an additional rule to our development process as described on [1]:
+I hereby #propose to add an additional rule to our development process as
+described on [1]:
 
-Adding or changing translation sources is not allowed in release branches (implying that pull requests doing so need to be directed to the branch develop).
+Adding or changing translation sources is not allowed in release branches
+(implying that pull requests doing so need to be directed to the branch
+develop).
 
 Best regards
 Sven
@@ -38,11 +536,20 @@ Proposed by Greg Logan <gregorydlogan@gmail.com>, passed on November 17, 2017
 ```no-highlight
 Hi all,
 
-Per the discussion in the meeting today, we need to set a policy regarding what is expected of our Crowdin translators prior to joining the translation team.  My proposal is that they must write a brief, understandable sentence regarding why they want to help translate Opencast via the Crowdin UI.  This is an optional field in the workflow where they request to be a translator (ie, no new tools or fields) which is sometimes filled in, but mostly left blank.  Something like
+Per the discussion in the meeting today, we need to set a policy regarding what
+is expected of our Crowdin translators prior to joining the translation team.
+My proposal is that they must write a brief, understandable sentence regarding
+why they want to help translate Opencast via the Crowdin UI.  This is an
+optional field in the workflow where they request to be a translator (ie, no new
+tools or fields) which is sometimes filled in, but mostly left blank.  Something
+like
 
 'I want to help translate $project into [language]'
 
-would be sufficient.  This filters out the bots, yet is simple enough that someone with Google translate ought to be able to work something out.  Once this passes I will update the Crowdin and Opencast docs regarding the requirements, and then we should be good to go.
+would be sufficient.  This filters out the bots, yet is simple enough that
+someone with Google translate ought to be able to work something out.  Once this
+passes I will update the Crowdin and Opencast docs regarding the requirements,
+and then we should be good to go.
 
 Proposal closes EOD 2017-11-17.
 ```
@@ -153,16 +660,18 @@ Lars
 Proposed by Stephen Marquard <stephen.marquard@uct.ac.za>, passed on June 9, 2017
 
 ```no-highlight
-To reduce the overhead involved in improving our documentation, I #propose that minor fixes
-to documentation may be committed to either maintenance branches or develop without requiring
-a JIRA issue or pull request.
+To reduce the overhead involved in improving our documentation, I #propose that
+minor fixes to documentation may be committed to either maintenance branches or
+develop without requiring a JIRA issue or pull request.
 
-Markdown docs can be edited directly on bitbucket (and git should we move to that), which is 
-a very fast and convenient way for developers to fix documentation.
+Markdown docs can be edited directly on bitbucket (and git should we move to
+that), which is a very fast and convenient way for developers to fix
+documentation.
 
-Constraints: documentation fixes committed in this way should be minor changes only;
-for example fixing typos, layout, formatting, links or small changes to existing content, 
-but no significant new content (which should continue to go through the usual review process).
+Constraints: documentation fixes committed in this way should be minor changes
+only; for example fixing typos, layout, formatting, links or small changes to
+existing content, but no significant new content (which should continue to go
+through the usual review process).
 ```
 
 ### Requiring Java 1.8 for 3.0
@@ -186,6 +695,50 @@ to cut the release.
 
 G
 ```
+
+
+### Change version numbers scheme
+Proposed by Rüdiger Rolf <rrolf@uni-osnabrueck.de>>, passed on Mar 23, 2017
+
+```no-highlight
+Hi all,
+
+as we currently approach a new release, I would like to raise a question
+when it comes to our version numbers: du we need a version number that
+consists of three parts?
+
+At the moment we have
+<main-version-number>.<major-release-number>.<minor-release-number>.
+
+With our current release process, with a new release every 6 month we
+would always increase the <major-release-number>. Additional to this we
+have the <minor-release-number> for bug-fix-releases, whenever they are
+needed.
+
+But we do not have a process for increasing the <main-version-number>.
+Okay 2 years ago we were lucky enough that two long running sub-projects
+that replaced all UIs in one release were finished. That was an obvious
+reason to increase the main version. But will we ever be that lucky
+again? Is only replacing all UIs justifying a main version increase?
+If I look at the project history we had several milestones that could
+have justified a new main version, like a nearly complete refactoring of
+the backend in 1.4, the video-editor in 1.6, the Karaf update in 2.1,
+the External API in 2.3.
+
+*So my #proposal would be to remove the first part of the version number
+for all upcoming releases. So our next release would be 3.0 and the
+release at the end of the year it would be 4.0. *
+
+We would follow other projects like Sakai in this change  - although
+without the confusing part of going from 2.9.3 to 10.0, where they
+removed the first number.
+
+What are your thoughts?
+
+Regards
+Rüdiger
+```
+
 
 ### Officially declare the Admin UI Facade as internal API for exclusive use by the module matterhorn-adminui-ng
 Proposed by Sven Stauber <sven.stauber@switch.ch>, passed on December 16, 2016
@@ -241,7 +794,7 @@ draft [1] into account, although I still dared to include the two last
 items but this time, hopefully with a convincing reason for why they
 should be removed.
 
-1. Old Administrative User Interface (admin-ui)
+1. Old Administrative User Interface (matterhorn-admin-ui)
    The reason for this should be obvious: We got a new one. The old one
    has not been tested for the last three releases, is not linked
    anywhere anymore and is partly buggy due to changes to Opencast. To
@@ -314,7 +867,7 @@ should be removed.
     except by components to be removed.
 
 
-20. search-service-feeds
+20. matterhorn-search-service-feeds
     Broken implementation for RSS/Atom feeds
 
 21. matterhorn-caption-* and embed operation
@@ -352,7 +905,7 @@ Hi,
 we discussed this on today's technical meeting and I'm slightly
 changing the proposal:
 
-20. Let's remove search-service-feeds only after September
+20. Let's remove matterhorn-search-service-feeds only after September
     1st which is a realistic time to get things into the next Opencast
     release. If someone has fixed the issue by them, we will, of
     course, keep it.

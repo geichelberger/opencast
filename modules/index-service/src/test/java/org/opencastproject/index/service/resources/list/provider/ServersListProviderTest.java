@@ -23,9 +23,9 @@ package org.opencastproject.index.service.resources.list.provider;
 
 import static org.junit.Assert.assertEquals;
 
-import org.opencastproject.index.service.exception.ListProviderException;
-import org.opencastproject.index.service.resources.list.api.ResourceListQuery;
 import org.opencastproject.index.service.resources.list.query.ServersListQuery;
+import org.opencastproject.list.api.ListProviderException;
+import org.opencastproject.list.api.ResourceListQuery;
 import org.opencastproject.serviceregistry.api.HostRegistration;
 import org.opencastproject.serviceregistry.api.JaxbHostRegistration;
 import org.opencastproject.serviceregistry.api.ServiceRegistry;
@@ -55,10 +55,10 @@ public class ServersListProviderTest {
     serverListProvider = new ServersListProvider();
 
     List<HostRegistration> hosts = new ArrayList<HostRegistration>();
-    hosts.add(new JaxbHostRegistration(HOST1, "1.1.1.1", 400000, 8, 8, true, false));
-    hosts.add(new JaxbHostRegistration(HOST2, "1.1.1.2", 400000, 8, 8, true, true));
-    hosts.add(new JaxbHostRegistration(HOST3, "1.1.1.3", 500000, 2, 8, false, false));
-    hosts.add(new JaxbHostRegistration(HOST4, "1.1.1.4", 500000, 6, 8, true, true));
+    hosts.add(new JaxbHostRegistration(HOST1, "1.1.1.1", "node1", 400000, 8, 8, true, false));
+    hosts.add(new JaxbHostRegistration(HOST2, "1.1.1.2", "node2", 400000, 8, 8, true, true));
+    hosts.add(new JaxbHostRegistration(HOST3, "1.1.1.3", "node3", 500000, 2, 8, false, false));
+    hosts.add(new JaxbHostRegistration(HOST4, "1.1.1.4", "node4", 500000, 6, 8, true, true));
 
     EasyMock.expect(serviceRegistry.getHostRegistrations()).andReturn(hosts).anyTimes();
 
@@ -72,16 +72,17 @@ public class ServersListProviderTest {
   public void testListNames() throws ListProviderException {
     ResourceListQuery query = new ServersListQuery();
 
-    assertEquals(4, serverListProvider.getList("non-existing-name", query, null).size());
-    assertEquals(4, serverListProvider.getList(ServersListProvider.LIST_HOSTNAME, query, null).size());
-    assertEquals(3, serverListProvider.getList(ServersListProvider.LIST_STATUS, query, null).size());
+    assertEquals(4, serverListProvider.getList("non-existing-name", query).size());
+    assertEquals(4, serverListProvider.getList(ServersListProvider.LIST_HOSTNAME, query).size());
+    assertEquals(4, serverListProvider.getList(ServersListProvider.LIST_NODE_NAME, query).size());
+    assertEquals(3, serverListProvider.getList(ServersListProvider.LIST_STATUS, query).size());
   }
 
   @Test
   public void testHostnameList() throws ListProviderException {
     ResourceListQuery query = new ServersListQuery();
 
-    Map<String, String> list = serverListProvider.getList(ServersListProvider.LIST_HOSTNAME, query, null);
+    Map<String, String> list = serverListProvider.getList(ServersListProvider.LIST_HOSTNAME, query);
     assertEquals(HOST1, list.get(HOST1));
     assertEquals(HOST2, list.get(HOST2));
     assertEquals(HOST3, list.get(HOST3));
@@ -89,10 +90,21 @@ public class ServersListProviderTest {
   }
 
   @Test
+  public void testNodeNameList() throws ListProviderException {
+    ResourceListQuery query = new ServersListQuery();
+
+    Map<String, String> list = serverListProvider.getList(ServersListProvider.LIST_NODE_NAME, query);
+    assertEquals("node1", list.get("node1"));
+    assertEquals("node2", list.get("node2"));
+    assertEquals("node3", list.get("node3"));
+    assertEquals("node4", list.get("node4"));
+  }
+
+  @Test
   public void testStatusList() throws ListProviderException {
     ResourceListQuery query = new ServersListQuery();
 
-    Map<String, String> list = serverListProvider.getList(ServersListProvider.LIST_STATUS, query, null);
+    Map<String, String> list = serverListProvider.getList(ServersListProvider.LIST_STATUS, query);
     assertEquals(ServersListProvider.SERVER_STATUS_LABEL_ONLINE, list.get(ServersListProvider.SERVER_STATUS_ONLINE));
     assertEquals(ServersListProvider.SERVER_STATUS_LABEL_OFFLINE, list.get(ServersListProvider.SERVER_STATUS_OFFLINE));
     assertEquals(ServersListProvider.SERVER_STATUS_LABEL_MAINTENANCE, list.get(ServersListProvider.SERVER_STATUS_MAINTENANCE));

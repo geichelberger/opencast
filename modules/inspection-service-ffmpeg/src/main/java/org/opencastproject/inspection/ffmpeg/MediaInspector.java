@@ -30,6 +30,7 @@ import org.opencastproject.inspection.ffmpeg.api.MediaAnalyzer;
 import org.opencastproject.inspection.ffmpeg.api.MediaAnalyzerException;
 import org.opencastproject.inspection.ffmpeg.api.MediaContainerMetadata;
 import org.opencastproject.inspection.ffmpeg.api.VideoStreamMetadata;
+import org.opencastproject.mediapackage.AdaptivePlaylist;
 import org.opencastproject.mediapackage.MediaPackageElement;
 import org.opencastproject.mediapackage.MediaPackageElementBuilder;
 import org.opencastproject.mediapackage.MediaPackageElementBuilderFactory;
@@ -42,7 +43,6 @@ import org.opencastproject.mediapackage.track.TrackImpl;
 import org.opencastproject.mediapackage.track.VideoStreamImpl;
 import org.opencastproject.util.Checksum;
 import org.opencastproject.util.ChecksumType;
-import org.opencastproject.util.IoSupport;
 import org.opencastproject.util.MimeType;
 import org.opencastproject.util.MimeTypes;
 import org.opencastproject.util.NotFoundException;
@@ -52,18 +52,11 @@ import org.opencastproject.workspace.api.Workspace;
 
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.BooleanUtils;
-import org.apache.tika.metadata.HttpHeaders;
-import org.apache.tika.metadata.Metadata;
-import org.apache.tika.parser.ParseContext;
-import org.apache.tika.parser.Parser;
-import org.apache.tika.sax.BodyContentHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URI;
 import java.util.Dictionary;
 import java.util.Hashtable;
@@ -80,13 +73,10 @@ public class MediaInspector {
   private static final Logger logger = LoggerFactory.getLogger(MediaInspector.class);
 
   private final Workspace workspace;
-  /** The Apache Tika parser */
-  private final Parser tikaParser;
   private final String ffprobePath;
 
-  public MediaInspector(Workspace workspace, Parser tikaParser, String ffprobePath) {
+  public MediaInspector(Workspace workspace, String ffprobePath) {
     this.workspace = workspace;
-    this.tikaParser = tikaParser;
     this.ffprobePath = ffprobePath;
   }
 
@@ -146,29 +136,8 @@ public class MediaInspector {
         }
 
         // Mimetype
-        InputStream is = null;
-        try {
-          // Try to get the Mimetype from Apache Tika
-          is = new FileInputStream(file);
-          MimeType mimeType = extractContentType(is);
-
-          // If Mimetype could not be extracted try to get it from opencast
-          if (mimeType == null) {
-            mimeType = MimeTypes.fromURL(file.toURI().toURL());
-
-            // The mimetype library doesn't know about audio/video metadata, so the type might be wrong.
-            if ("audio".equals(mimeType.getType()) && metadata.hasVideoStreamMetadata()) {
-              mimeType = MimeTypes.parseMimeType("video/" + mimeType.getSubtype());
-            } else if ("video".equals(mimeType.getType()) && !metadata.hasVideoStreamMetadata()) {
-              mimeType = MimeTypes.parseMimeType("audio/" + mimeType.getSubtype());
-            }
-          }
-          track.setMimeType(mimeType);
-        } catch (Exception e) {
-          logger.error("Unable to find mimetype for {}", file.getAbsolutePath());
-        } finally {
-          IoSupport.closeQuietly(is);
-        }
+        track.setMimeType(metadata.getMimeType());
+        track.setMaster(metadata.getAdaptiveMaster());
 
         // Audio metadata
         try {
@@ -177,12 +146,15 @@ public class MediaInspector {
           throw new MediaInspectionException("Unable to extract audio metadata from " + file, e);
         }
 
-        // Videometadata
+        // Video metadata
         try {
           addVideoStreamMetadata(track, metadata);
         } catch (Exception e) {
           throw new MediaInspectionException("Unable to extract video metadata from " + file, e);
         }
+
+        // File size
+        track.setSize(file.length());
 
         return track;
       }
@@ -270,6 +242,11 @@ public class MediaInspector {
         track.setElementDescription(originalTrack.getElementDescription());
         track.setFlavor(flavor);
         track.setIdentifier(originalTrack.getIdentifier());
+        // If HLS
+        if (!originalTrack.hasMaster() || override)
+          track.setMaster(metadata.getAdaptiveMaster());
+        else
+          track.setMaster(originalTrack.isMaster());
         track.setMimeType(originalTrack.getMimeType());
         track.setReference(originalTrack.getReference());
         track.setSize(file.length());
@@ -291,19 +268,7 @@ public class MediaInspector {
 
         // Add the mime type if it's not already present
         if (track.getMimeType() == null || override) {
-          try {
-            MimeType mimeType = MimeTypes.fromURI(track.getURI());
-
-            // The mimetype library doesn't know about audio/video metadata, so the type might be wrong.
-            if ("audio".equals(mimeType.getType()) && metadata.hasVideoStreamMetadata()) {
-              mimeType = MimeTypes.parseMimeType("video/" + mimeType.getSubtype());
-            } else if ("video".equals(mimeType.getType()) && !metadata.hasVideoStreamMetadata()) {
-              mimeType = MimeTypes.parseMimeType("audio/" + mimeType.getSubtype());
-            }
-            track.setMimeType(mimeType);
-          } catch (UnknownFileTypeException e) {
-            logger.info("Unable to detect the mimetype for track {} at {}", track.getIdentifier(), track.getURI());
-          }
+            track.setMimeType(metadata.getMimeType());
         }
 
         // find all streams
@@ -375,7 +340,7 @@ public class MediaInspector {
       // Mimetype
       if (element.getMimeType() == null || override) {
         try {
-          element.setMimeType(MimeTypes.fromURI(file.toURI()));
+          element.setMimeType(MimeTypes.fromString(file.getPath()));
         } catch (UnknownFileTypeException e) {
           logger.info("unable to determine the mime type for {}", file.getName());
         }
@@ -409,7 +374,34 @@ public class MediaInspector {
     try {
       MediaAnalyzer analyzer = new FFmpegAnalyzer(accurateFrameCount);
       analyzer.setConfig(map(Tuple.<String, Object> tuple(FFmpegAnalyzer.FFPROBE_BINARY_CONFIG, ffprobePath)));
-      return analyzer.analyze(file);
+
+      MediaContainerMetadata metadata = analyzer.analyze(file);
+      // - setting mimetype for all media
+      try {
+        // Add mimeType - important for some browsers, eg: safari
+        MimeType mimeType = MimeTypes.fromString(file.getName());
+        // TODO: DO we need this
+        // The mimetype library doesn't know about audio/video metadata, so the type might be wrong.
+        if ("audio".equals(mimeType.getType()) && metadata.hasVideoStreamMetadata()) {
+          mimeType = MimeTypes.parseMimeType("video/" + mimeType.getSubtype());
+        } else if ("video".equals(mimeType.getType()) && !metadata.hasVideoStreamMetadata()) {
+          mimeType = MimeTypes.parseMimeType("audio/" + mimeType.getSubtype());
+        }
+        metadata.setMimeType(mimeType);
+      } catch (UnknownFileTypeException e) {
+        logger.error("parsing mimeType failed for {} : {}", file, e.getMessage());
+        throw new MediaAnalyzerException("parsing mimetype failed for file" + file);
+      }
+      // - setting adaptive play list master
+      // ffmpeg will show format_name == hls
+      // but does not distinguish variant playlist from master
+      try { // parse text only for correct file extensions
+        metadata.setAdaptiveMaster(AdaptivePlaylist.checkForMaster(file));
+      } catch (IOException e) {
+        logger.error("parsing adaptive playlist failed for {} : {}", file, e.getMessage());
+        throw new MediaAnalyzerException("parsing for adaptive playlist master failed for file" + file);
+      }
+      return metadata;
     } catch (MediaAnalyzerException e) {
       throw new MediaInspectionException(e);
     }
@@ -477,31 +469,6 @@ public class MediaInspector {
       }
     }
     return track;
-  }
-
-  /**
-   * Determines the content type of an input stream. This method reads part of the stream, so it is typically best to
-   * close the stream immediately after calling this method.
-   *
-   * @param in
-   *          the input stream
-   * @return the content type
-   */
-  private MimeType extractContentType(InputStream in) {
-    try {
-      // Find the content type, based on the stream content
-      BodyContentHandler contenthandler = new BodyContentHandler();
-      Metadata metadata = new Metadata();
-      ParseContext context = new ParseContext();
-      tikaParser.parse(in, contenthandler, metadata, context);
-      String mimeType = metadata.get(HttpHeaders.CONTENT_TYPE);
-      if (mimeType == null)
-        return null;
-      return MimeTypes.parseMimeType(mimeType);
-    } catch (Exception e) {
-      logger.warn("Unable to extract mimetype from input stream, ", e);
-      return null;
-    }
   }
 
   /* Return true if OPTION_ACCURATE_FRAME_COUNT is set to true, false otherwise */

@@ -29,13 +29,12 @@ import org.opencastproject.mediapackage.MediaPackage;
 import org.opencastproject.mediapackage.MediaPackageBuilderFactory;
 import org.opencastproject.mediapackage.MediaPackageElementFlavor;
 import org.opencastproject.mediapackage.MediaPackageParser;
-import org.opencastproject.mediapackage.identifier.UUIDIdBuilderImpl;
+import org.opencastproject.mediapackage.identifier.IdImpl;
 import org.opencastproject.workflow.api.WorkflowInstanceImpl;
 
 import org.apache.commons.fileupload.MockHttpServletRequest;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.cxf.jaxrs.impl.MetadataMap;
 import org.easymock.Capture;
 import org.easymock.EasyMock;
 import org.junit.Assert;
@@ -50,12 +49,12 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.util.HashMap;
 import java.util.Map;
 
 import javax.servlet.ReadListener;
 import javax.servlet.ServletInputStream;
 import javax.servlet.http.HttpServletRequest;
-import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
@@ -85,7 +84,7 @@ public class IngestRestServiceTest {
             .andReturn(MediaPackageBuilderFactory.newInstance().newMediaPackageBuilder().createNew());
     EasyMock.expect(ingestService.createMediaPackage("1a6f70ab-4262-4523-9f8e-babce22a1ea8"))
             .andReturn(MediaPackageBuilderFactory.newInstance().newMediaPackageBuilder()
-                    .createNew(new UUIDIdBuilderImpl().fromString("1a6f70ab-4262-4523-9f8e-babce22a1ea8")));
+                    .createNew(new IdImpl("1a6f70ab-4262-4523-9f8e-babce22a1ea8")));
     EasyMock.expect(ingestService.addAttachment((URI) EasyMock.anyObject(),
             (MediaPackageElementFlavor) EasyMock.anyObject(), (MediaPackage) EasyMock.anyObject()))
             .andReturn(MediaPackageBuilderFactory.newInstance().newMediaPackageBuilder().createNew());
@@ -253,12 +252,15 @@ public class IngestRestServiceTest {
 
     String mpId = "6f7a7850-3232-4719-9064-24c9bad2832f";
 
-    MultivaluedMap<String, String> metadataMap = new MetadataMap<>();
     Response createMediaPackage = restService.createMediaPackage();
     MediaPackage mp = (MediaPackage) createMediaPackage.getEntity();
-    metadataMap.add("mediaPackage", MediaPackageParser.getAsXml(mp));
-    metadataMap.add(IngestRestService.WORKFLOW_INSTANCE_ID_PARAM, mpId);
-    Response response = restService.ingest(metadataMap);
+    Map<String, String[]> metadataMap = new HashMap<>();
+    metadataMap.put("mediaPackage", new String[] {MediaPackageParser.getAsXml(mp)});
+    metadataMap.put(IngestRestService.WORKFLOW_INSTANCE_ID_PARAM, new String[] {mpId});
+    HttpServletRequest request = EasyMock.createNiceMock(HttpServletRequest.class);
+    EasyMock.expect(request.getParameterMap()).andReturn(metadataMap).anyTimes();
+    EasyMock.replay(request);
+    Response response = restService.ingest(request);
     Assert.assertEquals(Status.OK.getStatusCode(), response.getStatus());
     Map<String, String> config = workflowConfigCapture.getValue();
     Assert.assertFalse(config.isEmpty());

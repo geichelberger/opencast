@@ -34,7 +34,6 @@ import static com.entwinemedia.fn.parser.Parsers.token;
 import static com.entwinemedia.fn.parser.Parsers.yield;
 import static java.lang.String.format;
 import static org.opencastproject.util.EqualsUtil.eq;
-import static org.opencastproject.util.data.Tuple.tuple;
 
 import org.opencastproject.composer.api.ComposerService;
 import org.opencastproject.composer.api.EncodingProfile;
@@ -48,15 +47,17 @@ import org.opencastproject.mediapackage.MediaPackageElementFlavor;
 import org.opencastproject.mediapackage.MediaPackageElementParser;
 import org.opencastproject.mediapackage.MediaPackageException;
 import org.opencastproject.mediapackage.MediaPackageSupport;
-import org.opencastproject.mediapackage.MediaPackageSupport.Filters;
 import org.opencastproject.mediapackage.Track;
+import org.opencastproject.mediapackage.VideoStream;
 import org.opencastproject.mediapackage.selector.AbstractMediaPackageElementSelector;
 import org.opencastproject.mediapackage.selector.TrackSelector;
 import org.opencastproject.util.JobUtil;
 import org.opencastproject.util.MimeTypes;
 import org.opencastproject.util.PathSupport;
+import org.opencastproject.util.UnknownFileTypeException;
 import org.opencastproject.util.data.Collections;
 import org.opencastproject.workflow.api.AbstractWorkflowOperationHandler;
+import org.opencastproject.workflow.api.ConfiguredTagsAndFlavors;
 import org.opencastproject.workflow.api.WorkflowInstance;
 import org.opencastproject.workflow.api.WorkflowOperationException;
 import org.opencastproject.workflow.api.WorkflowOperationInstance;
@@ -82,9 +83,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.URI;
+import java.util.Arrays;
 import java.util.IllegalFormatException;
 import java.util.List;
-import java.util.SortedMap;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * The workflow definition for handling "image" operations
@@ -94,34 +97,14 @@ public class ImageWorkflowOperationHandler extends AbstractWorkflowOperationHand
   private static final Logger logger = LoggerFactory.getLogger(ImageWorkflowOperationHandler.class);
 
   // legacy option
-  public static final String OPT_SOURCE_FLAVOR = "source-flavor";
-  public static final String OPT_SOURCE_FLAVORS = "source-flavors";
-  public static final String OPT_SOURCE_TAGS = "source-tags";
   public static final String OPT_PROFILES = "encoding-profile";
   public static final String OPT_POSITIONS = "time";
-  public static final String OPT_TARGET_FLAVOR = "target-flavor";
-  public static final String OPT_TARGET_TAGS = "target-tags";
   public static final String OPT_TARGET_BASE_NAME_FORMAT_SECOND = "target-base-name-format-second";
   public static final String OPT_TARGET_BASE_NAME_FORMAT_PERCENT = "target-base-name-format-percent";
   public static final String OPT_END_MARGIN = "end-margin";
 
   private static final long END_MARGIN_DEFAULT = 100;
-
-  /** The configuration options for this handler */
-  @SuppressWarnings("unchecked")
-  private static final SortedMap<String, String> CONFIG_OPTIONS = Collections.smap(
-          tuple(OPT_SOURCE_FLAVOR, "The \"flavor\" of the track to use as a video source input"),
-          tuple(OPT_SOURCE_FLAVORS, "The \"flavors\" of the track to use as a video source input"),
-          tuple(OPT_SOURCE_TAGS,
-                "The required tags that must exist on the track for the track to be used as a video source"),
-          tuple(OPT_PROFILES, "The encoding profile to use"),
-          tuple(OPT_POSITIONS, "The number of seconds into the video file to extract the image"),
-          tuple(OPT_TARGET_FLAVOR, "The flavor to apply to the extracted image"),
-          tuple(OPT_TARGET_TAGS, "The tags to apply to the extracted image"),
-          tuple(OPT_TARGET_BASE_NAME_FORMAT_SECOND, "TODO"), // todo description
-          tuple(OPT_TARGET_BASE_NAME_FORMAT_PERCENT, "The target base name pattern for seconds 'thumbnail' or 'extracted'."), //todo description
-          tuple(OPT_END_MARGIN, "A margin in milliseconds at the end of the video. Each position is "
-                  + "limited to not exceed this bound. Defaults to " + END_MARGIN_DEFAULT + "ms."));
+  public static final double SINGLE_FRAME_POS = 0.0;
 
   /** The composer service */
   private ComposerService composerService = null;
@@ -151,16 +134,11 @@ public class ImageWorkflowOperationHandler extends AbstractWorkflowOperationHand
   }
 
   @Override
-  public SortedMap<String, String> getConfigurationOptions() {
-    return CONFIG_OPTIONS;
-  }
-
-  @Override
   public WorkflowOperationResult start(final WorkflowInstance wi, JobContext ctx)
           throws WorkflowOperationException {
     logger.debug("Running image workflow operation on {}", wi);
     try {
-      final Extractor e = new Extractor(this, configure(wi.getMediaPackage(), wi.getCurrentOperation()));
+      final Extractor e = new Extractor(this, configure(wi.getMediaPackage(), wi));
       return e.main(MediaPackageSupport.copy(wi.getMediaPackage()));
     } catch (Exception e) {
       throw new WorkflowOperationException(e);
@@ -192,7 +170,7 @@ public class ImageWorkflowOperationHandler extends AbstractWorkflowOperationHand
           if (p.size() != cfg.positions.size()) {
             logger.warn("Could not apply all configured positions to track " + t);
           } else {
-            logger.info(format("Extracting images from %s at position %s", t, $(p).mkString(", ")));
+            logger.info("Extracting images from {} at position {}", t, $(p).mkString(", "));
           }
           // create one extraction per encoding profile
           return $(cfg.profiles).map(new Fn<EncodingProfile, Extraction>() {
@@ -213,6 +191,7 @@ public class ImageWorkflowOperationHandler extends AbstractWorkflowOperationHand
             // post process images
             for (final P2<Attachment, MediaPosition> image : $(images).zip(extraction.positions)) {
               adjustMetadata(extraction, image.get1());
+              if (image.get1().getIdentifier() == null) image.get1().setIdentifier(UUID.randomUUID().toString());
               mp.addDerived(image.get1(), extraction.track);
               final String fileName = createFileName(
                       extraction.profile.getSuffix(), extraction.track.getURI(), image.get2());
@@ -248,8 +227,10 @@ public class ImageWorkflowOperationHandler extends AbstractWorkflowOperationHand
         logger.debug("Resulting image has flavor '{}'", image.getFlavor());
       }
       // Set the mime type
-      for (final String mimeType : Opt.nul(extraction.profile.getMimeType())) {
-        image.setMimeType(MimeTypes.parseMimeType(mimeType));
+      try {
+        image.setMimeType(MimeTypes.fromURI(image.getURI()));
+      } catch (UnknownFileTypeException e) {
+        logger.warn("Mime type unknown for file {}. Setting none.", image.getURI(), e);
       }
       // Add tags
       for (final String tag : cfg.targetImageTags) {
@@ -344,15 +325,20 @@ public class ImageWorkflowOperationHandler extends AbstractWorkflowOperationHand
 
   /** Limit the list of media positions to those that fit into the length of the track. */
   static List<MediaPosition> limit(Track track, List<MediaPosition> positions) {
-    final long duration = track.getDuration();
-    return $(positions).filter(new Fn<MediaPosition, Boolean>() {
-      @Override public Boolean apply(MediaPosition p) {
-        return !(
-                (eq(p.type, PositionType.Seconds) && (p.position >= duration || p.position < 0.0))
-                        ||
-                        (eq(p.type, PositionType.Percentage) && (p.position < 0.0 || p.position > 100.0)));
-      }
-    }).toList();
+    final Long duration = track.getDuration();
+    // if the video has just one frame (e.g.: MP3-Podcasts) it makes no sense to go to a certain position
+    // as the video has only one image at position 0
+    if (duration == null || (track.getStreams() != null && Arrays.stream(track.getStreams())
+            .filter(stream -> stream instanceof VideoStream)
+            .map(org.opencastproject.mediapackage.Stream::getFrameCount)
+            .allMatch(frameCount -> frameCount == null || frameCount == 1))) {
+      return java.util.Collections.singletonList(new MediaPosition(PositionType.Seconds, 0));
+    }
+
+    return positions.stream()
+        .filter(p -> (PositionType.Seconds.equals(p.type) && p.position >= 0 && p.position < duration)
+                || (PositionType.Percentage.equals(p.type) && p.position >= 0 && p.position <= 100))
+        .collect(Collectors.toList());
   }
 
   /**
@@ -361,7 +347,7 @@ public class ImageWorkflowOperationHandler extends AbstractWorkflowOperationHand
    * the bounds of the tracks length.
    */
   static double toSeconds(Track track, MediaPosition position, double endMarginMs) {
-    final long durationMs = track.getDuration();
+    final long durationMs = track.getDuration() == null ? 0 : track.getDuration();
     final double posMs;
     switch (position.type) {
       case Percentage:
@@ -450,7 +436,7 @@ public class ImageWorkflowOperationHandler extends AbstractWorkflowOperationHand
     private final List<Track> sourceTracks;
     private final List<MediaPosition> positions;
     private final List<EncodingProfile> profiles;
-    private final Opt<MediaPackageElementFlavor> targetImageFlavor;
+    private final List<MediaPackageElementFlavor> targetImageFlavor;
     private final List<String> targetImageTags;
     private final Opt<String> targetBaseNameFormatSecond;
     private final Opt<String> targetBaseNameFormatPercent;
@@ -459,7 +445,7 @@ public class ImageWorkflowOperationHandler extends AbstractWorkflowOperationHand
     Cfg(List<Track> sourceTracks,
         List<MediaPosition> positions,
         List<EncodingProfile> profiles,
-        Opt<MediaPackageElementFlavor> targetImageFlavor,
+        List<MediaPackageElementFlavor> targetImageFlavor,
         List<String> targetImageTags,
         Opt<String> targetBaseNameFormatSecond,
         Opt<String> targetBaseNameFormatPercent,
@@ -476,33 +462,33 @@ public class ImageWorkflowOperationHandler extends AbstractWorkflowOperationHand
   }
 
   /** Get and parse the configuration options. */
-  private Cfg configure(MediaPackage mp, WorkflowOperationInstance woi) throws WorkflowOperationException {
+  private Cfg configure(MediaPackage mp, WorkflowInstance wi) throws WorkflowOperationException {
+    WorkflowOperationInstance woi = wi.getCurrentOperation();
+    ConfiguredTagsAndFlavors tagsAndFlavors = getTagsAndFlavors(wi,
+        Configuration.many, Configuration.many, Configuration.many, Configuration.one);
     final List<EncodingProfile> profiles = getOptConfig(woi, OPT_PROFILES).toStream().bind(asList.toFn())
             .map(fetchProfile(composerService)).toList();
-    final List<String> targetImageTags = getOptConfig(woi, OPT_TARGET_TAGS).toStream().bind(asList.toFn()).toList();
-    final Opt<MediaPackageElementFlavor> targetImageFlavor =
-            getOptConfig(woi, OPT_TARGET_FLAVOR).map(MediaPackageElementFlavor.parseFlavor.toFn());
+    final List<String> targetImageTags = tagsAndFlavors.getTargetTags();
+    final List<MediaPackageElementFlavor> targetImageFlavor = tagsAndFlavors.getTargetFlavors();
     final List<Track> sourceTracks;
     {
-      // get the source flavors
-      final Stream<MediaPackageElementFlavor> sourceFlavors = getOptConfig(woi, OPT_SOURCE_FLAVORS).toStream()
-              .bind(Strings.splitCsv)
-              .append(getOptConfig(woi, OPT_SOURCE_FLAVOR))
-              .map(MediaPackageElementFlavor.parseFlavor.toFn());
       // get the source tags
-      final Stream<String> sourceTags = getOptConfig(woi, OPT_SOURCE_TAGS).toStream().bind(Strings.splitCsv);
-      // fold both into a selector
-      final TrackSelector trackSelector = sourceTags.apply(tagFold(sourceFlavors.apply(flavorFold(new TrackSelector()))));
+      final List<String> sourceTags = tagsAndFlavors.getSrcTags();
+      final List<MediaPackageElementFlavor> sourceFlavors = tagsAndFlavors.getSrcFlavors();
+      TrackSelector trackSelector = new TrackSelector();
+
+      //add tags and flavors to TrackSelector
+      for (String tag : sourceTags) {
+        trackSelector.addTag(tag);
+      }
+      for (MediaPackageElementFlavor flavor : sourceFlavors) {
+        trackSelector.addFlavor(flavor);
+      }
+
       // select the tracks based on source flavors and tags and skip those that don't have video
-      sourceTracks = $(trackSelector.select(mp, true))
-              .filter(Filters.hasVideo.toFn())
-              .each(new Fx<Track>() {
-                @Override public void apply(Track track) {
-                  if (track.getDuration() == null) {
-                    chuck(new WorkflowOperationException(format("Track %s cannot tell its duration", track)));
-                  }
-                }
-              }).toList();
+      sourceTracks = trackSelector.select(mp, true).stream()
+          .filter(Track::hasVideo)
+          .collect(Collectors.toList());
     }
     final List<MediaPosition> positions = parsePositions(getConfig(woi, OPT_POSITIONS));
     final long endMargin = getOptConfig(woi, OPT_END_MARGIN).bind(Strings.toLong).getOr(END_MARGIN_DEFAULT);
@@ -587,7 +573,7 @@ public class ImageWorkflowOperationHandler extends AbstractWorkflowOperationHand
     if (r.isDefined() && r.getRest().isEmpty()) {
       return r.getResult();
     } else {
-      throw new WorkflowOperationException(format("Cannot parse time string %s. Rest is %s", time, r.getRest()));
+      throw new WorkflowOperationException(format("Cannot parse time string %s.", time));
     }
   }
 
@@ -599,12 +585,16 @@ public class ImageWorkflowOperationHandler extends AbstractWorkflowOperationHand
    * A position in time in a media file.
    */
   static final class MediaPosition {
-    private final double position;
+    private double position;
     private final PositionType type;
 
     MediaPosition(PositionType type, double position) {
       this.position = position;
       this.type = type;
+    }
+
+    public void setPosition(double position) {
+      this.position = position;
     }
 
     @Override public int hashCode() {

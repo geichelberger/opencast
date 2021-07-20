@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <artifactId>opencast-common</artifactId>
   <name>Opencast :: common</name>
@@ -7,7 +7,7 @@
   <parent>
     <groupId>org.opencastproject</groupId>
     <artifactId>base</artifactId>
-    <version>5-SNAPSHOT</version>
+    <version>11-SNAPSHOT</version>
     <relativePath>../../pom.xml</relativePath>
   </parent>
   <properties>
@@ -15,12 +15,6 @@
     <checkstyle.skip>false</checkstyle.skip>
   </properties>
   <dependencies>
-    <!-- Opencast -->
-    <dependency>
-      <groupId>org.opencastproject</groupId>
-      <artifactId>opencast-urlsigning-service-api</artifactId>
-      <version>${project.version}</version>
-    </dependency>
     <dependency>
       <groupId>com.entwinemedia.common</groupId>
       <artifactId>functional</artifactId>
@@ -30,28 +24,28 @@
       <artifactId>freemarker</artifactId>
     </dependency>
     <dependency>
-      <groupId>javax.xml.bind</groupId>
-      <artifactId>jaxb-api</artifactId>
+      <groupId>jakarta.xml.bind</groupId>
+      <artifactId>jakarta.xml.bind-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.persistence</groupId>
+      <artifactId>org.eclipse.persistence.core</artifactId>
     </dependency>
     <dependency>
       <groupId>javax.servlet</groupId>
       <artifactId>javax.servlet-api</artifactId>
     </dependency>
     <dependency>
-      <groupId>javax.ws.rs</groupId>
-      <artifactId>jsr311-api</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.commons</groupId>
-      <artifactId>com.springsource.org.apache.commons.beanutils</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>commons-logging</groupId>
-      <artifactId>commons-logging</artifactId>
+      <groupId>jakarta.ws.rs</groupId>
+      <artifactId>jakarta.ws.rs-api</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.httpcomponents</groupId>
       <artifactId>httpclient-osgi</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.httpcomponents</groupId>
+      <artifactId>httpcore-osgi</artifactId>
     </dependency>
     <dependency>
       <groupId>com.googlecode.json-simple</groupId>
@@ -62,20 +56,8 @@
       <artifactId>commons-io</artifactId>
     </dependency>
     <dependency>
-      <groupId>commons-codec</groupId>
-      <artifactId>commons-codec</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>commons-fileupload</groupId>
-      <artifactId>commons-fileupload</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-lang3</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>commons-collections</groupId>
-      <artifactId>commons-collections</artifactId>
     </dependency>
     <dependency>
       <groupId>joda-time</groupId>
@@ -86,11 +68,7 @@
       <artifactId>guava</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.google.code.findbugs</groupId>
-      <artifactId>jsr305</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>net.fortuna.ical4j</groupId>
+      <groupId>org.mnode.ical4j</groupId>
       <artifactId>ical4j</artifactId>
     </dependency>
     <!-- OSGi -->
@@ -105,7 +83,7 @@
     <!-- Persistence -->
     <dependency>
       <groupId>org.eclipse.persistence</groupId>
-      <artifactId>javax.persistence</artifactId>
+      <artifactId>jakarta.persistence</artifactId>
     </dependency>
     <dependency>
       <groupId>org.eclipse.persistence</groupId>
@@ -119,7 +97,7 @@
     <dependency>
       <groupId>de.schlichtherle</groupId>
       <artifactId>truezip</artifactId>
-      <version>6.8</version>
+      <version>6.8.4</version>
       <exclusions>
         <exclusion>
           <groupId>bouncycastle</groupId>
@@ -131,59 +109,21 @@
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
-      <scope>provided</scope>
     </dependency>
     <!-- REST test environment -->
     <dependency>
-      <groupId>com.jayway.restassured</groupId>
-      <artifactId>rest-assured</artifactId>
-      <version>2.4.0</version>
-      <exclusions>
-        <exclusion>
-          <groupId>org.hamcrest</groupId>
-          <artifactId>hamcrest-core</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.hamcrest</groupId>
-          <artifactId>hamcrest-library</artifactId>
-        </exclusion>
-      </exclusions>
+      <groupId>io.rest-assured</groupId>
+      <artifactId>json-path</artifactId>
+      <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>com.sun.jersey</groupId>
-      <artifactId>jersey-bundle</artifactId>
-      <version>1.19</version>
-    </dependency>
-    <dependency>
-      <groupId>org.eclipse.jetty</groupId>
-      <artifactId>jetty-server</artifactId>
-      <version>9.2.19.v20160908</version>
-    </dependency>
-    <dependency>
-      <groupId>org.eclipse.jetty</groupId>
-      <artifactId>jetty-servlet</artifactId>
-      <version>9.2.19.v20160908</version>
-    </dependency>
-    <dependency>
-      <groupId>org.hamcrest</groupId>
-      <artifactId>hamcrest-library</artifactId>
-      <version>1.3</version>
-    </dependency>
-    <dependency>
-      <groupId>org.hamcrest</groupId>
-      <artifactId>hamcrest-core</artifactId>
-      <version>1.3</version>
+      <groupId>io.rest-assured</groupId>
+      <artifactId>xml-path</artifactId>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.codehaus.jettison</groupId>
       <artifactId>jettison</artifactId>
-      <version>1.3.1</version>
-      <exclusions>
-        <exclusion>
-          <groupId>stax</groupId>
-          <artifactId>stax-api</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
     <!-- Testing -->
     <dependency>
@@ -191,23 +131,24 @@
       <artifactId>junit</artifactId>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>org.hamcrest</groupId>
+      <artifactId>hamcrest</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>net.sf.saxon</groupId>
+      <artifactId>Saxon-HE</artifactId>
+      <version>9.6.0-4</version>
+      <scope>test</scope>
+    </dependency>
     <!--
     - Parameterized tests for JUnit
     - https://github.com/Pragmatists/JUnitParams
     -->
     <dependency>
-      <groupId>pl.pragmatists</groupId>
-      <artifactId>JUnitParams</artifactId>
-      <version>1.0.4</version>
-    </dependency>
-    <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-log4j12</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>log4j</groupId>
-      <artifactId>log4j</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -236,7 +177,6 @@
     <dependency>
       <groupId>xmlunit</groupId>
       <artifactId>xmlunit</artifactId>
-      <version>1.5</version>
       <scope>test</scope>
     </dependency>
     <!-- for xml matchers (org.w3c.dom.ElementTraversal) -->
@@ -249,6 +189,19 @@
   </dependencies>
   <build>
     <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <extensions>true</extensions>
+        <configuration>
+          <ignoredUnusedDeclaredDependencies>
+            <!-- provide a logger for tests -->
+            <ignoredUnusedDeclaredDependency>org.slf4j:slf4j-log4j12</ignoredUnusedDeclaredDependency>
+            <!-- probably needed for the module scheduler-api -->
+            <ignoredUnusedDeclaredDependency>org.mnode.ical4j:ical4j</ignoredUnusedDeclaredDependency>
+          </ignoredUnusedDeclaredDependencies>
+        </configuration>
+      </plugin>
       <plugin>
         <groupId>org.pitest</groupId>
         <artifactId>pitest-maven</artifactId>
@@ -277,16 +230,14 @@
             <Import-Package>
               !com.mchange.v2.c3p0.*,
               !com.sun.*,
+              !javax.cache.*,
               !javax.el.*,
               !javax.servlet.jsp.*,
-              !net.fortuna.ical4j.factory,
-              !net.fortuna.ical4j.timezone,
               !org.apache.log.*,
               !org.apache.tools.*,
               !org.bouncycastle.crypto.*,
               !org.dom4j.*,
               !org.eclipse.persistence.jpa.*,
-              !org.hamcrest.*,
               !org.jaxen.*,
               !org.jdom.*,
               !org.mozilla.javascript.*,
@@ -308,6 +259,7 @@
             </Private-Package>
             <_exportcontents>
               net.fortuna.ical4j,
+              net.fortuna.ical4j.agent,
               net.fortuna.ical4j.data,
               net.fortuna.ical4j.filter,
               net.fortuna.ical4j.model,
@@ -315,12 +267,14 @@
               net.fortuna.ical4j.model.parameter,
               net.fortuna.ical4j.model.property,
               net.fortuna.ical4j.transform,
-              net.fortuna.ical4j.util
+              net.fortuna.ical4j.util,
+              net.fortuna.ical4j.validate,
+              net.fortuna.ical4j.validate.component,
+              net.fortuna.ical4j.validate.property
             </_exportcontents>
             <Export-Package>
               org.opencastproject.util.*;version=${project.version};-split-package:=merge-first,
               org.opencastproject.capture;version=${project.version},
-              org.opencastproject.index;version=${project.version},
               org.opencastproject.mediapackage;version=${project.version},
               org.opencastproject.mediapackage.attachment;version=${project.version},
               org.opencastproject.mediapackage.track;version=${project.version},
@@ -337,6 +291,9 @@
               org.opencastproject.systems;version=${project.version},
               org.opencastproject.security.util;version=${project.version}
             </Export-Package>
+            <Provide-Capability>
+              osgi.service;objectClass="org.opencastproject.util.ReadinessIndicator"
+            </Provide-Capability>
             <Service-Component>
               OSGI-INF/chaining-mp-serializer.xml
             </Service-Component>

@@ -1,7 +1,7 @@
 Install from Source (Linux)
 ===========================
 
-These instructions outline how to install an all in one Opencast system on Linux.
+These instructions outline how to install and build an all-in-one Opencast system on Linux.
 
 Preparation
 -----------
@@ -37,21 +37,24 @@ Cloning the Git repository:
 Install Dependencies
 --------------------
 
-Please make sure to install the following dependencies. Note that not all dependencies are in the system repositories.
+Please make sure to install the following dependencies.
 
 Required:
 
-    java-devel / openjdk >= 1.8.0
+    java-1.11.0-openjdk-devel.x86_64 / openjdk-11-jdk
     ffmpeg >= 3.2.4
     maven >= 3.1
+    python >= 2.6
     unzip
     gcc-c++
     tar
     bzip2
+    nc
 
 Required (not necessarily on the same machine):
 
     ActiveMQ >= 5.10 (older versions untested)
+    Elasticsearch 7.9.x
 
 Required for text extraction (recommended):
 
@@ -65,15 +68,19 @@ Required for audio normalization (optional):
 
     sox >= 14.4
 
+Required for animate service (optional):
+
+    synfig
+
 ### Dependency Download
 
 Pre-built versions of most dependencies that are not in the repositories can be downloaded from the respective project
 website:
 
- - [Get FFmpeg](http://ffmpeg.org/download.html)
- - [Get Apache Maven](https://maven.apache.org/download.cgi)
- - [Get Apache ActiveMQ](http://activemq.apache.org/download.html)
-
+* [Get FFmpeg](http://ffmpeg.org/download.html)
+* [Get Apache Maven](https://maven.apache.org/download.cgi)
+* [Get Apache ActiveMQ](http://activemq.apache.org/download.html)
+* [Get Elasticsearch](https://elastic.co)
 
 Building Opencast
 -----------------
@@ -97,9 +104,13 @@ Configure
 ---------
 
 Please follow the steps of the [Basic Configuration guide](../configuration/basic.md). It will help you to set your
-hostname, login information, …
+hostname, login information, etc.
 
+<!-- _We are redirected to this doc to run OC, but have to scroll through all the "Source Install" before getting to this point. If running OC happens after the build (or install, depending on from where it's being installed), shouldn't all Install Docs redirect to this point, or a separate Run OC Doc? (They currently don't.) -->
 
+<!-- _Up to here, the MacOS source install is pretty similar, but now the steps aren't homogenous anymore... Is running OC so different in the two OSs that in MacOS it doesn't mention running as a service? -->
+
+<!-- _No mention of running ActiveMQ first here!! -->
 Running Opencast
 ------------------
 

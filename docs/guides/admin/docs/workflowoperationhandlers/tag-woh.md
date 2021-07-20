@@ -1,9 +1,11 @@
 # TagWorkflowOperation
 
 ## Description
-With the TagWorkflowOperationHandler it's possible to select various media package elements and then modify their tag set and / or set their flavor.
+With the TagWorkflowOperationHandler it's possible to select various media package elements and then modify their tag
+set and / or set their flavor.
 
-So for example it's possible to pick up elements like the dublin core catalogs that have been added to the media package at the beginning of the workflow and tag them, so they can be picked up by operations later on.
+So for example it's possible to pick up elements like the dublin core catalogs that have been added to the media package
+at the beginning of the workflow and tag them, so they can be picked up by operations later on.
 
 ## Parameter Table
 Tags and flavors can be used in combination.
@@ -35,7 +37,7 @@ Tags and flavors can be used in combination.
       exception-handler-workflow="error"
       description="Tagging media package elements">
       <configurations>
-        <configuration key="source-tags">engage,atom,-publish</configuration>
+        <configuration key="source-tags">engage,atom,publish</configuration>
         <configuration key="source-flavors">presentation/trimmed</configuration>
         <configuration key="target-tags">-atom,+rss</configuration>
         <configuration key="target-flavor">presentation/tagged</configuration>

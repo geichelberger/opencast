@@ -22,11 +22,8 @@
 package org.opencastproject.index.service.resources.list.provider;
 
 import org.opencastproject.index.service.api.EventIndex;
-import org.opencastproject.index.service.exception.ListProviderException;
-import org.opencastproject.index.service.resources.list.api.ResourceListProvider;
-import org.opencastproject.index.service.resources.list.api.ResourceListQuery;
-import org.opencastproject.scheduler.api.SchedulerService.ReviewStatus;
-import org.opencastproject.security.api.Organization;
+import org.opencastproject.list.api.ResourceListProvider;
+import org.opencastproject.list.api.ResourceListQuery;
 import org.opencastproject.workflow.api.WorkflowInstance.WorkflowState;
 
 import org.osgi.framework.BundleContext;
@@ -48,15 +45,15 @@ public class EventsListProvider implements ResourceListProvider {
   public static final String START_DATE = PROVIDER_PREFIX + ".START_DATE";
   public static final String PROGRESS = PROVIDER_PREFIX + ".PROGRESS";
   public static final String STATUS = PROVIDER_PREFIX + ".STATUS";
-  public static final String REVIEW_STATUS = PROVIDER_PREFIX + ".REVIEW_STATUS";
   public static final String COMMENTS = PROVIDER_PREFIX + ".COMMENTS";
+  public static final String PUBLISHER = PROVIDER_PREFIX + ".PUBLISHER";
 
   public enum Comments {
     NONE, OPEN, RESOLVED;
   }
 
   private static final String[] NAMES = { PROVIDER_PREFIX, CONTRIBUTORS, PRESENTERS_BIBLIOGRAPHIC, PRESENTERS_TECHNICAL,
-          SUBJECT, LOCATION, PROGRESS, STATUS, REVIEW_STATUS, COMMENTS };
+          SUBJECT, LOCATION, PROGRESS, STATUS, COMMENTS, PUBLISHER };
 
   private static final Logger logger = LoggerFactory.getLogger(EventsListProvider.class);
 
@@ -76,8 +73,7 @@ public class EventsListProvider implements ResourceListProvider {
   }
 
   @Override
-  public Map<String, String> getList(String listName, ResourceListQuery query, Organization organization)
-          throws ListProviderException {
+  public Map<String, String> getList(String listName, ResourceListQuery query) {
     Map<String, String> list = new HashMap<String, String>();
 
     if (CONTRIBUTORS.equals(listName)) {
@@ -100,8 +96,6 @@ public class EventsListProvider implements ResourceListProvider {
         list.put(progress.toString(), progress.toString());
     } else if (STATUS.equals(listName)) {
       list.put("EVENTS.EVENTS.STATUS.SCHEDULED", "EVENTS.EVENTS.STATUS.SCHEDULED");
-      list.put("EVENTS.EVENTS.STATUS.OPTEDOUT", "EVENTS.EVENTS.STATUS.OPTEDOUT");
-      list.put("EVENTS.EVENTS.STATUS.BLACKLISTED", "EVENTS.EVENTS.STATUS.BLACKLISTED");
       list.put("EVENTS.EVENTS.STATUS.RECORDING", "EVENTS.EVENTS.STATUS.RECORDING");
       list.put("EVENTS.EVENTS.STATUS.INGESTING", "EVENTS.EVENTS.STATUS.INGESTING");
       list.put("EVENTS.EVENTS.STATUS.PENDING", "EVENTS.EVENTS.STATUS.PENDING");
@@ -110,13 +104,13 @@ public class EventsListProvider implements ResourceListProvider {
       list.put("EVENTS.EVENTS.STATUS.PROCESSED", "EVENTS.EVENTS.STATUS.PROCESSED");
       list.put("EVENTS.EVENTS.STATUS.RECORDING_FAILURE", "EVENTS.EVENTS.STATUS.RECORDING_FAILURE");
       list.put("EVENTS.EVENTS.STATUS.PROCESSING_FAILURE", "EVENTS.EVENTS.STATUS.PROCESSING_FAILURE");
-      list.put("EVENTS.EVENTS.STATUS.PROCESSING_CANCELED", "EVENTS.EVENTS.STATUS.PROCESSING_CANCELED");
-    } else if (REVIEW_STATUS.equals(listName)) {
-      for (ReviewStatus status : ReviewStatus.values())
-        list.put(status.toString(), status.toString());
+      list.put("EVENTS.EVENTS.STATUS.PROCESSING_CANCELLED", "EVENTS.EVENTS.STATUS.PROCESSING_CANCELLED");
     } else if (COMMENTS.equals(listName)) {
       for (Comments comments : Comments.values())
-        list.put(comments.toString(), comments.toString());
+        list.put(comments.toString(), "FILTERS.EVENTS.COMMENTS." + comments.toString());
+    } else if (PUBLISHER.equals(listName)) {
+      for (String publisher : index.getEventPublishers())
+        list.put(publisher, publisher);
     }
 
     return list;
@@ -124,7 +118,7 @@ public class EventsListProvider implements ResourceListProvider {
 
   @Override
   public boolean isTranslatable(String listName) {
-    return STATUS.equals(listName);
+    return STATUS.equals(listName) || COMMENTS.equals(listName);
   }
 
   @Override

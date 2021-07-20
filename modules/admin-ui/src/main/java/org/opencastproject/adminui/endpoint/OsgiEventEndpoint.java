@@ -22,7 +22,8 @@
 package org.opencastproject.adminui.endpoint;
 
 import org.opencastproject.adminui.impl.AdminUIConfiguration;
-import org.opencastproject.adminui.impl.index.AdminUISearchIndex;
+import org.opencastproject.adminui.index.AdminUISearchIndex;
+import org.opencastproject.assetmanager.api.AssetManager;
 import org.opencastproject.authorization.xacml.manager.api.AclService;
 import org.opencastproject.authorization.xacml.manager.api.AclServiceFactory;
 import org.opencastproject.capture.admin.api.CaptureAgentStateService;
@@ -35,10 +36,12 @@ import org.opencastproject.security.urlsigning.service.UrlSigningService;
 import org.opencastproject.security.urlsigning.utils.UrlSigningServiceOsgiUtil;
 import org.opencastproject.workflow.api.WorkflowService;
 
+import org.apache.commons.lang3.BooleanUtils;
 import org.osgi.service.cm.ConfigurationException;
 import org.osgi.service.cm.ManagedService;
 
 import java.util.Dictionary;
+import java.util.Objects;
 
 import javax.ws.rs.Path;
 
@@ -47,12 +50,14 @@ import javax.ws.rs.Path;
 public class OsgiEventEndpoint extends AbstractEventEndpoint implements ManagedService {
 
   private AclServiceFactory aclServiceFactory;
+  private AssetManager assetManager;
   private AdminUISearchIndex index;
   private AuthorizationService authorizationService;
   private CaptureAgentStateService captureAgentStateService;
   private EventCommentService eventCommentService;
   private IndexService indexService;
   private JobEndpoint jobService;
+  private SeriesEndpoint seriesEndpoint;
   private SchedulerService schedulerService;
   private SecurityService securityService;
   private UrlSigningService urlSigningService;
@@ -61,6 +66,11 @@ public class OsgiEventEndpoint extends AbstractEventEndpoint implements ManagedS
 
   private long expireSeconds = UrlSigningServiceOsgiUtil.DEFAULT_URL_SIGNING_EXPIRE_DURATION;
   private Boolean signWithClientIP = UrlSigningServiceOsgiUtil.DEFAULT_SIGN_WITH_CLIENT_IP;
+
+  public static final String EVENTMODAL_ONLYSERIESWITHWRITEACCESS_KEY = "eventModal.onlySeriesWithWriteAccess";
+  public static final String EVENTSTAB_ONLYEVENTSWITHWRITEACCESS_KEY = "eventsTab.onlyEventsWithWriteAccess";
+  private Boolean onlySeriesWithWriteAccessEventModal = false;
+  private Boolean onlyEventsWithWriteAccessEventsTab = false;
 
   @Override
   public AdminUIConfiguration getAdminUIConfiguration() {
@@ -85,6 +95,16 @@ public class OsgiEventEndpoint extends AbstractEventEndpoint implements ManagedS
   @Override
   public JobEndpoint getJobService() {
     return jobService;
+  }
+
+  /** OSGi DI. */
+  public void setSeriesEndpoint(SeriesEndpoint seriesEndpoint) {
+    this.seriesEndpoint = seriesEndpoint;
+  }
+
+  @Override
+  public SeriesEndpoint getSeriesEndpoint() {
+    return seriesEndpoint;
   }
 
   /** OSGi DI. */
@@ -143,6 +163,16 @@ public class OsgiEventEndpoint extends AbstractEventEndpoint implements ManagedS
   }
 
   @Override
+  public AssetManager getAssetManager() {
+    return assetManager;
+  }
+
+  /** OSGi DI. */
+  public void setAssetManager(AssetManager assetManager) {
+    this.assetManager = assetManager;
+  }
+
+  @Override
   public SchedulerService getSchedulerService() {
     return schedulerService;
   }
@@ -192,6 +222,12 @@ public class OsgiEventEndpoint extends AbstractEventEndpoint implements ManagedS
     expireSeconds = UrlSigningServiceOsgiUtil.getUpdatedSigningExpiration(properties, this.getClass().getSimpleName());
     signWithClientIP = UrlSigningServiceOsgiUtil.getUpdatedSignWithClientIP(properties,
             this.getClass().getSimpleName());
+
+    Object dictionaryValue = properties.get(EVENTMODAL_ONLYSERIESWITHWRITEACCESS_KEY);
+    onlySeriesWithWriteAccessEventModal = BooleanUtils.toBoolean(Objects.toString(dictionaryValue, "true"));
+
+    dictionaryValue = properties.get(EVENTSTAB_ONLYEVENTSWITHWRITEACCESS_KEY);
+    onlyEventsWithWriteAccessEventsTab = BooleanUtils.toBoolean(Objects.toString(dictionaryValue, "true"));
   }
 
   @Override
@@ -202,6 +238,16 @@ public class OsgiEventEndpoint extends AbstractEventEndpoint implements ManagedS
   @Override
   public Boolean signWithClientIP() {
     return signWithClientIP;
+  }
+
+  @Override
+  public Boolean getOnlySeriesWithWriteAccessEventModal() {
+    return onlySeriesWithWriteAccessEventModal;
+  }
+
+  @Override
+  public Boolean getOnlyEventsWithWriteAccessEventsTab() {
+    return onlyEventsWithWriteAccessEventsTab;
   }
 
 }

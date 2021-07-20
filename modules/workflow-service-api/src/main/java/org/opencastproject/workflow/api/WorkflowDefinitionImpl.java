@@ -25,7 +25,10 @@ import org.apache.commons.lang3.StringUtils;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
@@ -59,15 +62,22 @@ public class WorkflowDefinitionImpl implements WorkflowDefinition {
   @XmlElement(name = "title")
   private String title;
 
+  @XmlElement(name = "organization")
+  private String organization;
+
   @XmlElementWrapper(name = "tags")
   @XmlElement(name = "tag")
-  protected SortedSet<String> tags = new TreeSet<String>();
+  protected SortedSet<String> tags = new TreeSet<>();
+
+  @XmlElementWrapper(name = "roles")
+  @XmlElement(name = "role")
+  protected SortedSet<String> roles = new TreeSet<>();
 
   @XmlElement(name = "description")
   private String description;
 
-  @XmlElement(name = "published")
-  private boolean published;
+  @XmlElement(name = "displayOrder")
+  private int displayOrder = 0;
 
   @XmlElement(name = "configuration_panel")
   private String configurationPanel;
@@ -75,6 +85,10 @@ public class WorkflowDefinitionImpl implements WorkflowDefinition {
   @XmlElement(name = "operation")
   @XmlElementWrapper(name = "operations")
   private List<WorkflowOperationDefinition> operations;
+
+  @XmlElement(name = "state-mapping")
+  @XmlElementWrapper(name = "state-mappings")
+  private Set<WorkflowStateMapping> stateMappings;
 
   /**
    * {@inheritDoc}
@@ -113,6 +127,24 @@ public class WorkflowDefinitionImpl implements WorkflowDefinition {
   }
 
   /**
+   * {@inheritDoc}
+   *
+   * @see org.opencastproject.workflow.api.WorkflowDefinition#getDisplayOrder()
+   */
+  public int getDisplayOrder() {
+    return displayOrder;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @see org.opencastproject.workflow.api.WorkflowDefinition#setDisplayOrder(int)
+   */
+  public void setDisplayOrder(int displayOrder) {
+    this.displayOrder = displayOrder;
+  }
+
+  /**
    * Sets the configuration panel for this workflow.
    *
    * @param panelXML
@@ -138,8 +170,16 @@ public class WorkflowDefinitionImpl implements WorkflowDefinition {
    */
   public List<WorkflowOperationDefinition> getOperations() {
     if (operations == null)
-      operations = new ArrayList<WorkflowOperationDefinition>();
+      operations = new ArrayList<>();
     return operations;
+  }
+
+  @Override
+  public Set<WorkflowStateMapping> getStateMappings() {
+    if (stateMappings == null) {
+      stateMappings = new HashSet<>();
+    }
+    return stateMappings;
   }
 
   /**
@@ -150,7 +190,7 @@ public class WorkflowDefinitionImpl implements WorkflowDefinition {
   @Override
   public WorkflowOperationDefinition get(int position) throws IndexOutOfBoundsException {
     if (operations == null)
-      operations = new ArrayList<WorkflowOperationDefinition>();
+      operations = new ArrayList<>();
     if (position < 0 || position >= operations.size())
       throw new IndexOutOfBoundsException();
     return operations.get(position);
@@ -164,7 +204,7 @@ public class WorkflowDefinitionImpl implements WorkflowDefinition {
   @Override
   public void add(WorkflowOperationDefinition operation) {
     if (operations == null)
-      operations = new ArrayList<WorkflowOperationDefinition>();
+      operations = new ArrayList<>();
     add(operation, this.operations.size());
   }
 
@@ -177,7 +217,7 @@ public class WorkflowDefinitionImpl implements WorkflowDefinition {
   @Override
   public void add(WorkflowOperationDefinition operation, int position) {
     if (operations == null)
-      operations = new ArrayList<WorkflowOperationDefinition>();
+      operations = new ArrayList<>();
 
     if (operation == null)
       throw new IllegalArgumentException("Workflow operation cannot be null");
@@ -198,7 +238,7 @@ public class WorkflowDefinitionImpl implements WorkflowDefinition {
   @Override
   public WorkflowOperationDefinition remove(int position) throws IndexOutOfBoundsException {
     if (operations == null)
-      operations = new ArrayList<WorkflowOperationDefinition>();
+      operations = new ArrayList<>();
     return operations.remove(position);
   }
 
@@ -251,7 +291,7 @@ public class WorkflowDefinitionImpl implements WorkflowDefinition {
    */
   @Override
   public String[] getTags() {
-    return tags.toArray(new String[tags.size()]);
+    return tags.toArray(new String[0]);
   }
 
   /**
@@ -291,28 +331,13 @@ public class WorkflowDefinitionImpl implements WorkflowDefinition {
   }
 
   static class Adapter extends XmlAdapter<WorkflowDefinitionImpl, WorkflowDefinition> {
-    public WorkflowDefinitionImpl marshal(WorkflowDefinition op) throws Exception {
+    public WorkflowDefinitionImpl marshal(WorkflowDefinition op) {
       return (WorkflowDefinitionImpl) op;
     }
 
-    public WorkflowDefinition unmarshal(WorkflowDefinitionImpl op) throws Exception {
+    public WorkflowDefinition unmarshal(WorkflowDefinitionImpl op) {
       return op;
     }
-  }
-
-  /**
-   * @return the published
-   */
-  public boolean isPublished() {
-    return published;
-  }
-
-  /**
-   * @param published
-   *          the published to set
-   */
-  public void setPublished(boolean published) {
-    this.published = published;
   }
 
   /**
@@ -330,12 +355,28 @@ public class WorkflowDefinitionImpl implements WorkflowDefinition {
     this.title = title;
   }
 
+  @Override
+  public String getOrganization() {
+    return organization;
+  }
+
+  @Override
+  public Collection<String> getRoles() {
+    if (roles == null) {
+      return Collections.emptySet();
+    }
+    return roles;
+  }
+
   /**
    * {@inheritDoc}
    *
    * @see java.lang.Object#toString()
    */
   public String toString() {
+    if (organization != null) {
+      return "Workflow definition {" + id + "/" + organization + "}";
+    }
     return "Workflow definition {" + id + "}";
   }
 

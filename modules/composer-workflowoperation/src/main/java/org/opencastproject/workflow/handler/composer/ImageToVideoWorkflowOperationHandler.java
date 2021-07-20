@@ -21,10 +21,7 @@
 
 package org.opencastproject.workflow.handler.composer;
 
-import static org.opencastproject.util.data.Collections.nil;
-import static org.opencastproject.util.data.Collections.smap;
 import static org.opencastproject.util.data.Monadics.mlist;
-import static org.opencastproject.util.data.Tuple.tuple;
 
 import org.opencastproject.composer.api.ComposerService;
 import org.opencastproject.composer.api.EncoderException;
@@ -47,6 +44,7 @@ import org.opencastproject.util.data.functions.Booleans;
 import org.opencastproject.util.data.functions.Misc;
 import org.opencastproject.util.data.functions.Strings;
 import org.opencastproject.workflow.api.AbstractWorkflowOperationHandler;
+import org.opencastproject.workflow.api.ConfiguredTagsAndFlavors;
 import org.opencastproject.workflow.api.WorkflowInstance;
 import org.opencastproject.workflow.api.WorkflowOperationException;
 import org.opencastproject.workflow.api.WorkflowOperationResult;
@@ -58,27 +56,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
-import java.util.SortedMap;
 
 /**
  * The workflow definition creating a video from a still image.
  */
 public class ImageToVideoWorkflowOperationHandler extends AbstractWorkflowOperationHandler {
-  private static final String OPT_SOURCE_TAGS = "source-tags";
-  private static final String OPT_SOURCE_FLAVOR = "source-flavor";
-  private static final String OPT_TARGET_TAGS = "target-tags";
-  private static final String OPT_TARGET_FLAVOR = "target-flavor";
   private static final String OPT_DURATION = "duration";
   private static final String OPT_PROFILE = "profile";
 
   /** The logging facility */
   private static final Logger logger = LoggerFactory.getLogger(ImageToVideoWorkflowOperationHandler.class);
-
-  /** The configuration options for this handler */
-  private static final SortedMap<String, String> CONFIG_OPTIONS = smap(
-          tuple(OPT_SOURCE_TAGS, "The image attachment must be tagged with one of the given tags"),
-          tuple(OPT_SOURCE_FLAVOR, "The image attachment must be of the given flavor"),
-          tuple(OPT_DURATION, "The duration of the resulting video in seconds"));
 
   /** The composer service */
   private ComposerService composerService = null;
@@ -107,16 +94,6 @@ public class ImageToVideoWorkflowOperationHandler extends AbstractWorkflowOperat
     this.workspace = workspace;
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * @see org.opencastproject.workflow.api.WorkflowOperationHandler#getConfigurationOptions()
-   */
-  @Override
-  public SortedMap<String, String> getConfigurationOptions() {
-    return CONFIG_OPTIONS;
-  }
-
   @Override
   public WorkflowOperationResult start(final WorkflowInstance workflowInstance, JobContext context)
           throws WorkflowOperationException {
@@ -132,16 +109,20 @@ public class ImageToVideoWorkflowOperationHandler extends AbstractWorkflowOperat
 
   private WorkflowOperationResult imageToVideo(MediaPackage mp, WorkflowInstance wi) throws Exception {
     // read cfg
-    final List<String> sourceTags = getCfg(wi, OPT_SOURCE_TAGS).map(asList).getOrElse(nil(String.class));
-    final Option<MediaPackageElementFlavor> sourceFlavor = getCfg(wi, OPT_SOURCE_FLAVOR).map(
-            MediaPackageElementFlavor.parseFlavor);
-    if (sourceFlavor.isNone() && sourceTags.isEmpty()) {
+    ConfiguredTagsAndFlavors tagsAndFlavors = getTagsAndFlavors(wi,
+        Configuration.many, Configuration.many, Configuration.many, Configuration.many);
+    final List<String> sourceTags = tagsAndFlavors.getSrcTags();
+    List<MediaPackageElementFlavor> sourceFlavors = tagsAndFlavors.getSrcFlavors();
+
+    if (sourceFlavors.isEmpty() && sourceTags.isEmpty()) {
       logger.warn("No source tags or flavor are given to determine the image to use");
       return createResult(mp, Action.SKIP);
     }
-    final List<String> targetTags = getCfg(wi, OPT_TARGET_TAGS).map(asList).getOrElse(nil(String.class));
-    final Option<MediaPackageElementFlavor> targetFlavor = getCfg(wi, OPT_TARGET_FLAVOR).map(
-            MediaPackageElementFlavor.parseFlavor);
+    final Option<MediaPackageElementFlavor> sourceFlavor = Option.option(sourceFlavors.get(0));
+
+    final List<String> targetTags = tagsAndFlavors.getTargetTags();
+    List<MediaPackageElementFlavor> targetFlavors = tagsAndFlavors.getTargetFlavors();
+    final Option<MediaPackageElementFlavor> targetFlavor = Option.option(targetFlavors.get(0));
     final double duration = getCfg(wi, OPT_DURATION).bind(Strings.toDouble).getOrElse(
             this.<Double> cfgKeyMissing(OPT_DURATION));
     final String profile = getCfg(wi, OPT_PROFILE).getOrElse(this.<String> cfgKeyMissing(OPT_PROFILE));

@@ -23,12 +23,12 @@ package org.opencastproject.job.api;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-import static org.opencastproject.fun.juc.Immutables.list;
 import static org.opencastproject.job.api.Job.Status.DISPATCHING;
 
 import org.junit.Test;
 
 import java.net.URI;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 
@@ -37,14 +37,14 @@ public class JaxbJobTest {
   @Test
   public void testMappingOfAllFields() throws Exception {
 
-    final List<String> arguments = list("arg-1", "arg-2");
+    final List<String> arguments = Arrays.asList("arg-1", "arg-2");
     final Date now = new Date();
     final URI uri = new URI("http://test");
-    final List<Long> blockedJobs = list(5L, 6L);
+    final List<Long> blockedJobs = Arrays.asList(5L, 6L);
 
     final JaxbJob jaxb = new JaxbJob(
             new JobImpl(3L, "test", "test_org", 0L, "simple", "do", arguments, DISPATCHING, "localhost", "remotehost",
-                    now, now, now, 100L, 200L, "result", 1L, 3L, true, uri, 1.5F, blockedJobs, 4L));
+                    now, now, now, 100L, 200L, "result", 1L, 3L, true, uri, 1.5F));
     final Job job = jaxb.toJob();
 
     assertEquals(3L, job.getId());
@@ -68,8 +68,6 @@ public class JaxbJobTest {
     assertTrue(job.isDispatchable());
     assertEquals(uri, job.getUri());
     assertEquals((Float) 1.5F, job.getJobLoad());
-    assertEquals(blockedJobs, job.getBlockedJobIds());
-    assertEquals((Long) 4L, job.getBlockingJobId());
   }
 
 }

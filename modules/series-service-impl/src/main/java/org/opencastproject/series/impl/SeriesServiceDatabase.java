@@ -24,12 +24,13 @@ package org.opencastproject.series.impl;
 import org.opencastproject.metadata.dublincore.DublinCoreCatalog;
 import org.opencastproject.security.api.AccessControlList;
 import org.opencastproject.security.api.UnauthorizedException;
+import org.opencastproject.series.impl.persistence.SeriesEntity;
 import org.opencastproject.util.NotFoundException;
 import org.opencastproject.util.data.Tuple;
 
 import com.entwinemedia.fn.data.Opt;
 
-import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -102,7 +103,7 @@ public interface SeriesServiceDatabase {
    * @throws SeriesServiceDatabaseException
    *           if exception occurs
    */
-  Iterator<Tuple<DublinCoreCatalog, String>> getAllSeries() throws SeriesServiceDatabaseException;
+  List<SeriesEntity> getAllSeries() throws SeriesServiceDatabaseException;
 
   /**
    * Retrieves ACL for series with given ID.
@@ -177,33 +178,6 @@ public interface SeriesServiceDatabase {
    */
   void updateSeriesProperty(String seriesId, String propertyName, String propertyValue) throws NotFoundException,
           SeriesServiceDatabaseException;
-
-  /**
-   * Returns the opt out status of series with the given series id
-   *
-   * @param seriesId
-   *          the series id
-   * @return the opt out status
-   * @throws NotFoundException
-   *           if there is no series with specified series ID
-   * @throws SeriesServiceDatabaseException
-   *           if exception occurred
-   */
-  boolean isOptOut(String seriesId) throws NotFoundException, SeriesServiceDatabaseException;
-
-  /**
-   * Updates a series' opt out status.
-   *
-   * @param seriesId
-   *          The id of the series to update the opt out status of.
-   * @param optOut
-   *          Whether to opt out this series or not.
-   * @throws NotFoundException
-   *           if there is no series with specified series ID
-   * @throws SeriesServiceDatabaseException
-   *           if exception occurred
-   */
-  void updateOptOutStatus(String seriesId, boolean optOut) throws NotFoundException, SeriesServiceDatabaseException;
 
   /**
    * Returns true if the series with the given identifier contains an element with the given type.

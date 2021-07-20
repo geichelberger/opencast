@@ -37,9 +37,6 @@ import org.osgi.service.component.ComponentContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.SortedMap;
-import java.util.TreeMap;
-
 /**
  * Workflow operation for retracting a media package from OAI-PMH publication repository.
  */
@@ -51,29 +48,12 @@ public class RetractOaiPmhWorkflowOperationHandler extends AbstractWorkflowOpera
   /** Workflow configuration option keys */
   private static final String REPOSITORY = "repository";
 
-  /** The configuration options for this handler */
-  private static final SortedMap<String, String> CONFIG_OPTIONS = new TreeMap<String, String>();
-
-  static {
-    CONFIG_OPTIONS.put(REPOSITORY, "The OAI-PMH repository");
-  }
-
   /** The OAI-PMH publication service */
   private OaiPmhPublicationService publicationService = null;
 
   /**
-   * {@inheritDoc}
-   * 
-   * @see org.opencastproject.workflow.api.WorkflowOperationHandler#getConfigurationOptions()
-   */
-  @Override
-  public SortedMap<String, String> getConfigurationOptions() {
-    return CONFIG_OPTIONS;
-  }
-
-  /**
    * OSGi declarative service configuration callback.
-   * 
+   *
    * @param publicationService
    *          the publication service
    */
@@ -83,7 +63,7 @@ public class RetractOaiPmhWorkflowOperationHandler extends AbstractWorkflowOpera
 
   /**
    * {@inheritDoc}
-   * 
+   *
    * @see org.opencastproject.workflow.api.AbstractWorkflowOperationHandler#activate(ComponentContext)
    */
   @Override
@@ -93,7 +73,7 @@ public class RetractOaiPmhWorkflowOperationHandler extends AbstractWorkflowOpera
 
   /**
    * {@inheritDoc}
-   * 
+   *
    * @see org.opencastproject.workflow.api.WorkflowOperationHandler#start(WorkflowInstance, JobContext)
    */
   @Override
@@ -102,16 +82,18 @@ public class RetractOaiPmhWorkflowOperationHandler extends AbstractWorkflowOpera
     MediaPackage mediaPackage = workflowInstance.getMediaPackage();
 
     String repository = StringUtils.trimToNull(workflowInstance.getCurrentOperation().getConfiguration(REPOSITORY));
-    if (repository == null)
+    if (repository == null) {
       throw new IllegalArgumentException("No repository has been specified");
+    }
 
     try {
-      logger.info("Retracting media package {} from OAI-PMH publication repository", mediaPackage);
+      logger.info("Retracting media package {} publication from OAI-PMH repository {}", mediaPackage, repository);
 
       // Wait for OAI-PMH retraction to finish
       Job retractJob = publicationService.retract(mediaPackage, repository);
-      if (!waitForStatus(retractJob).isSuccess())
+      if (!waitForStatus(retractJob).isSuccess()) {
         throw new WorkflowOperationException("The OAI-PMH retract job did not complete successfully");
+      }
 
       logger.debug("Retraction from OAI-PMH operation complete");
 

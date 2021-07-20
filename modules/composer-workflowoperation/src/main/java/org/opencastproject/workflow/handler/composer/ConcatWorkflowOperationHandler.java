@@ -38,6 +38,7 @@ import org.opencastproject.mediapackage.selector.TrackSelector;
 import org.opencastproject.util.NotFoundException;
 import org.opencastproject.util.data.Tuple;
 import org.opencastproject.workflow.api.AbstractWorkflowOperationHandler;
+import org.opencastproject.workflow.api.ConfiguredTagsAndFlavors;
 import org.opencastproject.workflow.api.WorkflowInstance;
 import org.opencastproject.workflow.api.WorkflowOperationException;
 import org.opencastproject.workflow.api.WorkflowOperationInstance;
@@ -52,6 +53,7 @@ import org.apache.commons.lang3.math.NumberUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -59,8 +61,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.SortedMap;
-import java.util.TreeMap;
 
 /**
  * The workflow definition for handling "concat" operations
@@ -71,38 +71,25 @@ public class ConcatWorkflowOperationHandler extends AbstractWorkflowOperationHan
   private static final String SOURCE_FLAVOR_PREFIX = "source-flavor-part-";
   private static final String MANDATORY_SUFFIX = "-mandatory";
 
-  private static final String TARGET_TAGS = "target-tags";
-  private static final String TARGET_FLAVOR = "target-flavor";
-
   private static final String ENCODING_PROFILE = "encoding-profile";
   private static final String OUTPUT_RESOLUTION = "output-resolution";
   private static final String OUTPUT_FRAMERATE = "output-framerate";
   private static final String OUTPUT_PART_PREFIX = "part-";
 
+  /** Concatenate flavored media by lexicographical order -eg v01.mp4, v02.mp4, etc */
+  private static final String SOURCE_FLAVOR_NUMBERED_FILES = "source-flavor-numbered-files";
+  /**
+  * If codec and dimension are the same in all the src files, do not scale and transcode, just put all the content into
+  * the container
+  */
+  private static final String SAME_CODEC = "same-codec";
+  enum SourceType {
+    None, PrefixedFile, NumberedFile
+  };
+
 
   /** The logging facility */
   private static final Logger logger = LoggerFactory.getLogger(ConcatWorkflowOperationHandler.class);
-
-  /** The configuration options for this handler */
-  private static final SortedMap<String, String> CONFIG_OPTIONS;
-
-  static {
-    CONFIG_OPTIONS = new TreeMap<String, String>();
-    CONFIG_OPTIONS.put(SOURCE_TAGS_PREFIX,
-            "The prefix of the iterative \"tags\" used to specify the order of the source input tracks");
-    CONFIG_OPTIONS.put(SOURCE_FLAVOR_PREFIX,
-            "The prefix of the iterative \"flavors\" used to specify the order of the source input tracks");
-
-    CONFIG_OPTIONS.put(TARGET_TAGS, "The tags to apply to the compound video track");
-    CONFIG_OPTIONS.put(TARGET_FLAVOR, "The flavor to apply to the compound video track");
-    CONFIG_OPTIONS
-            .put(OUTPUT_RESOLUTION,
-                    "The resulting resolution of the concat video e.g. 1900x1080 or the part name to take as the output resolution");
-    CONFIG_OPTIONS.put(ENCODING_PROFILE, "The encoding profile to use");
-    CONFIG_OPTIONS.put(OUTPUT_FRAMERATE,
-            "The frame rate of the resulting video in frames per second, e.g. 25, 23.976 "
-            + "or part name to take the value from, e.g. part-1.");
-  }
 
   /** The composer service */
   private ComposerService composerService = null;
@@ -134,16 +121,6 @@ public class ConcatWorkflowOperationHandler extends AbstractWorkflowOperationHan
   /**
    * {@inheritDoc}
    *
-   * @see org.opencastproject.workflow.api.WorkflowOperationHandler#getConfigurationOptions()
-   */
-  @Override
-  public SortedMap<String, String> getConfigurationOptions() {
-    return CONFIG_OPTIONS;
-  }
-
-  /**
-   * {@inheritDoc}
-   *
    * @see org.opencastproject.workflow.api.WorkflowOperationHandler#start(org.opencastproject.workflow.api.WorkflowInstance,
    *      JobContext)
    */
@@ -153,20 +130,23 @@ public class ConcatWorkflowOperationHandler extends AbstractWorkflowOperationHan
     logger.debug("Running concat workflow operation on workflow {}", workflowInstance.getId());
 
     try {
-      return concat(workflowInstance.getMediaPackage(), workflowInstance.getCurrentOperation());
+      return concat(workflowInstance.getMediaPackage(), workflowInstance);
     } catch (Exception e) {
       throw new WorkflowOperationException(e);
     }
   }
 
-  private WorkflowOperationResult concat(MediaPackage src, WorkflowOperationInstance operation)
+  private WorkflowOperationResult concat(MediaPackage src, WorkflowInstance workflowInstance)
           throws EncoderException, IOException, NotFoundException, MediaPackageException, WorkflowOperationException {
     MediaPackage mediaPackage = (MediaPackage) src.clone();
+
+    WorkflowOperationInstance operation = workflowInstance.getCurrentOperation();
 
     Map<Integer, Tuple<TrackSelector, Boolean>> trackSelectors = getTrackSelectors(operation);
     String outputResolution = StringUtils.trimToNull(operation.getConfiguration(OUTPUT_RESOLUTION));
     String outputFrameRate = StringUtils.trimToNull(operation.getConfiguration(OUTPUT_FRAMERATE));
     String encodingProfile = StringUtils.trimToNull(operation.getConfiguration(ENCODING_PROFILE));
+    boolean sameCodec = BooleanUtils.toBoolean(operation.getConfiguration(SAME_CODEC));
 
     // Skip the worklow if no source-flavors or tags has been configured
     if (trackSelectors.isEmpty()) {
@@ -174,14 +154,12 @@ public class ConcatWorkflowOperationHandler extends AbstractWorkflowOperationHan
       return createResult(mediaPackage, Action.SKIP);
     }
 
-    String targetTagsOption = StringUtils.trimToNull(operation.getConfiguration(TARGET_TAGS));
-    String targetFlavorOption = StringUtils.trimToNull(operation.getConfiguration(TARGET_FLAVOR));
-
-    // Target tags
-    List<String> targetTags = asList(targetTagsOption);
+    ConfiguredTagsAndFlavors tagsAndFlavors = getTagsAndFlavors(workflowInstance, Configuration.none, Configuration.none, Configuration.many, Configuration.one);
+    List<String> targetTagsOption = tagsAndFlavors.getTargetTags();
+    List<MediaPackageElementFlavor> targetFlavorOption = tagsAndFlavors.getTargetFlavors();
 
     // Target flavor
-    if (targetFlavorOption == null)
+    if (targetFlavorOption.isEmpty())
       throw new WorkflowOperationException("Target flavor must be set!");
 
     // Find the encoding profile
@@ -192,39 +170,43 @@ public class ConcatWorkflowOperationHandler extends AbstractWorkflowOperationHan
     if (profile == null)
       throw new WorkflowOperationException("Encoding profile '" + encodingProfile + "' was not found");
 
-    // Output resolution
-    if (outputResolution == null)
-      throw new WorkflowOperationException("Output resolution must be set!");
+    // Output resolution - if not keeping dimensions the same, it must be set
+    if (!sameCodec && outputResolution == null)
+        throw new WorkflowOperationException("Output resolution must be set!");
 
     Dimension outputDimension = null;
-    if (outputResolution.startsWith(OUTPUT_PART_PREFIX)) {
-      if (!trackSelectors.keySet().contains(
-              Integer.parseInt(outputResolution.substring(OUTPUT_PART_PREFIX.length()))))
-        throw new WorkflowOperationException("Output resolution part not set!");
-    } else {
-      try {
-        String[] outputResolutionArray = StringUtils.split(outputResolution, "x");
-        if (outputResolutionArray.length != 2) {
-          throw new WorkflowOperationException("Invalid format of output resolution!");
+    if (!sameCodec) { // Ignore resolution if same Codec - no scaling
+      if (outputResolution.startsWith(OUTPUT_PART_PREFIX)) {
+        if (!trackSelectors.keySet().contains(
+            Integer.parseInt(outputResolution.substring(OUTPUT_PART_PREFIX.length())))) {
+          throw new WorkflowOperationException("Output resolution part not set!");
         }
-        outputDimension = Dimension.dimension(Integer.parseInt(outputResolutionArray[0]),
-                Integer.parseInt(outputResolutionArray[1]));
-      } catch (WorkflowOperationException e) {
-        throw e;
-      } catch (Exception e) {
-        throw new WorkflowOperationException("Unable to parse output resolution!", e);
+      } else {
+        try {
+          String[] outputResolutionArray = StringUtils.split(outputResolution, "x");
+          if (outputResolutionArray.length != 2) {
+            throw new WorkflowOperationException("Invalid format of output resolution!");
+          }
+          outputDimension = Dimension.dimension(Integer.parseInt(outputResolutionArray[0]),
+            Integer.parseInt(outputResolutionArray[1]));
+        } catch (WorkflowOperationException e) {
+          throw e;
+        } catch (Exception e) {
+          throw new WorkflowOperationException("Unable to parse output resolution!", e);
+        }
       }
     }
 
     float fps = -1.0f;
-    if (StringUtils.isNotEmpty(outputFrameRate)) {
+    // Ignore fps if same Codec - no scaling
+    if (!sameCodec && StringUtils.isNotEmpty(outputFrameRate)) {
       if (StringUtils.startsWith(outputFrameRate, OUTPUT_PART_PREFIX)) {
-        if (!NumberUtils.isNumber(outputFrameRate.substring(OUTPUT_PART_PREFIX.length()))
+        if (!NumberUtils.isCreatable(outputFrameRate.substring(OUTPUT_PART_PREFIX.length()))
                 || !trackSelectors.keySet().contains(Integer.parseInt(
                         outputFrameRate.substring(OUTPUT_PART_PREFIX.length())))) {
           throw new WorkflowOperationException("Output frame rate part not set or invalid!");
         }
-      } else if (NumberUtils.isNumber(outputFrameRate)) {
+      } else if (NumberUtils.isCreatable(outputFrameRate)) {
         fps = NumberUtils.toFloat(outputFrameRate);
       } else {
         throw new WorkflowOperationException("Unable to parse output frame rate!");
@@ -233,7 +215,7 @@ public class ConcatWorkflowOperationHandler extends AbstractWorkflowOperationHan
 
     MediaPackageElementFlavor targetFlavor = null;
     try {
-      targetFlavor = MediaPackageElementFlavor.parseFlavor(targetFlavorOption);
+      targetFlavor = targetFlavorOption.get(0);
       if ("*".equals(targetFlavor.getType()) || "*".equals(targetFlavor.getSubtype()))
         throw new WorkflowOperationException("Target flavor must have a type and a subtype, '*' are not allowed!");
     } catch (IllegalArgumentException e) {
@@ -246,15 +228,24 @@ public class ConcatWorkflowOperationHandler extends AbstractWorkflowOperationHan
       String currentFlavor = StringUtils.join(trackSelector.getValue().getA().getFlavors());
       String currentTag = StringUtils.join(trackSelector.getValue().getA().getTags());
 
-      if (tracksForSelector.size() > 1) {
-        logger.warn(
-                "More than one track has been found with flavor '{}' and/or tag '{}' for concat operation, skipping concatenation!",
-                currentFlavor, currentTag);
+      // Cannot mix prefix-number tracks with numbered files
+      // PREFIXED_FILES must have multiple files, but numbered file can skip the operation if there is only one
+      if (trackSelectors.size() == 1) {
+        // NUMBERED FILES will have one trackSelector only and multiple sorted files in it
+        List<Track> list = new ArrayList<>(tracksForSelector);
+        list.sort((left, right) -> {
+            String l = (new File(left.getURI().getPath())).getName(); // Get and compare basename only, getPath() for mock
+            String r = (new File(right.getURI().getPath())).getName();
+            return (l.compareTo(r));
+          });
+        tracksForSelector = list;
+      } else if (tracksForSelector.size() > 1) {
+        logger.warn("More than one track has been found with flavor '{}' and/or tag '{}' for concat operation, "
+                        + "skipping concatenation!", currentFlavor, currentTag);
         return createResult(mediaPackage, Action.SKIP);
       } else if (tracksForSelector.size() == 0 && trackSelector.getValue().getB()) {
-        logger.warn(
-                "No track has been found with flavor '{}' and/or tag '{}' for concat operation, skipping concatenation!",
-                currentFlavor, currentTag);
+        logger.warn("No track has been found with flavor '{}' and/or tag '{}' for concat operation, "
+                        + "skipping concatenation!", currentFlavor, currentTag);
         return createResult(mediaPackage, Action.SKIP);
       } else if (tracksForSelector.size() == 0 && !trackSelector.getValue().getB()) {
         logger.info("No track has been found with flavor '{}' and/or tag '{}' for concat operation, skipping track!",
@@ -270,7 +261,7 @@ public class ConcatWorkflowOperationHandler extends AbstractWorkflowOperationHan
           return createResult(mediaPackage, Action.SKIP);
         }
         if (StringUtils.startsWith(outputResolution, OUTPUT_PART_PREFIX)
-                && NumberUtils.isNumber(outputResolution.substring(OUTPUT_PART_PREFIX.length()))
+                && NumberUtils.isCreatable(outputResolution.substring(OUTPUT_PART_PREFIX.length()))
                 && trackSelector.getKey() == Integer.parseInt(outputResolution.substring(OUTPUT_PART_PREFIX.length()))) {
           outputDimension = new Dimension(videoStreams[0].getFrameWidth(), videoStreams[0].getFrameHeight());
           if (!trackSelector.getValue().getB()) {
@@ -279,7 +270,7 @@ public class ConcatWorkflowOperationHandler extends AbstractWorkflowOperationHan
           }
         }
         if (fps <= 0 && StringUtils.startsWith(outputFrameRate, OUTPUT_PART_PREFIX)
-                && NumberUtils.isNumber(outputFrameRate.substring(OUTPUT_PART_PREFIX.length()))
+                && NumberUtils.isCreatable(outputFrameRate.substring(OUTPUT_PART_PREFIX.length()))
                 && trackSelector.getKey() == Integer.parseInt(outputFrameRate.substring(OUTPUT_PART_PREFIX.length()))) {
           fps = videoStreams[0].getFrameRate();
         }
@@ -292,7 +283,7 @@ public class ConcatWorkflowOperationHandler extends AbstractWorkflowOperationHan
     } else if (tracks.size() == 1) {
       Track track = (Track) tracks.get(0).clone();
       track.setIdentifier(null);
-      addNewTrack(mediaPackage, track, targetTags, targetFlavor);
+      addNewTrack(mediaPackage, track, targetTagsOption, targetFlavor);
       logger.info("At least two tracks are needed for the concating operation, skipping concatenation!");
       return createResult(mediaPackage, Action.SKIP);
     }
@@ -300,10 +291,10 @@ public class ConcatWorkflowOperationHandler extends AbstractWorkflowOperationHan
     Job concatJob;
     if (fps > 0) {
       concatJob = composerService.concat(profile.getIdentifier(), outputDimension,
-              fps, tracks.toArray(new Track[tracks.size()]));
+              fps, sameCodec, tracks.toArray(new Track[tracks.size()]));
     } else {
       concatJob = composerService.concat(profile.getIdentifier(), outputDimension,
-              tracks.toArray(new Track[tracks.size()]));
+              sameCodec,tracks.toArray(new Track[tracks.size()]));
     }
 
     // Wait for the jobs to return
@@ -317,7 +308,7 @@ public class ConcatWorkflowOperationHandler extends AbstractWorkflowOperationHan
       concatTrack.setURI(workspace.moveTo(concatTrack.getURI(), mediaPackage.getIdentifier().toString(),
               concatTrack.getIdentifier(), "concat." + FilenameUtils.getExtension(concatTrack.getURI().toString())));
 
-      addNewTrack(mediaPackage, concatTrack, targetTags, targetFlavor);
+      addNewTrack(mediaPackage, concatTrack, targetTagsOption, targetFlavor);
 
       WorkflowOperationResult result = createResult(mediaPackage, Action.CONTINUE, concatJob.getQueueTime());
       logger.debug("Concat operation completed");
@@ -346,6 +337,44 @@ public class ConcatWorkflowOperationHandler extends AbstractWorkflowOperationHan
   private Map<Integer, Tuple<TrackSelector, Boolean>> getTrackSelectors(WorkflowOperationInstance operation)
           throws WorkflowOperationException {
     Map<Integer, Tuple<TrackSelector, Boolean>> trackSelectors = new HashMap<Integer, Tuple<TrackSelector, Boolean>>();
+    SourceType flavorType = SourceType.None;
+    String srcFlavor = null;
+
+    // Search config for SOURCE_FLAVOR_NUMBERED_FILES and SOURCE_FLAVOR_PREFIX
+    for (String key : operation.getConfigurationKeys()) {
+      if (key.startsWith(SOURCE_FLAVOR_PREFIX) || key.startsWith(SOURCE_TAGS_PREFIX)) {
+        if (flavorType == SourceType.None) {
+          flavorType = SourceType.PrefixedFile;
+        } else if (flavorType != SourceType.PrefixedFile) {
+          throw new WorkflowOperationException(
+                  "Cannot mix source prefix flavor/tags with source numbered files - use one type of selector only");
+        }
+      }
+
+      if (key.equals(SOURCE_FLAVOR_NUMBERED_FILES)) { // Search config for SOURCE_FLAVORS_NUMBERED_FILES
+        srcFlavor = operation.getConfiguration(key);
+        if (flavorType == SourceType.None) {
+          flavorType = SourceType.NumberedFile;
+          srcFlavor = operation.getConfiguration(key);
+        } else if (flavorType != SourceType.NumberedFile) {
+          throw new WorkflowOperationException(
+                  "Cannot mix source prefix flavor/tags with source numbered files - use one type of selector only");
+        }
+      }
+    }
+
+    // if is SOURCE_FLAVOR_NUMBERED_FILES, do not use prefixed (tags or flavor)
+    if (srcFlavor != null) { // Numbered files has only one selector
+      int number = 0;
+      Tuple<TrackSelector, Boolean> selectorTuple = trackSelectors.get(number);
+      selectorTuple = Tuple.tuple(new TrackSelector(), true);
+      TrackSelector trackSelector = selectorTuple.getA();
+      trackSelector.addFlavor(srcFlavor);
+      trackSelectors.put(number, selectorTuple);
+      return trackSelectors;
+    }
+
+    // Prefix only
     for (String key : operation.getConfigurationKeys()) {
       String tags = null;
       String flavor = null;

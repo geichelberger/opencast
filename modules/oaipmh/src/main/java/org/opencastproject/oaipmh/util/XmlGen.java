@@ -21,12 +21,12 @@
 package org.opencastproject.oaipmh.util;
 
 import static com.entwinemedia.fn.Stream.$;
-import static org.opencastproject.fun.juc.Immutables.list;
 import static org.opencastproject.util.IoSupport.withResource;
 import static org.opencastproject.util.data.Option.some;
 import static org.opencastproject.util.data.functions.Misc.chuck;
 
 import org.opencastproject.metadata.dublincore.DublinCore;
+import org.opencastproject.util.XmlSafeParser;
 import org.opencastproject.util.data.Function;
 import org.opencastproject.util.data.Function0;
 import org.opencastproject.util.data.Option;
@@ -43,6 +43,7 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
 import java.io.OutputStream;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -54,7 +55,6 @@ import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.transform.OutputKeys;
 import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerException;
-import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
@@ -78,7 +78,7 @@ public abstract class XmlGen {
 
   private Document createDocument() {
     try {
-      DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+      DocumentBuilderFactory factory = XmlSafeParser.newDocumentBuilderFactory();
       factory.setNamespaceAware(true);
       DocumentBuilder builder = factory.newDocumentBuilder();
       return builder.newDocument();
@@ -89,8 +89,7 @@ public abstract class XmlGen {
 
   private void write(OutputStream out) {
     try {
-      TransformerFactory transformerFactory = TransformerFactory.newInstance();
-      Transformer transformer = transformerFactory.newTransformer();
+      Transformer transformer = XmlSafeParser.newTransformerFactory().newTransformer();
       transformer.setOutputProperty(OutputKeys.METHOD, "xml");
       transformer.setOutputProperty(OutputKeys.ENCODING, "UTF-8");
       transformer.setOutputProperty(OutputKeys.INDENT, "yes");
@@ -206,15 +205,15 @@ public abstract class XmlGen {
   }
 
   protected Element $e(String qname, Option<String> namespace, Node... nodes) {
-    return $e(qname, namespace, list(nodes));
+    return $e(qname, namespace, Arrays.asList(nodes));
   }
 
   protected Element $e(String name, Node... nodes) {
-    return $e(name, defaultNamespace, list(nodes));
+    return $e(name, defaultNamespace, Arrays.asList(nodes));
   }
 
   protected Element $e(String name, List<Node> nodes) {
-    return $e(name, defaultNamespace, list(nodes));
+    return $e(name, defaultNamespace, Collections.unmodifiableList(nodes));
   }
 
   /**
@@ -222,7 +221,7 @@ public abstract class XmlGen {
    * namespace <code>namespace</code> with children <code>nodes</code>.
    */
   protected Element $e(String qname, String namespace, Node... nodes) {
-    return $e(qname, some(namespace), list(nodes));
+    return $e(qname, some(namespace), Arrays.asList(nodes));
   }
 
   protected Element $e(String qname, String namespace, List<Node> nodes) {
@@ -253,7 +252,7 @@ public abstract class XmlGen {
   }
 
   protected Element $e(String name, List<Namespace> namespaces, Node... nodes) {
-    return appendTo(appendNs(createElemDefaultNs(name), namespaces), list(nodes));
+    return appendTo(appendNs(createElemDefaultNs(name), namespaces), Arrays.asList(nodes));
   }
 
   protected Element $e(String name, List<Namespace> namespaces, NodeList nodes) {
@@ -265,7 +264,7 @@ public abstract class XmlGen {
   }
 
   protected Element $e(String qname, String namespace, List<Namespace> namespaces, Node... nodes) {
-    return appendTo(appendNs(createElemNs(namespace, qname), namespaces), list(nodes));
+    return appendTo(appendNs(createElemNs(namespace, qname), namespaces), Arrays.asList(nodes));
   }
 
   private Element createElemDefaultNs(String name) {
@@ -305,7 +304,7 @@ public abstract class XmlGen {
    * nodes, etc.
    */
   protected Node $e(String name, Option<Node>... nodes) {
-    final List<Node> existing = filter(list(nodes));
+    final List<Node> existing = filter(Arrays.asList(nodes));
     if (!existing.isEmpty()) {
       return $e(name, existing);
     } else {
@@ -339,12 +338,12 @@ public abstract class XmlGen {
         return nodeOption.fold(new Option.Match<Node, Collection<Node>>() {
           @Override
           public Collection<Node> some(Node node) {
-            return list(node);
+            return Collections.singletonList(node);
           }
 
           @Override
           public Collection<Node> none() {
-            return Collections.EMPTY_LIST;
+            return Collections.emptyList();
           }
         });
       }

@@ -1,6 +1,8 @@
 Opencast
 ========
 
+![Test Opencast](https://github.com/opencast/opencast/workflows/Test%20Opencast/badge.svg)
+
 Open Source Lecture Capture & Video Management for Education
 
 Opencast is a free, open-source platform to support the management of
@@ -13,20 +15,16 @@ educational videos.
 Installation
 ------------
 
-Installation instructions can be found locally at
-
-    docs/guides/admin/docs
-
-or on our documentation server at:
-
- * [Opencast Documentation](http://docs.opencast.org)
+Installation instructions can be found locally at `docs/guides/admin/docs` or in
+our [online documentation](https://docs.opencast.org).
 
 
 Community
 ---------
 
-More information about the community can be found at:
+More information about the community:
 
-* [Opencast Website](http://opencast.org/)
-* [Mailing lists, IRC, …](http://opencast.org/community)
-* [Issue Tracker](http://opencast.jira.com/)
+- [Website](https://opencast.org)
+- [Documentation](https://docs.opencast.org)
+- [Twitter](https://twitter.com/openmatter)
+- [Facebook](https://facebook.com/opencast)

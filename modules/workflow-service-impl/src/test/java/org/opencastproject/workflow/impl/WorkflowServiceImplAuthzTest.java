@@ -21,13 +21,17 @@
 
 package org.opencastproject.workflow.impl;
 
+import static org.easymock.EasyMock.createNiceMock;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 import static org.opencastproject.workflow.impl.SecurityServiceStub.DEFAULT_ORG_ADMIN;
 
+import org.opencastproject.assetmanager.api.AssetManager;
+import org.opencastproject.elasticsearch.api.SearchResult;
+import org.opencastproject.elasticsearch.index.AbstractSearchIndex;
+import org.opencastproject.elasticsearch.index.event.EventSearchQuery;
 import org.opencastproject.mediapackage.MediaPackage;
 import org.opencastproject.mediapackage.MediaPackageBuilderFactory;
-import org.opencastproject.message.broker.api.MessageSender;
 import org.opencastproject.metadata.api.MediaPackageMetadataService;
 import org.opencastproject.security.api.AccessControlEntry;
 import org.opencastproject.security.api.AccessControlList;
@@ -53,6 +57,8 @@ import org.opencastproject.workflow.api.WorkflowInstance;
 import org.opencastproject.workflow.api.WorkflowOperationDefinitionImpl;
 import org.opencastproject.workspace.api.Workspace;
 
+import com.entwinemedia.fn.data.Opt;
+
 import org.apache.commons.io.FileUtils;
 import org.easymock.EasyMock;
 import org.easymock.IAnswer;
@@ -63,6 +69,7 @@ import org.junit.Test;
 import java.io.File;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -153,6 +160,17 @@ public class WorkflowServiceImplAuthzTest {
     scanner = new WorkflowDefinitionScanner();
     service.addWorkflowDefinitionScanner(scanner);
 
+    {
+      final AssetManager assetManager = createNiceMock(AssetManager.class);
+      EasyMock.expect(assetManager.selectProperties(EasyMock.anyString(), EasyMock.anyString()))
+              .andReturn(Collections.emptyList())
+              .anyTimes();
+      EasyMock.expect(assetManager.getMediaPackage(EasyMock.anyString())).andReturn(Opt.none()).anyTimes();
+      EasyMock.expect(assetManager.snapshotExists(EasyMock.anyString())).andReturn(true).anyTimes();
+      EasyMock.replay(assetManager);
+      service.setAssetManager(assetManager);
+    }
+
     // Organization Service
     List<Organization> organizationList = new ArrayList<Organization>();
     organizationList.add(defaultOrganization);
@@ -209,9 +227,6 @@ public class WorkflowServiceImplAuthzTest {
     EasyMock.replay(authzService);
     service.setAuthorizationService(authzService);
 
-    MessageSender messageSender = EasyMock.createNiceMock(MessageSender.class);
-    EasyMock.replay(messageSender);
-
     // Service Registry
     serviceRegistry = new ServiceRegistryInMemoryImpl(service, securityService, userDirectoryService,
             organizationDirectoryService, EasyMock.createNiceMock(IncidentService.class));
@@ -228,7 +243,16 @@ public class WorkflowServiceImplAuthzTest {
     dao.solrRoot = sRoot + File.separator + "solr." + System.currentTimeMillis();
     dao.activate("System Admin");
     service.setDao(dao);
-    service.setMessageSender(messageSender);
+
+    SearchResult result = EasyMock.createNiceMock(SearchResult.class);
+
+    final AbstractSearchIndex index = EasyMock.createNiceMock(AbstractSearchIndex.class);
+    EasyMock.expect(index.getIndexName()).andReturn("index").anyTimes();
+    EasyMock.expect(index.getByQuery(EasyMock.anyObject(EventSearchQuery.class))).andReturn(result).anyTimes();
+    EasyMock.replay(result, index);
+
+    service.setAdminUiIndex(index);
+    service.setExternalApiIndex(index);
 
     // Activate
     service.activate(null);

@@ -35,18 +35,17 @@ import org.opencastproject.mediapackage.selector.SimpleElementSelector;
 import org.opencastproject.publication.api.PublicationException;
 import org.opencastproject.publication.api.YouTubePublicationService;
 import org.opencastproject.workflow.api.AbstractWorkflowOperationHandler;
+import org.opencastproject.workflow.api.ConfiguredTagsAndFlavors;
 import org.opencastproject.workflow.api.WorkflowInstance;
 import org.opencastproject.workflow.api.WorkflowOperationException;
 import org.opencastproject.workflow.api.WorkflowOperationResult;
 import org.opencastproject.workflow.api.WorkflowOperationResult.Action;
 
-import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Collection;
-import java.util.SortedMap;
-import java.util.TreeMap;
+import java.util.List;
 
 /**
  * The workflow definition for handling "publish" operations
@@ -69,31 +68,6 @@ public class PublishYouTubeWorkflowOperationHandler extends AbstractWorkflowOper
     this.publicationService = publicationService;
   }
 
-  /** The configuration options for this handler */
-  private static final SortedMap<String, String> CONFIG_OPTIONS;
-
-  static {
-    CONFIG_OPTIONS = new TreeMap<String, String>();
-    CONFIG_OPTIONS.put("source-tags", "Publish the mediapackage element with these matching (comma separated) tags.");
-    CONFIG_OPTIONS.put("source-flavors", "Publish the mediapackage element with one of these matching flavors");
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * @see org.opencastproject.workflow.api.WorkflowOperationHandler#getConfigurationOptions()
-   */
-  @Override
-  public SortedMap<String, String> getConfigurationOptions() {
-    return CONFIG_OPTIONS;
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * @see org.opencastproject.workflow.api.WorkflowOperationHandler#start(org.opencastproject.workflow.api.WorkflowInstance,
-   *      JobContext)
-   */
   public WorkflowOperationResult start(final WorkflowInstance workflowInstance, JobContext context)
           throws WorkflowOperationException {
     logger.debug("Running youtube publication workflow operation");
@@ -101,9 +75,10 @@ public class PublishYouTubeWorkflowOperationHandler extends AbstractWorkflowOper
     MediaPackage mediaPackage = workflowInstance.getMediaPackage();
 
     // Check which tags have been configured
-    String sourceTags = StringUtils.trimToNull(workflowInstance.getCurrentOperation().getConfiguration("source-tags"));
-    String sourceFlavors = StringUtils.trimToNull(workflowInstance.getCurrentOperation().getConfiguration(
-            "source-flavors"));
+    ConfiguredTagsAndFlavors tagsAndFlavors = getTagsAndFlavors(workflowInstance,
+        Configuration.many, Configuration.many, Configuration.none, Configuration.none);
+    List<String> sourceTags = tagsAndFlavors.getSrcTags();
+    List<MediaPackageElementFlavor> sourceFlavors = tagsAndFlavors.getSrcFlavors();
 
     AbstractMediaPackageElementSelector<MediaPackageElement> elementSelector;
 
@@ -113,13 +88,13 @@ public class PublishYouTubeWorkflowOperationHandler extends AbstractWorkflowOper
     }
     elementSelector = new SimpleElementSelector();
 
-    if (sourceFlavors != null) {
-      for (String flavor : asList(sourceFlavors)) {
-        elementSelector.addFlavor(MediaPackageElementFlavor.parseFlavor(flavor));
+    if (!sourceFlavors.isEmpty()) {
+      for (MediaPackageElementFlavor flavor : sourceFlavors) {
+        elementSelector.addFlavor(flavor);
       }
     }
-    if (sourceTags != null) {
-      for (String tag : asList(sourceTags)) {
+    if (!sourceTags.isEmpty()) {
+      for (String tag : sourceTags) {
         elementSelector.addTag(tag);
       }
     }
@@ -146,8 +121,9 @@ public class PublishYouTubeWorkflowOperationHandler extends AbstractWorkflowOper
       }
 
       // Wait until the youtube publication job has returned
-      if (!waitForStatus(youtubeJob).isSuccess())
+      if (!waitForStatus(youtubeJob).isSuccess()) {
         throw new WorkflowOperationException("The youtube publication jobs did not complete successfully");
+      }
 
       // All the jobs have passed
       Job job = serviceRegistry.getJob(youtubeJob.getId());
@@ -167,8 +143,8 @@ public class PublishYouTubeWorkflowOperationHandler extends AbstractWorkflowOper
 
       if (newElement == null) {
         logger.warn(
-                "Publication to youtube failed, unable to parse the payload '{}' from job '{}' to a mediapackage element",
-                job.getPayload(), job);
+            "Publication to youtube failed, unable to parse the payload '{}' from job '{}' to a mediapackage element",
+            job.getPayload(), job);
         return createResult(mediaPackage, Action.CONTINUE);
       }
       mediaPackage.add(newElement);

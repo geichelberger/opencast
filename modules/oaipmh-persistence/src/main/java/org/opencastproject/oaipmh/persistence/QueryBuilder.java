@@ -27,20 +27,41 @@ import org.opencastproject.mediapackage.MediaPackage;
 import org.opencastproject.util.data.Option;
 
 import java.util.Date;
+import java.util.LinkedList;
+import java.util.List;
 
 /** Query builder. */
 public class QueryBuilder {
   private Option<String> mediaPackageId = none();
   private Option<String> repositoryId = none();
   private Option<String> seriesId = none();
+  private Option<Boolean> deleted = none();
   private Option<Date> modifiedAfter = none();
   private Option<Date> modifiedBefore = none();
   private Option<Integer> limit = none();
   private Option<Integer> offset = none();
+  private Option<String> setSpec = none();
+  private List<OaiPmhSetDefinition> setDefinitions = new LinkedList<>();
   private boolean subsequentRequest = false;
 
   public static QueryBuilder query() {
     return new QueryBuilder();
+  }
+
+  public static QueryBuilder query(Query query) {
+    QueryBuilder queryBuilder = new QueryBuilder();
+    queryBuilder.mediaPackageId = query.getMediaPackageId();
+    queryBuilder.repositoryId = query.getRepositoryId();
+    queryBuilder.seriesId = query.getSeriesId();
+    queryBuilder.deleted = query.isDeleted();
+    queryBuilder.modifiedAfter = query.getModifiedAfter();
+    queryBuilder.modifiedBefore = query.getModifiedBefore();
+    queryBuilder.limit = query.getLimit();
+    queryBuilder.offset = query.getOffset();
+    queryBuilder.setDefinitions = query.getSetDefinitions();
+    queryBuilder.setSpec = query.getSetSpec();
+    queryBuilder.subsequentRequest = query.isSubsequentRequest();
+    return queryBuilder;
   }
 
   /** Create a query for a certain repository. */
@@ -59,7 +80,7 @@ public class QueryBuilder {
   }
 
   public QueryBuilder mediaPackageId(MediaPackage mediaPackage) {
-    this.mediaPackageId = some(mediaPackage.getIdentifier().toString());
+    this.mediaPackageId = some(mediaPackage.getIdentifier().toString().toString());
     return this;
   }
 
@@ -107,6 +128,11 @@ public class QueryBuilder {
     return this;
   }
 
+  public QueryBuilder isDeleted(boolean deleted) {
+    this.deleted = some(deleted);
+    return this;
+  }
+
   public QueryBuilder limit(Option<Integer> limit) {
     this.limit = limit;
     return this;
@@ -128,15 +154,30 @@ public class QueryBuilder {
     return this;
   }
 
+  public QueryBuilder setDefinitions(List<OaiPmhSetDefinition> setDef) {
+    this.setDefinitions = setDef;
+    return this;
+  }
+
+  public QueryBuilder setSpec(String setSpec) {
+    if (setSpec != null) {
+      this.setSpec = some(setSpec);
+    }
+    return this;
+  }
+
   /** Create the query. */
   public Query build() {
     final Option<String> mediaPackageId = this.mediaPackageId;
     final Option<String> repositoryId = this.repositoryId;
     final Option<String> seriesId = this.seriesId;
+    final Option<Boolean> deleted = this.deleted;
     final Option<Date> modifiedAfter = this.modifiedAfter;
     final Option<Date> modifiedBefore = this.modifiedBefore;
     final Option<Integer> limit = this.limit;
     final Option<Integer> offset = this.offset;
+    final Option<String> setSpec = this.setSpec;
+    final List<OaiPmhSetDefinition> setDefinitions = this.setDefinitions;
     final boolean subsequentRequest = this.subsequentRequest;
 
     return new Query() {
@@ -150,6 +191,10 @@ public class QueryBuilder {
 
       @Override public Option<String> getSeriesId() {
         return seriesId;
+      }
+
+      @Override public Option<Boolean> isDeleted() {
+        return deleted;
       }
 
       @Override public Option<Date> getModifiedAfter() {
@@ -166,6 +211,16 @@ public class QueryBuilder {
 
       @Override public Option<Integer> getOffset() {
         return offset;
+      }
+
+      @Override
+      public List<OaiPmhSetDefinition> getSetDefinitions() {
+        return setDefinitions;
+      }
+
+      @Override
+      public Option<String> getSetSpec() {
+        return setSpec;
       }
 
       @Override public boolean isSubsequentRequest() {

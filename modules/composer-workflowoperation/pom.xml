@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <artifactId>opencast-composer-workflowoperation</artifactId>
   <packaging>bundle</packaging>
@@ -7,7 +7,7 @@
   <parent>
     <groupId>org.opencastproject</groupId>
     <artifactId>base</artifactId>
-    <version>5-SNAPSHOT</version>
+    <version>11-SNAPSHOT</version>
     <relativePath>../../pom.xml</relativePath>
   </parent>
   <properties>
@@ -37,11 +37,6 @@
     </dependency>
     <dependency>
       <groupId>org.opencastproject</groupId>
-      <artifactId>opencast-series-service-api</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.opencastproject</groupId>
       <artifactId>opencast-smil-api</artifactId>
       <version>${project.version}</version>
     </dependency>
@@ -52,17 +47,8 @@
     </dependency>
     <dependency>
       <groupId>org.opencastproject</groupId>
-      <artifactId>opencast-dublincore</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.opencastproject</groupId>
       <artifactId>opencast-mpeg7</artifactId>
       <version>${project.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.opencastproject</groupId>
-      <artifactId>android-mms</artifactId>
     </dependency>
     <dependency>
       <groupId>commons-io</groupId>
@@ -81,6 +67,10 @@
       <artifactId>slf4j-api</artifactId>
     </dependency>
     <dependency>
+      <groupId>jakarta.xml.bind</groupId>
+      <artifactId>jakarta.xml.bind-api</artifactId>
+    </dependency>
+    <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
       <scope>test</scope>
@@ -95,17 +85,19 @@
       <artifactId>slf4j-log4j12</artifactId>
       <scope>test</scope>
     </dependency>
-    <dependency>
-      <groupId>org.osgi</groupId>
-      <artifactId>org.osgi.core</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.osgi</groupId>
-      <artifactId>org.osgi.compendium</artifactId>
-    </dependency>
   </dependencies>
   <build>
     <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <configuration>
+          <ignoredUnusedDeclaredDependencies>
+            <!-- provide a logger for tests -->
+            <ignoredUnusedDeclaredDependency>org.slf4j:slf4j-log4j12</ignoredUnusedDeclaredDependency>
+          </ignoredUnusedDeclaredDependencies>
+        </configuration>
+      </plugin>
       <plugin>
         <groupId>org.apache.felix</groupId>
         <artifactId>maven-bundle-plugin</artifactId>
@@ -118,17 +110,20 @@
               org.opencastproject.workflow.handler.composer;version=${project.version}
             </Export-Package>
             <Service-Component>
-              OSGI-INF/operations/compose.xml,
               OSGI-INF/operations/composite.xml,
               OSGI-INF/operations/concat.xml,
-              OSGI-INF/operations/coverart.xml,
+              OSGI-INF/operations/demux.xml,
               OSGI-INF/operations/encode.xml,
+              OSGI-INF/operations/image-convert.xml,
               OSGI-INF/operations/image-to-video.xml,
               OSGI-INF/operations/image.xml,
+              OSGI-INF/operations/multiencode.xml,
               OSGI-INF/operations/partial-import.xml,
               OSGI-INF/operations/prepare-av.xml,
+              OSGI-INF/operations/process-smil.xml,
+              OSGI-INF/operations/sanitize-adaptive.xml,
               OSGI-INF/operations/segmentpreviews.xml,
-              OSGI-INF/operations/watermark.xml
+              OSGI-INF/operations/select-tracks.xml
             </Service-Component>
           </instructions>
         </configuration>

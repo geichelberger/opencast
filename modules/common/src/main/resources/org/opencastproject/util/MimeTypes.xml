@@ -1,5 +1,15 @@
 <MimeTypes>
   <MimeType>
+    <Type>application/x-mpegURL</Type>
+    <Description>Apple HTTP Live Streaming </Description>
+    <Extensions>m3u8</Extensions>
+  </MimeType>
+  <MimeType>
+    <Type>application/dash+xml</Type>
+    <Description>Mpeg Dash</Description>
+    <Extensions>mpd</Extensions>
+  </MimeType>
+  <MimeType>
     <Type>application/futuresplash</Type>
     <Description>FutureSplash Player</Description>
     <Extensions>spl</Extensions>
@@ -20,9 +30,9 @@
     <Extensions>json</Extensions>
   </MimeType>
   <MimeType>
-    <Type>application/ogg</Type>
-    <Description>Ogg file</Description>
-    <Extensions>ogg,oga,ogv,ogx</Extensions>
+    <Type>text/yaml</Type>
+    <Description>YAML Ain't Markup Language</Description>
+    <Extensions>yml,yaml</Extensions>
   </MimeType>
   <MimeType>
     <Type>application/pdf</Type>
@@ -100,6 +110,11 @@
     <Extensions>flac</Extensions>
   </MimeType>
   <MimeType>
+    <Type>audio/m4a</Type>
+    <Description>AAC audio</Description>
+    <Extensions>m4a</Extensions>
+  </MimeType>
+  <MimeType>
     <Type>audio/mid</Type>
     <Description>MIDI</Description>
     <Extensions>mid,midi,smf,kar</Extensions>
@@ -110,22 +125,17 @@
     <Extensions>mid,midi,smf,kar</Extensions>
   </MimeType>
   <MimeType>
-    <Type>audio/mp3</Type>
+    <Type>audio/mpeg</Type>
+    <Description>MPEG audio</Description>
+    <Extensions>mp3,m1a,mp2,mpa,m2a,swa</Extensions>
+  </MimeType>
+  <MimeType>
+    <Type>audio/mpeg3</Type>
     <Description>MP3 audio</Description>
     <Extensions>mp3,swa</Extensions>
   </MimeType>
   <MimeType>
-    <Type>audio/mp4</Type>
-    <Description>MPEG-4 media</Description>
-    <Extensions>mp4</Extensions>
-  </MimeType>
-  <MimeType>
-    <Type>audio/mpeg</Type>
-    <Description>MPEG audio</Description>
-    <Extensions>m1a,mp2,mpa,m2a,mp3,swa</Extensions>
-  </MimeType>
-  <MimeType>
-    <Type>audio/mpeg3</Type>
+    <Type>audio/mp3</Type>
     <Description>MP3 audio</Description>
     <Extensions>mp3,swa</Extensions>
   </MimeType>
@@ -377,12 +387,17 @@
   <MimeType>
     <Type>video/mp2t</Type>
     <Description>MPEG-2 transport stream</Description>
-    <Extensions>ts</Extensions>
+    <Extensions>ts,mts</Extensions>
   </MimeType>
   <MimeType>
     <Type>video/mp4</Type>
     <Description>MPEG-4 media</Description>
-    <Extensions>mp4,m4v</Extensions>
+    <Extensions>mp4,mp4v,m4v</Extensions>
+  </MimeType>
+  <MimeType>
+    <Type>audio/mp4</Type>
+    <Description>MPEG-4 media</Description>
+    <Extensions>mp4,mp4a,m4a</Extensions>
   </MimeType>
   <MimeType>
     <Type>video/mpeg</Type>
@@ -398,6 +413,11 @@
     <Type>video/ogg</Type>
     <Description>Ogg video</Description>
     <Extensions>ogg,ogv,ogx</Extensions>
+  </MimeType>
+  <MimeType>
+    <Type>application/ogg</Type>
+    <Description>Ogg file</Description>
+    <Extensions>ogg,oga,ogv,ogx</Extensions>
   </MimeType>
   <MimeType>
     <Type>video/quicktime</Type>
@@ -473,5 +493,10 @@
     <Type>video/x-ms-wvx</Type>
     <Description>Windows Media Playlist</Description>
     <Extensions>wvx</Extensions>
+  </MimeType>
+  <MimeType>
+    <Type>video/x-nut</Type>
+    <Description>NUT</Description>
+    <Extensions>nut</Extensions>
   </MimeType>
 </MimeTypes>

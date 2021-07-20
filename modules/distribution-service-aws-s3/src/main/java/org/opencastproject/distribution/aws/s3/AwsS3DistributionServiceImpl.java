@@ -28,19 +28,25 @@ import org.opencastproject.distribution.api.DistributionException;
 import org.opencastproject.distribution.api.DistributionService;
 import org.opencastproject.distribution.aws.s3.api.AwsS3DistributionService;
 import org.opencastproject.job.api.Job;
+import org.opencastproject.mediapackage.AdaptivePlaylist;
 import org.opencastproject.mediapackage.MediaPackage;
 import org.opencastproject.mediapackage.MediaPackageElement;
+import org.opencastproject.mediapackage.MediaPackageElementFlavor;
 import org.opencastproject.mediapackage.MediaPackageElementParser;
 import org.opencastproject.mediapackage.MediaPackageException;
 import org.opencastproject.mediapackage.MediaPackageParser;
+import org.opencastproject.mediapackage.Track;
 import org.opencastproject.serviceregistry.api.ServiceRegistryException;
 import org.opencastproject.util.ConfigurationException;
+import org.opencastproject.util.LoadUtil;
 import org.opencastproject.util.NotFoundException;
 import org.opencastproject.util.OsgiUtil;
 import org.opencastproject.util.data.Option;
 
 import com.amazonaws.AmazonClientException;
 import com.amazonaws.AmazonServiceException;
+import com.amazonaws.ClientConfiguration;
+import com.amazonaws.HttpMethod;
 import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.auth.AWSStaticCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;
@@ -48,14 +54,16 @@ import com.amazonaws.auth.DefaultAWSCredentialsProviderChain;
 import com.amazonaws.auth.policy.Policy;
 import com.amazonaws.auth.policy.Principal;
 import com.amazonaws.auth.policy.Statement;
-import com.amazonaws.auth.policy.Statement.Effect;
 import com.amazonaws.auth.policy.actions.S3Actions;
 import com.amazonaws.auth.policy.resources.S3ObjectResource;
+import com.amazonaws.client.builder.AwsClientBuilder;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
+import com.amazonaws.services.s3.model.BucketWebsiteConfiguration;
 import com.amazonaws.services.s3.model.DeleteVersionRequest;
 import com.amazonaws.services.s3.model.GetObjectMetadataRequest;
 import com.amazonaws.services.s3.model.ListVersionsRequest;
+import com.amazonaws.services.s3.model.SetBucketWebsiteConfigurationRequest;
 import com.amazonaws.services.s3.model.VersionListing;
 import com.amazonaws.services.s3.transfer.TransferManager;
 import com.amazonaws.services.s3.transfer.Upload;
@@ -63,7 +71,9 @@ import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
 import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpHead;
 import org.apache.http.impl.client.CloseableHttpClient;
@@ -76,11 +86,20 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
+import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map.Entry;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import javax.servlet.http.HttpServletResponse;
 
@@ -100,13 +119,61 @@ public class AwsS3DistributionServiceImpl extends AbstractDistributionService
 
   // Service configuration
   public static final String AWS_S3_DISTRIBUTION_ENABLE = "org.opencastproject.distribution.aws.s3.distribution.enable";
-  public static final String AWS_S3_DISTRIBUTION_BASE_CONFIG = "org.opencastproject.distribution.aws.s3.distribution.base";
+  public static final String AWS_S3_DISTRIBUTION_BASE_CONFIG
+          = "org.opencastproject.distribution.aws.s3.distribution.base";
   public static final String AWS_S3_ACCESS_KEY_ID_CONFIG = "org.opencastproject.distribution.aws.s3.access.id";
   public static final String AWS_S3_SECRET_ACCESS_KEY_CONFIG = "org.opencastproject.distribution.aws.s3.secret.key";
   public static final String AWS_S3_REGION_CONFIG = "org.opencastproject.distribution.aws.s3.region";
   public static final String AWS_S3_BUCKET_CONFIG = "org.opencastproject.distribution.aws.s3.bucket";
+  public static final String AWS_S3_ENDPOINT_CONFIG = "org.opencastproject.distribution.aws.s3.endpoint";
+  public static final String AWS_S3_PATH_STYLE_CONFIG = "org.opencastproject.distribution.aws.s3.path.style";
+  public static final String AWS_S3_PRESIGNED_URL_CONFIG = "org.opencastproject.distribution.aws.s3.presigned.url";
+  public static final String AWS_S3_PRESIGNED_URL_VALID_DURATION_CONFIG
+      = "org.opencastproject.distribution.aws.s3.presigned.url.valid.duration";
+  // S3 client configuration
+  public static final String AWS_S3_MAX_CONNECTIONS = "org.opencastproject.distribution.aws.s3.max.connections";
+  public static final String AWS_S3_CONNECTION_TIMEOUT = "org.opencastproject.distribution.aws.s3.connection.timeout";
+  public static final String AWS_S3_MAX_RETRIES = "org.opencastproject.distribution.aws.s3.max.retries";
+  // job loads
+  public static final String DISTRIBUTE_JOB_LOAD_KEY = "job.load.aws.s3.distribute";
+  public static final String RETRACT_JOB_LOAD_KEY = "job.load.aws.s3.retract";
+  public static final String RESTORE_JOB_LOAD_KEY = "job.load.aws.s3.restore";
+
   // config.properties
   public static final String OPENCAST_DOWNLOAD_URL = "org.opencastproject.download.url";
+  public static final String OPENCAST_STORAGE_DIR = "org.opencastproject.storage.dir";
+  public static final String DEFAULT_TEMP_DIR = "tmp/s3dist";
+
+  // Defaults
+
+  // S3 client config defaults
+  public static final int DEFAULT_MAX_CONNECTIONS = 50;
+  public static final int DEFAULT_CONNECTION_TIMEOUT = 10000;
+  public static final int DEFAULT_MAX_RETRIES = 100;
+
+  /** The load on the system introduced by creating a distribute job */
+  public static final float DEFAULT_DISTRIBUTE_JOB_LOAD = 0.1f;
+
+  /** The load on the system introduced by creating a retract job */
+  public static final float DEFAULT_RETRACT_JOB_LOAD = 0.1f;
+
+  /** The load on the system introduced by creating a restore job */
+  public static final float DEFAULT_RESTORE_JOB_LOAD = 0.1f;
+
+  /** Default expiration time for presigned URL in millis, 6 hours */
+  public static final int DEFAULT_PRESIGNED_URL_EXPIRE_MILLIS = 6 * 60 * 60 * 1000;
+
+  /** Max expiration time for presigned URL in millis, 7 days */
+  private static final int MAXIMUM_PRESIGNED_URL_EXPIRE_MILLIS = 7 * 24 * 60 * 60 * 1000;
+
+  /** The load on the system introduced by creating a distribute job */
+  private float distributeJobLoad = DEFAULT_DISTRIBUTE_JOB_LOAD;
+
+  /** The load on the system introduced by creating a retract job */
+  private float retractJobLoad = DEFAULT_RETRACT_JOB_LOAD;
+
+  /** The load on the system introduced by creating a restore job */
+  private float restoreJobLoad = DEFAULT_RESTORE_JOB_LOAD;
 
   /** Maximum number of tries for checking availability of distributed file */
   private static final int MAX_TRIES = 10;
@@ -120,6 +187,19 @@ public class AwsS3DistributionServiceImpl extends AbstractDistributionService
 
   /** The AWS S3 bucket name */
   private String bucketName = null;
+  private Path tmpPath = null;
+
+  /** The AWS S3 endpoint */
+  private String endpoint = null;
+
+  /** path style enabled */
+  private boolean pathStyle = false;
+
+  /** whether use presigned URL */
+  private boolean presignedUrl = false;
+
+  /** valid duration for presigned URL in milliseconds */
+  private int presignedUrlValidDuration = DEFAULT_PRESIGNED_URL_EXPIRE_MILLIS;
 
   /** The opencast download distribution url */
   private String opencastDistributionUrl = null;
@@ -147,9 +227,25 @@ public class AwsS3DistributionServiceImpl extends AbstractDistributionService
     // Get the configuration
     if (cc != null) {
 
-      if (!Boolean.valueOf(getAWSConfigKey(cc, AWS_S3_DISTRIBUTION_ENABLE))) {
+      if (!BooleanUtils.toBoolean(getAWSConfigKey(cc, AWS_S3_DISTRIBUTION_ENABLE))) {
         logger.info("AWS S3 distribution disabled");
         return;
+      }
+
+      tmpPath = Paths.get(cc.getBundleContext().getProperty("org.opencastproject.storage.dir"), DEFAULT_TEMP_DIR);
+
+      // clean up old data and delete directory if it exists
+      try (Stream<Path> walk = Files.walk(tmpPath)) {
+        walk.map(Path::toFile).sorted(Comparator.reverseOrder()).forEach(File::delete);
+      } catch (IOException e) {
+        logger.warn("Unable to delete {}", tmpPath, e);
+      }
+      logger.info("AWS S3 Distribution uses temp storage in {}", tmpPath);
+      try { // create a new temp directory
+        Files.createDirectories(tmpPath);
+      } catch (IOException e) {
+        logger.error("Could not create temporary directory for AWS S3 Distribution : `{}`", tmpPath);
+        throw new IllegalStateException(e);
       }
 
       // AWS S3 bucket name
@@ -160,11 +256,42 @@ public class AwsS3DistributionServiceImpl extends AbstractDistributionService
       String regionStr = getAWSConfigKey(cc, AWS_S3_REGION_CONFIG);
       logger.info("AWS region is {}", regionStr);
 
+      // AWS endpoint
+      endpoint = OsgiUtil.getComponentContextProperty(cc, AWS_S3_ENDPOINT_CONFIG, "s3." + regionStr + ".amazonaws.com");
+      logger.info("AWS S3 endpoint is {}", endpoint);
+
+      // AWS path style
+      pathStyle = BooleanUtils.toBoolean(OsgiUtil.getComponentContextProperty(cc, AWS_S3_PATH_STYLE_CONFIG, "false"));
+      logger.info("AWS path style is {}", pathStyle);
+
+      // AWS presigned URL
+      String presignedUrlConfigValue = OsgiUtil.getComponentContextProperty(cc, AWS_S3_PRESIGNED_URL_CONFIG, "false");
+      presignedUrl = StringUtils.equalsIgnoreCase("true", presignedUrlConfigValue);
+      logger.info("AWS use presigned URL: {}", presignedUrl);
+
+      // AWS presigned URL expiration time in millis
+      String presignedUrlExpTimeMillisConfigValue = OsgiUtil.getComponentContextProperty(cc,
+              AWS_S3_PRESIGNED_URL_VALID_DURATION_CONFIG, null);
+      presignedUrlValidDuration = NumberUtils.toInt(presignedUrlExpTimeMillisConfigValue,
+              DEFAULT_PRESIGNED_URL_EXPIRE_MILLIS);
+      if (presignedUrlValidDuration > MAXIMUM_PRESIGNED_URL_EXPIRE_MILLIS) {
+        logger.warn(
+                "Valid duration of presigned URL is too large, MAXIMUM_PRESIGNED_URL_EXPIRE_MILLIS(7 days) is used");
+        presignedUrlValidDuration = MAXIMUM_PRESIGNED_URL_EXPIRE_MILLIS;
+      }
+
       opencastDistributionUrl = getAWSConfigKey(cc, AWS_S3_DISTRIBUTION_BASE_CONFIG);
       if (!opencastDistributionUrl.endsWith("/")) {
         opencastDistributionUrl = opencastDistributionUrl + "/";
       }
       logger.info("AWS distribution url is {}", opencastDistributionUrl);
+
+      distributeJobLoad = LoadUtil.getConfiguredLoadValue(cc.getProperties(), DISTRIBUTE_JOB_LOAD_KEY,
+              DEFAULT_DISTRIBUTE_JOB_LOAD, serviceRegistry);
+      retractJobLoad = LoadUtil.getConfiguredLoadValue(cc.getProperties(), RETRACT_JOB_LOAD_KEY,
+              DEFAULT_RETRACT_JOB_LOAD, serviceRegistry);
+      restoreJobLoad = LoadUtil.getConfiguredLoadValue(cc.getProperties(), RESTORE_JOB_LOAD_KEY,
+              DEFAULT_RESTORE_JOB_LOAD, serviceRegistry);
 
       // Explicit credentials are optional.
       AWSCredentialsProvider provider = null;
@@ -174,14 +301,36 @@ public class AwsS3DistributionServiceImpl extends AbstractDistributionService
       // Keys not informed so use default credentials provider chain, which
       // will look at the environment variables, java system props, credential files, and instance
       // profile credentials
-      if (accessKeyIdOpt.isNone() && accessKeySecretOpt.isNone())
+      if (accessKeyIdOpt.isNone() && accessKeySecretOpt.isNone()) {
         provider = new DefaultAWSCredentialsProviderChain();
-      else
+      } else {
         provider = new AWSStaticCredentialsProvider(
                 new BasicAWSCredentials(accessKeyIdOpt.get(), accessKeySecretOpt.get()));
+      }
 
-      // Create AWS client.
-      s3 = AmazonS3ClientBuilder.standard().withRegion(regionStr).withCredentials(provider).build();
+      // S3 client configuration
+      ClientConfiguration clientConfiguration = new ClientConfiguration();
+
+      int maxConnections = OsgiUtil.getOptCfgAsInt(cc.getProperties(), AWS_S3_MAX_CONNECTIONS)
+              .getOrElse(DEFAULT_MAX_CONNECTIONS);
+      logger.debug("Max Connections: {}", maxConnections);
+      clientConfiguration.setMaxConnections(maxConnections);
+
+      int connectionTimeout = OsgiUtil.getOptCfgAsInt(cc.getProperties(), AWS_S3_CONNECTION_TIMEOUT)
+              .getOrElse(DEFAULT_CONNECTION_TIMEOUT);
+      logger.debug("Connection Output: {}", connectionTimeout);
+      clientConfiguration.setConnectionTimeout(connectionTimeout);
+
+      int maxRetries = OsgiUtil.getOptCfgAsInt(cc.getProperties(), AWS_S3_MAX_RETRIES)
+              .getOrElse(DEFAULT_MAX_RETRIES);
+      logger.debug("Max Retry: {}", maxRetries);
+      clientConfiguration.setMaxErrorRetry(maxRetries);
+
+      // Create AWS client
+      s3 = AmazonS3ClientBuilder.standard()
+              .withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(endpoint, regionStr))
+              .withClientConfiguration(clientConfiguration)
+              .withPathStyleAccessEnabled(pathStyle).withCredentials(provider).build();
 
       s3TransferManager = new TransferManager(s3);
 
@@ -200,17 +349,18 @@ public class AwsS3DistributionServiceImpl extends AbstractDistributionService
 
   public void deactivate() {
     // Transfer manager is null if service disabled
-    if (s3TransferManager != null)
+    if (s3TransferManager != null) {
       s3TransferManager.shutdownNow();
+    }
 
     logger.info("AwsS3DistributionService deactivated!");
   }
 
   @Override
   public Job distribute(String pubChannelId, MediaPackage mediaPackage, Set<String> downloadIds,
-    boolean checkAvailability, boolean preserveReference) throws DistributionException, MediaPackageException {
+          boolean checkAvailability, boolean preserveReference) throws DistributionException, MediaPackageException {
     throw new UnsupportedOperationException("Not supported yet.");
-  //stub function
+    // stub function
   }
 
   /**
@@ -227,7 +377,8 @@ public class AwsS3DistributionServiceImpl extends AbstractDistributionService
     notNull(channelId, "channelId");
     try {
       return serviceRegistry.createJob(JOB_TYPE, Operation.Distribute.toString(), Arrays.asList(channelId,
-              MediaPackageParser.getAsXml(mediaPackage), gson.toJson(elementIds), Boolean.toString(checkAvailability)));
+              MediaPackageParser.getAsXml(mediaPackage), gson.toJson(elementIds), Boolean.toString(checkAvailability)),
+              distributeJobLoad);
     } catch (ServiceRegistryException e) {
       throw new DistributionException("Unable to create a job", e);
     }
@@ -284,6 +435,10 @@ public class AwsS3DistributionServiceImpl extends AbstractDistributionService
     final Set<MediaPackageElement> elements = getElements(mediapackage, elementIds);
     List<MediaPackageElement> distributedElements = new ArrayList<>();
 
+    if (AdaptivePlaylist.hasHLSPlaylist(elements)) {
+      return distributeHLSElements(channelId, mediapackage, elements, checkAvailability);
+    }
+
     for (MediaPackageElement element : elements) {
       MediaPackageElement distributedElement = distributeElement(channelId, mediapackage, element, checkAvailability);
       distributedElements.add(distributedElement);
@@ -325,17 +480,20 @@ public class AwsS3DistributionServiceImpl extends AbstractDistributionService
     notNull(element, "element");
 
     try {
-      File source;
-      try {
-        source = workspace.get(element.getURI());
-      } catch (NotFoundException e) {
-        throw new DistributionException("Unable to find " + element.getURI() + " in the workspace", e);
-      } catch (IOException e) {
-        throw new DistributionException("Error loading " + element.getURI() + " from the workspace", e);
-      }
+      return distributeElement(channelId, mediaPackage, element, checkAvailability, workspace.get(element.getURI()));
+    } catch (NotFoundException e) {
+      throw new DistributionException("Unable to find " + element.getURI() + " in the workspace", e);
+    } catch (IOException e) {
+      throw new DistributionException("Error loading " + element.getURI() + " from the workspace", e);
+    }
+  }
 
-      // Use TransferManager to take advantage of multipart upload.
-      // TransferManager processes all transfers asynchronously, so this call will return immediately.
+  private MediaPackageElement distributeElement(String channelId, final MediaPackage mediaPackage,
+          MediaPackageElement element, boolean checkAvailability, File source) throws DistributionException {
+
+    // Use TransferManager to take advantage of multipart upload.
+    // TransferManager processes all transfers asynchronously, so this call will return immediately.
+    try {
       String objectName = buildObjectName(channelId, mediaPackage.getIdentifier().toString(), element);
       logger.info("Uploading {} to bucket {}...", objectName, bucketName);
       Upload upload = s3TransferManager.upload(bucketName, objectName, source);
@@ -362,11 +520,17 @@ public class AwsS3DistributionServiceImpl extends AbstractDistributionService
 
       if (checkAvailability) {
         URI uri = distributedElement.getURI();
+        String distributedElementUriStr = uri.toString();
         int tries = 0;
         CloseableHttpResponse response = null;
         boolean success = false;
         while (tries < MAX_TRIES) {
           try {
+            if (presignedUrl) {
+              // 5 minutes should be enough for check availability for presigned URL.
+              Date fiveMinutesLater = new Date(System.currentTimeMillis() + 5 * 60 * 1000);
+              uri = s3.generatePresignedUrl(bucketName, objectName, fiveMinutesLater, HttpMethod.HEAD).toURI();
+            }
             CloseableHttpClient httpClient = HttpClients.createDefault();
             logger.trace("Trying to access {}", uri);
             response = httpClient.execute(new HttpHead(uri));
@@ -421,10 +585,32 @@ public class AwsS3DistributionServiceImpl extends AbstractDistributionService
     notNull(channelId, "channelId");
     try {
       return serviceRegistry.createJob(JOB_TYPE, Operation.Retract.toString(),
-              Arrays.asList(channelId, MediaPackageParser.getAsXml(mediapackage), gson.toJson(elementIds)));
+              Arrays.asList(channelId, MediaPackageParser.getAsXml(mediapackage), gson.toJson(elementIds)),
+              retractJobLoad);
     } catch (ServiceRegistryException e) {
       throw new DistributionException("Unable to create a job", e);
     }
+  }
+
+  @Override
+  public List<MediaPackageElement> distributeSync(String channelId, MediaPackage mediapackage, Set<String> elementIds,
+          boolean checkAvailability) throws DistributionException {
+    final MediaPackageElement[] distributedElements = distributeElements(channelId, mediapackage, elementIds,
+            checkAvailability);
+    if (distributedElements == null) {
+      return null;
+    }
+    return Arrays.asList(distributedElements);
+  }
+
+  @Override
+  public List<MediaPackageElement> retractSync(String channelId, MediaPackage mediaPackage, Set<String> elementIds)
+          throws DistributionException {
+    final MediaPackageElement[] retractedElements = retractElements(channelId, mediaPackage, elementIds);
+    if (retractedElements == null) {
+      return null;
+    }
+    return Arrays.asList(retractedElements);
   }
 
   /**
@@ -488,16 +674,19 @@ public class AwsS3DistributionServiceImpl extends AbstractDistributionService
 
   @Override
   public Job restore(String channelId, MediaPackage mediaPackage, String elementId) throws DistributionException {
-    if (mediaPackage == null)
+    if (mediaPackage == null) {
       throw new IllegalArgumentException("Media package must be specified");
-    if (elementId == null)
+    }
+    if (elementId == null) {
       throw new IllegalArgumentException("Element ID must be specified");
-    if (channelId == null)
+    }
+    if (channelId == null) {
       throw new IllegalArgumentException("Channel ID must be specified");
+    }
 
     try {
       return serviceRegistry.createJob(JOB_TYPE, Operation.Restore.toString(),
-              Arrays.asList(channelId, MediaPackageParser.getAsXml(mediaPackage), elementId));
+              Arrays.asList(channelId, MediaPackageParser.getAsXml(mediaPackage), elementId), restoreJobLoad);
     } catch (ServiceRegistryException e) {
       throw new DistributionException("Unable to create a job", e);
     }
@@ -506,18 +695,22 @@ public class AwsS3DistributionServiceImpl extends AbstractDistributionService
   @Override
   public Job restore(String channelId, MediaPackage mediaPackage, String elementId, String fileName)
           throws DistributionException {
-    if (mediaPackage == null)
+    if (mediaPackage == null) {
       throw new IllegalArgumentException("Media package must be specified");
-    if (elementId == null)
+    }
+    if (elementId == null) {
       throw new IllegalArgumentException("Element ID must be specified");
-    if (channelId == null)
+    }
+    if (channelId == null) {
       throw new IllegalArgumentException("Channel ID must be specified");
-    if (fileName == null)
+    }
+    if (fileName == null) {
       throw new IllegalArgumentException("Filename must be specified");
+    }
 
     try {
       return serviceRegistry.createJob(JOB_TYPE, Operation.Restore.toString(),
-              Arrays.asList(channelId, MediaPackageParser.getAsXml(mediaPackage), elementId, fileName));
+              Arrays.asList(channelId, MediaPackageParser.getAsXml(mediaPackage), elementId, fileName), restoreJobLoad);
     } catch (ServiceRegistryException e) {
       throw new DistributionException("Unable to create a job", e);
     }
@@ -527,7 +720,8 @@ public class AwsS3DistributionServiceImpl extends AbstractDistributionService
           String fileName) throws DistributionException {
     String objectName = null;
     if (StringUtils.isNotBlank(fileName)) {
-      objectName = buildObjectName(channelId, mediaPackage.getIdentifier().toString(), elementId, fileName);
+      final String orgId = securityService.getOrganization().getId();
+      objectName = buildObjectName(orgId, channelId, mediaPackage.getIdentifier().toString(), elementId, fileName);
     } else {
       objectName = buildObjectName(channelId, mediaPackage.getIdentifier().toString(),
               mediaPackage.getElementById(elementId));
@@ -578,23 +772,25 @@ public class AwsS3DistributionServiceImpl extends AbstractDistributionService
    * @return
    */
   protected String buildObjectName(String channelId, String mpId, MediaPackageElement element) {
-    // Something like CHANNEL_ID/MP_ID/ELEMENT_ID/FILE_NAME.EXTENSION
+    // Something like ORG_ID/CHANNEL_ID/MP_ID/ELEMENT_ID/FILE_NAME.EXTENSION
+    final String orgId = securityService.getOrganization().getId();
     String uriString = element.getURI().toString();
     String fileName = FilenameUtils.getName(uriString);
-    return buildObjectName(channelId, mpId, element.getIdentifier(), fileName);
+    return buildObjectName(orgId, channelId, mpId, element.getIdentifier(), fileName);
   }
 
   /**
    * Builds the aws s3 object name using the raw elementID and filename
    *
+   * @param orgId
    * @param channelId
    * @param mpId
    * @param elementId
    * @param fileName
    * @return
    */
-  protected String buildObjectName(String channelId, String mpId, String elementId, String fileName) {
-    return StringUtils.join(new String[] { channelId, mpId, elementId, fileName }, "/");
+  protected String buildObjectName(String orgId, String channelId, String mpId, String elementId, String fileName) {
+    return StringUtils.join(new String[] { orgId, channelId, mpId, elementId, fileName }, "/");
   }
 
   /**
@@ -605,7 +801,7 @@ public class AwsS3DistributionServiceImpl extends AbstractDistributionService
    *           if the concrete implementation tries to create a malformed uri
    */
   protected URI getDistributionUri(String objectName) throws URISyntaxException {
-    // Something like https://OPENCAST_DOWNLOAD_URL/CHANNEL_ID/MP_ID/ELEMENT_ID/FILE_NAME.EXTENSION
+    // Something like https://OPENCAST_DOWNLOAD_URL/ORG_ID/CHANNEL_ID/MP_ID/ELEMENT_ID/FILE_NAME.EXTENSION
     return new URI(opencastDistributionUrl + objectName);
   }
 
@@ -615,7 +811,7 @@ public class AwsS3DistributionServiceImpl extends AbstractDistributionService
    * @return The distributed object name
    */
   protected String getDistributedObjectName(MediaPackageElement element) {
-    // Something like https://OPENCAST_DOWNLOAD_URL/CHANNEL_ID/MP_ID/ORIGINAL_ELEMENT_ID/FILE_NAME.EXTENSION
+    // Something like https://OPENCAST_DOWNLOAD_URL/ORG_ID/CHANNEL_ID/MP_ID/ORIGINAL_ELEMENT_ID/FILE_NAME.EXTENSION
     String uriString = element.getURI().toString();
 
     // String directoryName = distributionDirectory.getAbsolutePath();
@@ -624,10 +820,125 @@ public class AwsS3DistributionServiceImpl extends AbstractDistributionService
     } else {
       // Cannot retract
       logger.warn(
-              "Cannot retract {}. Uri must be in the format https://host/bucketName/channelId/mpId/originalElementId/fileName.extension",
-              uriString);
+          "Cannot retract {}. Uri must be in the format "
+              + "https://host/bucketName/orgId/channelId/mpId/originalElementId/fileName.extension",
+          uriString);
       return null;
     }
+  }
+
+  /**
+   * Distribute static items, create a temp directory for playlists, modify them to fix references, then publish the new
+   * list and then delete the temp files. This is used if there are any HLS playlists in the mediapackage, all the
+   * videos in the publication should be HLS or progressive, but not both. However, If this is called with non HLS
+   * files, it will distribute them anyway.
+   *
+   * @param channelId
+   *          - distribution channel
+   * @param mediapackage
+   *          - that holds all the files
+   * @param elements
+   *          - all the elements for publication
+   * @param checkAvailability
+   *          - check before pub
+   * @return distributed elements
+   * @throws DistributionException
+   * @throws IOException
+   */
+  private MediaPackageElement[] distributeHLSElements(String channelId, MediaPackage mediapackage,
+          Set<MediaPackageElement> elements, boolean checkAvailability) throws DistributionException {
+
+    List<MediaPackageElement> distributedElements = new ArrayList<MediaPackageElement>();
+    List<MediaPackageElement> nontrackElements = elements.stream()
+            .filter(e -> e.getElementType() != MediaPackageElement.Type.Track).collect(Collectors.toList());
+    // Distribute non track items
+    for (MediaPackageElement element : nontrackElements) {
+      MediaPackageElement distributedElement = distributeElement(channelId, mediapackage, element, checkAvailability);
+      distributedElements.add(distributedElement);
+    }
+    // Then get all tracks from mediapackage and sort them by flavor
+    // Each flavor is one video with multiple renditions
+    List<Track> trackElements = elements.stream().filter(e -> e.getElementType() == MediaPackageElement.Type.Track)
+            .map(e -> (Track) e).collect(Collectors.toList());
+    HashMap<MediaPackageElementFlavor, List<Track>> trackElementsMap
+        = new HashMap<MediaPackageElementFlavor, List<Track>>();
+    for (Track t : trackElements) {
+      List<Track> l = trackElementsMap.get(t.getFlavor());
+      if (l == null) {
+        l = new ArrayList<Track>();
+      }
+      l.add(t);
+      trackElementsMap.put(t.getFlavor(), l);
+    }
+
+    Path tmpDir = null;
+    try {
+      tmpDir = Files.createTempDirectory(tmpPath, mediapackage.getIdentifier().toString());
+      // Run distribution one flavor at a time
+      for (Entry<MediaPackageElementFlavor, List<Track>> elementSet : trackElementsMap.entrySet()) {
+        List<Track> tracks = elementSet.getValue();
+        try {
+          List<Track> transformedTracks = new ArrayList<Track>();
+          // If there are playlists in this flavor
+          if (tracks.stream().anyMatch(AdaptivePlaylist.isHLSTrackPred)) {
+            // For each adaptive playlist, get all the HLS files from the track URI
+            // and put them into a temporary directory
+            List<Track> tmpTracks = new ArrayList<Track>();
+            for (Track t : tracks) {
+
+              Track tcopy = (Track) t.clone();
+              String newName = "./" + t.getURI().getPath();
+              Path newPath = tmpDir.resolve(newName).normalize();
+              Files.createDirectories(newPath.getParent());
+              // If this flavor is a HLS playlist and therefore has internal references
+              if (AdaptivePlaylist.isPlaylist(t)) {
+                File f = workspace.get(t.getURI()); // Get actual file
+                Path plcopy = Files.copy(f.toPath(), newPath);
+                tcopy.setURI(plcopy.toUri()); // make it into an URI from filesystem
+              } else {
+                Path plcopy = Files.createFile(newPath); // new Empty File, only care about the URI
+                tcopy.setURI(plcopy.toUri());
+              }
+              tmpTracks.add(tcopy);
+            }
+            // The playlists' references are then replaced with relative links
+            tmpTracks = AdaptivePlaylist.fixReferences(tmpTracks, tmpDir.toFile()); // replace with fixed elements
+            // after fixing it, we retrieve the new playlist files and discard the old
+            // we collect the mp4 tracks and the playlists and put them into transformedTracks
+            tracks.stream().filter(AdaptivePlaylist.isHLSTrackPred.negate()).forEach(t -> transformedTracks.add(t));
+            tmpTracks.stream().filter(AdaptivePlaylist.isHLSTrackPred).forEach(t -> transformedTracks.add(t));
+          } else {
+            transformedTracks.addAll(tracks); // not playlists, distribute anyway
+          }
+          for (Track track : transformedTracks) {
+            MediaPackageElement distributedElement;
+            if (AdaptivePlaylist.isPlaylist(track)) {
+              distributedElement = distributeElement(channelId, mediapackage, track, checkAvailability,
+                      new File(track.getURI()));
+            } else {
+              distributedElement = distributeElement(channelId, mediapackage, track, checkAvailability);
+            }
+            distributedElements.add(distributedElement);
+          }
+        } catch (MediaPackageException | NotFoundException | IOException e1) {
+          logger.error("HLS Prepare failed for mediapackage {} in {}: {} ", elementSet.getKey(), mediapackage, e1);
+          throw new DistributionException("Cannot distribute " + mediapackage);
+        } catch (URISyntaxException e1) {
+          logger.error("HLS Prepare failed - Bad URI syntax {} in {}: {} ", elementSet.getKey(), mediapackage, e1);
+          throw new DistributionException("Cannot distribute - BAD URI syntax " + mediapackage);
+        }
+      }
+    } catch (IOException e2) {
+      throw new DistributionException("Cannot create tmp dir to process HLS:" + mediapackage + e2.getMessage());
+    } finally {
+      // Clean up temp dir
+      try (Stream<Path> walk = Files.walk(tmpDir)) {
+        walk.sorted(Comparator.reverseOrder()).map(Path::toFile).forEach(File::delete);
+      } catch (IOException e) {
+        logger.warn("Cannot delete tmp dir for processing HLS mp {}, path {}", mediapackage, tmpPath, e);
+      }
+    }
+    return distributedElements.toArray(new MediaPackageElement[distributedElements.size()]);
   }
 
   /**
@@ -698,10 +1009,18 @@ public class AwsS3DistributionServiceImpl extends AbstractDistributionService
         try {
           s3.createBucket(bucketName);
           // Allow public read
-          Statement allowPublicReadStatement = new Statement(Effect.Allow).withPrincipals(Principal.AllUsers)
+          Statement allowPublicReadStatement = new Statement(Statement.Effect.Allow).withPrincipals(Principal.AllUsers)
                   .withActions(S3Actions.GetObject).withResources(new S3ObjectResource(bucketName, "*"));
           Policy policy = new Policy().withStatements(allowPublicReadStatement);
           s3.setBucketPolicy(bucketName, policy.toJson());
+
+          // Set the website configuration. This needs to be static-site-enabled currently.
+          BucketWebsiteConfiguration defaultWebsite = new BucketWebsiteConfiguration();
+          // These files don't actually exist, but that doesn't matter since no one should be looking around in the
+          // bucket anyway.
+          defaultWebsite.setIndexDocumentSuffix("index.html");
+          defaultWebsite.setErrorDocument("error.html");
+          s3.setBucketWebsiteConfiguration(new SetBucketWebsiteConfigurationRequest(bucketName, defaultWebsite));
           logger.info("AWS S3 bucket {} created", bucketName);
         } catch (Exception e2) {
           throw new ConfigurationException("Bucket " + bucketName + " cannot be created: " + e2.getMessage(), e2);
@@ -710,6 +1029,22 @@ public class AwsS3DistributionServiceImpl extends AbstractDistributionService
         throw new ConfigurationException("Bucket " + bucketName + " exists, but we can't access it: " + e.getMessage(),
                 e);
       }
+    }
+  }
+
+  public URI presignedURI(URI uri) throws URISyntaxException {
+    if (!presignedUrl) {
+      return uri;
+    }
+    String s3UrlPrefix = s3.getUrl(bucketName, "").toString();
+
+    // Only handle URIs match s3 domain and bucket
+    if (uri.toString().startsWith(s3UrlPrefix)) {
+      String objectName = uri.toString().substring(s3UrlPrefix.length());
+      Date validUntil = new Date(System.currentTimeMillis() + presignedUrlValidDuration);
+      return s3.generatePresignedUrl(bucketName, objectName, validUntil).toURI();
+    } else {
+      return uri;
     }
   }
 
@@ -729,6 +1064,16 @@ public class AwsS3DistributionServiceImpl extends AbstractDistributionService
 
   protected void setOpencastDistributionUrl(String distributionUrl) {
     opencastDistributionUrl = distributionUrl;
+  }
+
+  // Use by unit test
+  protected void setStorageTmp(String path) {
+    this.tmpPath = Paths.get(path, DEFAULT_TEMP_DIR);
+    try {
+      Files.createDirectories(tmpPath);
+    } catch (IOException e) {
+      logger.info("AWS S3 bucket cannot create {} ", tmpPath);
+    }
   }
 
 }

@@ -30,28 +30,28 @@ import org.opencastproject.security.api.AccessControlParsingException;
 import org.opencastproject.security.api.AccessControlUtil;
 import org.opencastproject.security.api.Organization;
 import org.opencastproject.security.api.Permissions;
+import org.opencastproject.security.api.SecurityConstants;
 import org.opencastproject.security.api.SecurityService;
 import org.opencastproject.security.api.UnauthorizedException;
 import org.opencastproject.security.api.User;
 import org.opencastproject.series.impl.SeriesServiceDatabase;
 import org.opencastproject.series.impl.SeriesServiceDatabaseException;
 import org.opencastproject.util.NotFoundException;
-import org.opencastproject.util.data.Tuple;
 
 import com.entwinemedia.fn.data.Opt;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.osgi.service.component.ComponentContext;
+import org.osgi.service.component.annotations.Activate;
+import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Reference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.StringWriter;
-import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
@@ -64,6 +64,13 @@ import javax.persistence.Query;
 /**
  * Implements {@link SeriesServiceDatabase}. Defines permanent storage for series.
  */
+@Component(
+    property = {
+        "service.description=Series Service"
+    },
+    immediate = true,
+    service = { SeriesServiceDatabase.class }
+)
 public class SeriesServiceDatabaseImpl implements SeriesServiceDatabase {
 
   /** Logging utilities */
@@ -82,6 +89,7 @@ public class SeriesServiceDatabaseImpl implements SeriesServiceDatabase {
   protected SecurityService securityService;
 
   /** OSGi DI */
+  @Reference(name = "entityManagerFactory", target = "(osgi.unit.name=org.opencastproject.series.impl.persistence)")
   public void setEntityManagerFactory(EntityManagerFactory emf) {
     this.emf = emf;
   }
@@ -91,6 +99,7 @@ public class SeriesServiceDatabaseImpl implements SeriesServiceDatabase {
    *
    * @param cc
    */
+  @Activate
   public void activate(ComponentContext cc) {
     logger.info("Activating persistence manager for series");
   }
@@ -101,6 +110,7 @@ public class SeriesServiceDatabaseImpl implements SeriesServiceDatabase {
    * @param securityService
    *          the securityService to set
    */
+  @Reference(name = "security-service")
   public void setSecurityService(SecurityService securityService) {
     this.securityService = securityService;
   }
@@ -111,6 +121,7 @@ public class SeriesServiceDatabaseImpl implements SeriesServiceDatabase {
    * @param dcService
    *          {@link DublinCoreCatalogService} object
    */
+  @Reference(name = "dc")
   public void setDublinCoreService(DublinCoreCatalogService dcService) {
     this.dcService = dcService;
   }
@@ -131,20 +142,6 @@ public class SeriesServiceDatabaseImpl implements SeriesServiceDatabase {
     IOUtils.copy(in, writer, "UTF-8");
 
     return writer.toString();
-  }
-
-  /**
-   * Parses Dublin core stored as string.
-   *
-   * @param dcXML
-   *          string representation of Dublin core
-   * @return parsed {@link DublinCoreCatalog}
-   * @throws IOException
-   *           if parsing fails
-   */
-  private DublinCoreCatalog parseDublinCore(String dcXML) throws IOException {
-    DublinCoreCatalog dc = dcService.load(IOUtils.toInputStream(dcXML, "UTF-8"));
-    return dc;
   }
 
   /*
@@ -239,29 +236,17 @@ public class SeriesServiceDatabaseImpl implements SeriesServiceDatabase {
    */
   @SuppressWarnings("unchecked")
   @Override
-  public Iterator<Tuple<DublinCoreCatalog, String>> getAllSeries() throws SeriesServiceDatabaseException {
+  public List<SeriesEntity> getAllSeries() throws SeriesServiceDatabaseException {
     EntityManager em = emf.createEntityManager();
     Query query = em.createNamedQuery("Series.findAll");
-    List<SeriesEntity> seriesEntities = null;
     try {
-      seriesEntities = query.getResultList();
+      return query.getResultList();
     } catch (Exception e) {
       logger.error("Could not retrieve all series: {}", e.getMessage());
       throw new SeriesServiceDatabaseException(e);
     } finally {
       em.close();
     }
-    List<Tuple<DublinCoreCatalog, String>> seriesList = new LinkedList<>();
-    try {
-      for (SeriesEntity entity : seriesEntities) {
-        DublinCoreCatalog dc = parseDublinCore(entity.getDublinCoreXML());
-        seriesList.add(Tuple.tuple(dc, entity.getOrganization()));
-      }
-    } catch (Exception e) {
-      logger.error("Could not parse series entity: {}", e.getMessage());
-      throw new SeriesServiceDatabaseException(e);
-    }
-    return seriesList.iterator();
   }
 
   /*
@@ -491,6 +476,10 @@ public class SeriesServiceDatabaseImpl implements SeriesServiceDatabase {
       AccessControlList acl = AccessControlParser.parseAcl(accessControlXml);
       User currentUser = securityService.getUser();
       Organization currentOrg = securityService.getOrganization();
+
+      if (currentUser.hasRole(SecurityConstants.GLOBAL_CAPTURE_AGENT_ROLE)) {
+        return true;
+      }
       // There are several reasons a user may need to load a series: to read content, to edit it, or add content
       if (!AccessControlUtil.isAuthorized(acl, currentUser, currentOrg, Permissions.Action.READ.toString())
               && !AccessControlUtil.isAuthorized(acl, currentUser, currentOrg, Permissions.Action.CONTRIBUTE.toString())
@@ -577,26 +566,6 @@ public class SeriesServiceDatabaseImpl implements SeriesServiceDatabase {
   }
 
   @Override
-  public boolean isOptOut(String seriesId) throws NotFoundException, SeriesServiceDatabaseException {
-    EntityManager em = emf.createEntityManager();
-    try {
-      SeriesEntity entity = getSeriesEntity(seriesId, em);
-      if (entity == null) {
-        throw new NotFoundException("Could not found series with ID " + seriesId);
-      }
-      return entity.isOptOut();
-    } catch (NotFoundException e) {
-      throw e;
-    } catch (Exception e) {
-      logger.error("Could not retrieve opt out status for series '{}': {}", seriesId, ExceptionUtils.getStackTrace(e));
-      throw new SeriesServiceDatabaseException(e);
-    } finally {
-      if (em != null)
-        em.close();
-    }
-  }
-
-  @Override
   public void updateSeriesProperty(String seriesId, String propertyName, String propertyValue)
           throws NotFoundException, SeriesServiceDatabaseException {
     EntityManager em = null;
@@ -626,50 +595,12 @@ public class SeriesServiceDatabaseImpl implements SeriesServiceDatabase {
       if (tx.isActive()) {
         tx.rollback();
       }
-      logger.error("Couldn't update series {} with property: {}:{} because {}", seriesId, propertyName, propertyValue,
-              ExceptionUtils.getStackTrace(e));
+      logger.error("Couldn't update series {} with property: {}:{} because", seriesId, propertyName, propertyValue, e);
       throw new SeriesServiceDatabaseException(e);
     } finally {
-      if (em != null)
+      if (em != null) {
         em.close();
-    }
-  }
-
-  /**
-   * Updates a series' opt out status.
-   *
-   * @param seriesId
-   *          The id of the series to update the opt out status of.
-   * @param optOut
-   *          Whether to opt out this series or not.
-   */
-  @Override
-  public void updateOptOutStatus(String seriesId, boolean optOut)
-          throws NotFoundException, SeriesServiceDatabaseException {
-    EntityManager em = null;
-    EntityTransaction tx = null;
-    try {
-      em = emf.createEntityManager();
-      tx = em.getTransaction();
-      tx.begin();
-      SeriesEntity entity = getSeriesEntity(seriesId, em);
-      if (entity == null)
-        throw new NotFoundException("Series with ID " + seriesId + " does not exist");
-
-      entity.setOptOut(optOut);
-      em.merge(entity);
-      tx.commit();
-    } catch (NotFoundException e) {
-      throw e;
-    } catch (Exception e) {
-      if (tx.isActive()) {
-        tx.rollback();
       }
-      logger.error("Could not update series opted out status: {}", e.getMessage());
-      throw new SeriesServiceDatabaseException(e);
-    } finally {
-      if (em != null)
-        em.close();
     }
   }
 
@@ -716,8 +647,9 @@ public class SeriesServiceDatabaseImpl implements SeriesServiceDatabase {
       }
       throw new SeriesServiceDatabaseException(e);
     } finally {
-      if (em != null)
+      if (em != null) {
         em.close();
+      }
     }
     return success;
   }
@@ -750,8 +682,9 @@ public class SeriesServiceDatabaseImpl implements SeriesServiceDatabase {
       }
       throw new SeriesServiceDatabaseException(e);
     } finally {
-      if (em != null)
+      if (em != null) {
         em.close();
+      }
     }
     return success;
   }
@@ -767,17 +700,18 @@ public class SeriesServiceDatabaseImpl implements SeriesServiceDatabase {
         data = Opt.none();
       } else {
         Map<String, byte[]> elements = series.getElements();
-        if (elements.containsKey(type))
+        if (elements.containsKey(type)) {
           data = Opt.some(elements.get(type));
-        else {
+        } else {
           data = Opt.none();
         }
       }
     } catch (Exception e) {
       throw new SeriesServiceDatabaseException(e);
     } finally {
-      if (em != null)
+      if (em != null) {
         em.close();
+      }
     }
     return data;
   }
@@ -797,8 +731,9 @@ public class SeriesServiceDatabaseImpl implements SeriesServiceDatabase {
     } catch (Exception e) {
       throw new SeriesServiceDatabaseException(e);
     } finally {
-      if (em != null)
+      if (em != null) {
         em.close();
+      }
     }
     return elements;
   }

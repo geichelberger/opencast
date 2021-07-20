@@ -21,11 +21,19 @@
 
 package org.opencastproject.fsresources;
 
+import org.opencastproject.security.api.SecurityService;
+import org.opencastproject.security.api.StaticFileAuthorization;
 import org.opencastproject.util.ConfigurationException;
 import org.opencastproject.util.MimeTypes;
 
+import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.osgi.service.component.ComponentContext;
+import org.osgi.service.component.annotations.Activate;
+import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Reference;
+import org.osgi.service.component.annotations.ReferenceCardinality;
+import org.osgi.service.component.annotations.ReferencePolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,12 +41,16 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
+import java.util.Objects;
 import java.util.StringTokenizer;
+import java.util.regex.Pattern;
 import java.util.zip.CRC32;
 
-import javax.servlet.ServletException;
+import javax.servlet.Servlet;
 import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
@@ -48,6 +60,16 @@ import javax.servlet.http.HttpServletResponse;
  * Serves static content from a configured path on the filesystem. In production systems, this should be replaced with
  * apache httpd or another web server optimized for serving static content.
  */
+@Component(
+    property = {
+        "service.description=Opencast Download Resources",
+        "alias=/static",
+        "httpContext.id=opencast.httpcontext",
+        "httpContext.shared=true"
+    },
+    immediate = true,
+    service = Servlet.class
+)
 public class StaticResourceServlet extends HttpServlet {
 
   /** The serialization UID */
@@ -57,18 +79,57 @@ public class StaticResourceServlet extends HttpServlet {
   /** The logger */
   private static final Logger logger = LoggerFactory.getLogger(StaticResourceServlet.class);
 
+  private static final String PROP_AUTH_REQUIRED = "authentication.required";
+  private static final String PROP_X_ACCEL_REDIRECT = "x.accel.redirect";
+
   /** static initializer */
   static {
-    FULL_RANGE = new ArrayList<Range>();
+    FULL_RANGE = new ArrayList<>();
   }
 
   /** The filesystem directory to serve files fro */
-  protected String distributionDirectory;
+  private String distributionDirectory;
+
+  private boolean authRequired = true;
+  private String xAccelRedirect = null;
+
+  private SecurityService securityService = null;
+
+  private List<StaticFileAuthorization> authorizations = new ArrayList<>();
 
   /**
    * No-arg constructor
    */
   public StaticResourceServlet() {
+  }
+
+  @Reference(
+      cardinality = ReferenceCardinality.MULTIPLE,
+      policy = ReferencePolicy.DYNAMIC
+  )
+  public void addStaticFileAuthorization(final StaticFileAuthorization authorization) {
+    authorizations.add(authorization);
+    logger.info("Added static file authorization for {}", authorization.getProtectedUrlPattern());
+  }
+
+  public void removeStaticFileAuthorization(final StaticFileAuthorization authorization) {
+    authorizations.remove(authorization);
+    logger.info("Removed static file authorization for {}", authorization.getProtectedUrlPattern());
+  }
+
+  private boolean isAuthorized(final String path) {
+    // Check with authorization plug-ins
+    for (StaticFileAuthorization auth: authorizations) {
+      for (Pattern pattern: auth.getProtectedUrlPattern()) {
+        logger.debug("Testing pattern `{}`", pattern);
+        if (pattern.matcher(path).matches()) {
+          logger.debug("Using regexp `{}` for authorization check", pattern);
+          return auth.verifyUrlAccess(path);
+        }
+      }
+    }
+    logger.debug("No authorization plug-in matches");
+    return false;
   }
 
   /**
@@ -77,20 +138,28 @@ public class StaticResourceServlet extends HttpServlet {
    * @param cc
    *          the component context
    */
+  @Activate
   public void activate(ComponentContext cc) {
-    if (cc != null) {
-      String ccDistributionDirectory = cc.getBundleContext().getProperty("org.opencastproject.download.directory");
-      if (StringUtils.isNotEmpty(ccDistributionDirectory)) {
-        this.distributionDirectory = ccDistributionDirectory;
-      } else {
-        String storageDir = cc.getBundleContext().getProperty("org.opencastproject.storage.dir");
+    if (cc == null) {
+      // set defaults
+      authRequired = true;
+      xAccelRedirect = null;
+    } else {
+      authRequired = BooleanUtils.toBoolean(Objects.toString(cc.getProperties().get(PROP_AUTH_REQUIRED), "true"));
+
+      xAccelRedirect = Objects.toString(cc.getProperties().get(PROP_X_ACCEL_REDIRECT), null);
+
+      distributionDirectory = cc.getBundleContext().getProperty("org.opencastproject.download.directory");
+      if (StringUtils.isEmpty(distributionDirectory)) {
+        final String storageDir = cc.getBundleContext().getProperty("org.opencastproject.storage.dir");
         if (StringUtils.isNotEmpty(storageDir)) {
-          this.distributionDirectory = new File(storageDir, "downloads").getPath();
+          distributionDirectory = new File(storageDir, "downloads").getPath();
         }
       }
     }
+    logger.debug("Authentication check enabled: {}", authRequired);
 
-    if (distributionDirectory == null) {
+    if (StringUtils.isEmpty(distributionDirectory)) {
       throw new ConfigurationException("Distribution directory not set");
     }
     logger.info("Serving static files from '{}'", distributionDirectory);
@@ -103,101 +172,103 @@ public class StaticResourceServlet extends HttpServlet {
    *      javax.servlet.http.HttpServletResponse)
    */
   @Override
-  protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+  protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
     logger.debug("Looking for static resource '{}'", req.getRequestURI());
     String path = req.getPathInfo();
-    if (path == null) {
+    if (path == null || path.contains("..")) {
       resp.sendError(HttpServletResponse.SC_FORBIDDEN);
       return;
     }
 
-    String normalized = path.trim().replaceAll("/+", "/").replaceAll("\\.\\.", "");
-    if (normalized != null && normalized.startsWith("/") && normalized.length() > 1) {
-      normalized = normalized.substring(1);
+    if (authRequired && !isAuthorized(path)) {
+      resp.sendError(HttpServletResponse.SC_FORBIDDEN);
+      logger.debug("Not authorized");
+      return;
     }
 
-    File f = new File(distributionDirectory, normalized);
-    String eTag = null;
-    if (f.isFile() && f.canRead()) {
-      logger.debug("Serving static resource '{}'", f.getAbsolutePath());
-      eTag = computeEtag(f);
-      if (eTag.equals(req.getHeader("If-None-Match"))) {
-        resp.setStatus(304);
-        return;
-      }
-      resp.setHeader("ETag", eTag);
-      String contentType = MimeTypes.getMimeType(normalized);
-      if (!MimeTypes.DEFAULT_TYPE.equals(contentType)) {
-        resp.setContentType(contentType);
-      }
-      resp.setHeader("Content-Length", Long.toString(f.length()));
-      resp.setDateHeader("Last-Modified", f.lastModified());
-
-      resp.setHeader("Accept-Ranges", "bytes");
-      ArrayList<Range> ranges = parseRange(req, resp, eTag, f.lastModified(), f.length());
-
-      if ((((ranges == null) || (ranges.isEmpty())) && (req.getHeader("Range") == null)) || (ranges == FULL_RANGE)) {
-        IOException e = copyRange(new FileInputStream(f), resp.getOutputStream(), 0, f.length());
-        if (e != null) {
-          try {
-            resp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-            return;
-          } catch (IOException e1) {
-            logger.warn("unable to send http 500 error: {}", e1);
-            return;
-          } catch (IllegalStateException e2) {
-            logger.trace("unable to send http 500 error. Client side was probably closed during file copy.", e2);
-            return;
-          }
-        }
-      } else {
-        if ((ranges == null) || (ranges.isEmpty())) {
-          return;
-        }
-        if (ranges.size() == 1) {
-          Range range = ranges.get(0);
-          resp.addHeader("Content-Range", "bytes " + range.start + "-" + range.end + "/" + range.length);
-          long length = range.end - range.start + 1;
-          if (length < Integer.MAX_VALUE) {
-            resp.setContentLength((int) length);
-          } else {
-            // Set the content-length as String to be able to use a long
-            resp.setHeader("content-length", "" + length);
-          }
-          try {
-            resp.setBufferSize(2048);
-          } catch (IllegalStateException e) {
-            logger.debug(e.getMessage(), e);
-          }
-          resp.setStatus(HttpServletResponse.SC_PARTIAL_CONTENT);
-          IOException e = copyRange(new FileInputStream(f), resp.getOutputStream(), range.start, range.end);
-          if (e != null) {
-            try {
-              resp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-              return;
-            } catch (IOException e1) {
-              logger.warn("unable to send http 500 error: {}", e1);
-              return;
-            } catch (IllegalStateException e2) {
-              logger.trace("unable to send http 500 error. Client side was probably closed during file copy.", e2);
-              return;
-            }
-          }
-        } else {
-          resp.setStatus(HttpServletResponse.SC_PARTIAL_CONTENT);
-          resp.setContentType("multipart/byteranges; boundary=" + mimeSeparation);
-          try {
-            resp.setBufferSize(2048);
-          } catch (IllegalStateException e) {
-            logger.debug(e.getMessage(), e);
-          }
-          copy(f, resp.getOutputStream(), ranges.iterator(), contentType);
-        }
-      }
-    } else {
-      logger.debug("unable to find file '{}', returning HTTP 404");
+    File file = new File(distributionDirectory, path);
+    if (!file.isFile() || !file.canRead()) {
+      logger.debug("Unable to find file '{}', returning HTTP 404", file);
       resp.sendError(HttpServletResponse.SC_NOT_FOUND);
+      return;
     }
+
+    logger.debug("Serving static resource '{}'", file.getAbsolutePath());
+    String eTag = computeEtag(file);
+    if (eTag.equals(req.getHeader("If-None-Match"))) {
+      resp.setStatus(304);
+      return;
+    }
+    resp.setHeader("ETag", eTag);
+
+    if (xAccelRedirect != null) {
+      resp.setHeader("X-Accel-Redirect", Paths.get(xAccelRedirect, path).toString());
+      return;
+    }
+
+    String contentType = MimeTypes.getMimeType(path);
+    if (!MimeTypes.DEFAULT_TYPE.equals(contentType)) {
+      resp.setContentType(contentType);
+    }
+    resp.setHeader("Content-Length", Long.toString(file.length()));
+    resp.setDateHeader("Last-Modified", file.lastModified());
+
+    resp.setHeader("Accept-Ranges", "bytes");
+    ArrayList<Range> ranges = parseRange(req, resp, eTag, file.lastModified(), file.length());
+
+    if ((((ranges == null) || (ranges.isEmpty())) && (req.getHeader("Range") == null)) || (ranges == FULL_RANGE)) {
+      IOException e = copyRange(new FileInputStream(file), resp.getOutputStream(), 0, file.length());
+      if (e != null) {
+        try {
+          resp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+        } catch (IOException e1) {
+          logger.warn("unable to send http 500 error", e1);
+        } catch (IllegalStateException e2) {
+          logger.trace("unable to send http 500 error. Client side was probably closed during file copy.", e2);
+        }
+      }
+      return;
+    }
+    if ((ranges == null) || (ranges.isEmpty())) {
+      return;
+    }
+    if (ranges.size() == 1) {
+      Range range = ranges.get(0);
+      resp.addHeader("Content-Range", "bytes " + range.start + "-" + range.end + "/" + range.length);
+      long length = range.end - range.start + 1;
+      if (length < Integer.MAX_VALUE) {
+        resp.setContentLength((int) length);
+      } else {
+        // Set the content-length as String to be able to use a long
+        resp.setHeader("content-length", "" + length);
+      }
+      try {
+        resp.setBufferSize(2048);
+      } catch (IllegalStateException e) {
+        logger.debug(e.getMessage(), e);
+      }
+      resp.setStatus(HttpServletResponse.SC_PARTIAL_CONTENT);
+      IOException e = copyRange(new FileInputStream(file), resp.getOutputStream(), range.start, range.end);
+      if (e != null) {
+        try {
+          resp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+        } catch (IOException e1) {
+          logger.warn("unable to send http 500 error", e1);
+        } catch (IllegalStateException e2) {
+          logger.trace("unable to send http 500 error. Client side was probably closed during file copy.", e2);
+        }
+      }
+      return;
+    }
+
+    resp.setStatus(HttpServletResponse.SC_PARTIAL_CONTENT);
+    resp.setContentType("multipart/byteranges; boundary=" + mimeSeparation);
+    try {
+      resp.setBufferSize(2048);
+    } catch (IllegalStateException e) {
+      logger.debug(e.getMessage(), e);
+    }
+    copy(file, resp.getOutputStream(), ranges.iterator(), contentType);
   }
 
   /**
@@ -207,7 +278,7 @@ public class StaticResourceServlet extends HttpServlet {
    *          the file
    * @return the etag
    */
-  protected String computeEtag(File file) {
+  private String computeEtag(File file) {
     CRC32 crc = new CRC32();
     crc.update(file.getName().getBytes());
     checksum(file.lastModified(), crc);
@@ -251,7 +322,7 @@ public class StaticResourceServlet extends HttpServlet {
   /**
    * MIME multipart separation string
    */
-  protected static final String mimeSeparation = "MATTERHORN_MIME_BOUNDARY";
+  private static final String mimeSeparation = "MATTERHORN_MIME_BOUNDARY";
 
   /**
    * Parse the range header.
@@ -395,17 +466,20 @@ public class StaticResourceServlet extends HttpServlet {
           // This test could actually be "if (len != -1)"
           ostream.write(buffer, 0, len);
           bytesToRead -= len;
-          if (bytesToRead == 0)
+          if (bytesToRead == 0) {
             return null;
-        } else
+          }
+        } else {
           return null;
+        }
       }
 
       for (len = istream.read(buffer); len > 0; len = istream.read(buffer)) {
         ostream.write(buffer, 0, len);
         bytesToRead -= len;
-        if (bytesToRead < 1)
+        if (bytesToRead < 1) {
           break;
+        }
       }
     } catch (IOException e) {
       logger.trace("IOException after starting the byte copy, current length {}, buffer {}."

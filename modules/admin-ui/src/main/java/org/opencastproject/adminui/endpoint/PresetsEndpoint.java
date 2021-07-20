@@ -35,7 +35,6 @@ import org.opencastproject.util.doc.rest.RestResponse;
 import org.opencastproject.util.doc.rest.RestService;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.osgi.service.component.ComponentContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -75,7 +74,7 @@ public class PresetsEndpoint {
   @Path("{seriesId}/property/{propertyName}.json")
   @RestQuery(name = "getProperty", description = "Returns a property value if set as a preset", returnDescription = "Returns the property value", pathParameters = {
           @RestParameter(name = "seriesId", description = "ID of series", isRequired = true, type = Type.STRING),
-          @RestParameter(name = "propertyName", description = "Name of the property which is the key for it", isRequired = true, type = Type.STRING) }, reponses = {
+          @RestParameter(name = "propertyName", description = "Name of the property which is the key for it", isRequired = true, type = Type.STRING) }, responses = {
           @RestResponse(responseCode = SC_OK, description = "The access control list."),
           @RestResponse(responseCode = SC_UNAUTHORIZED, description = "If the current user is not authorized to perform this action") })
   public Response getProperty(@PathParam("seriesId") String seriesId, @PathParam("propertyName") String propertyName)
@@ -94,7 +93,7 @@ public class PresetsEndpoint {
     } catch (NotFoundException e) {
       throw e;
     } catch (Exception e) {
-      logger.warn("Could not perform search query: {}", ExceptionUtils.getStackTrace(e));
+      logger.warn("Could not perform search query", e);
     }
     throw new WebApplicationException(Response.Status.INTERNAL_SERVER_ERROR);
   }

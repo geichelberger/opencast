@@ -23,7 +23,6 @@ package org.opencastproject.job.api;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-import static org.opencastproject.fun.juc.Immutables.list;
 import static org.opencastproject.job.api.Job.FailureReason.NONE;
 import static org.opencastproject.job.api.Job.Status.DISPATCHING;
 
@@ -31,18 +30,17 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.net.URI;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 
 public class JobImplTest {
 
-  private final List<String> arguments = list("arg-1", "arg-2");
+  private final List<String> arguments = Arrays.asList("arg-1", "arg-2");
   private final Date created = new Date(1455008400000L); // Tue Feb 09 2016 09:00:00
   private final Date started = new Date(1455008700000L); // Tue Feb 09 2016 09:05:00
   private final Date completed = new Date(1455009315000L); // Tue Feb 09 2016 09:15:15
   private final URI uri;
-
-  private final List<Long> blockedJobs = list(5L, 6L);
 
   private JobImpl job;
 
@@ -53,7 +51,7 @@ public class JobImplTest {
   @Before
   public void setUp() throws Exception {
     job = new JobImpl(3L, "test", "test_org", 0L, "simple", "do", arguments, DISPATCHING, "localhost", "remotehost",
-            created, started, completed, 100L, 200L, "result", 3L, 1L, true, uri, 1.5F, blockedJobs, 4L);
+            created, started, completed, 100L, 200L, "result", 3L, 1L, true, uri, 1.5F);
   }
 
   @Test
@@ -172,19 +170,9 @@ public class JobImplTest {
   }
 
   @Test
-  public void testGetBlockedJobIds() throws Exception {
-    assertEquals(blockedJobs, job.getBlockedJobIds());
-  }
-
-  @Test
-  public void testGetBlockingJobId() throws Exception {
-    assertEquals((Long) 4L, job.getBlockingJobId());
-  }
-
-  @Test
   public void testEquals() throws Exception {
     Job equalJob = new JobImpl(3L, "test", "test_org", 0L, "simple", "do", arguments, DISPATCHING, "localhost", "remotehost",
-            created, started, completed, 100L, 200L, "result", 3L, 1L, true, uri, 1.5F, blockedJobs, 4L);
+            created, started, completed, 100L, 200L, "result", 3L, 1L, true, uri, 1.5F);
 
     assertEquals(job, equalJob);
   }
@@ -192,7 +180,7 @@ public class JobImplTest {
   @Test
   public void testToString() throws Exception {
     Job newJob = new JobImpl(3L, "test", "test_org", 0L, "simple", "do", arguments, DISPATCHING, "localhost",
-            "remotehost", created, started, completed, 100L, 200L, "result", 3L, 1L, true, uri, 1.5F, blockedJobs, 4L);
+            "remotehost", created, started, completed, 100L, 200L, "result", 3L, 1L, true, uri, 1.5F);
     String jobString = "Job {id:3, operation:do, status:DISPATCHING}";
     assertEquals(newJob.toString(), jobString);
   }

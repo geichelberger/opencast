@@ -112,6 +112,11 @@ public class PublicationImpl extends AbstractMediaPackageElement implements Publ
   }
 
   @Override
+  public void removeAttachmentById(String attachmentId) {
+    attachments.removeIf(a -> a.getIdentifier().equals(attachmentId));
+  }
+
+  @Override
   public Catalog[] getCatalogs() {
     return catalogs.toArray(new Catalog[catalogs.size()]);
   }
@@ -124,6 +129,11 @@ public class PublicationImpl extends AbstractMediaPackageElement implements Publ
       catalog.setIdentifier(createElementIdentifier());
     }
     catalogs.add(catalog);
+  }
+
+  @Override
+  public void clearTracks() {
+    tracks.clear();
   }
 
   @Override

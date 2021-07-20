@@ -23,6 +23,7 @@ package org.opencastproject.assetmanager.impl;
 import org.opencastproject.assetmanager.api.Asset;
 import org.opencastproject.assetmanager.api.AssetId;
 import org.opencastproject.assetmanager.api.Availability;
+import org.opencastproject.util.Checksum;
 import org.opencastproject.util.MimeType;
 
 import com.entwinemedia.fn.data.Opt;
@@ -35,18 +36,24 @@ public class AssetImpl implements Asset {
   private final Opt<MimeType> mimeType;
   private final long size;
   private final Availability availability;
+  private final String storageId;
+  private final Checksum checksum;
 
   public AssetImpl(
           AssetId id,
           InputStream in,
           Opt<MimeType> mimeType,
           long size,
-          Availability availability) {
+          String storeId,
+          Availability availability,
+          Checksum checksum) {
     this.id = id;
     this.in = in;
     this.mimeType = mimeType;
     this.size = size;
     this.availability = availability;
+    this.storageId = storeId;
+    this.checksum = checksum;
   }
 
   @Override public AssetId getId() {
@@ -67,5 +74,14 @@ public class AssetImpl implements Asset {
 
   @Override public Availability getAvailability() {
     return availability;
+  }
+
+  @Override public String getStorageId() {
+    return storageId;
+  }
+
+  @Override
+  public Checksum getChecksum() {
+    return checksum;
   }
 }

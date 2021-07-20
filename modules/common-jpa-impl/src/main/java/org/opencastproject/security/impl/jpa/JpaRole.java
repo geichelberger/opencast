@@ -20,9 +20,10 @@
  */
 package org.opencastproject.security.impl.jpa;
 
-import org.opencastproject.security.api.Organization;
 import org.opencastproject.security.api.Role;
 import org.opencastproject.util.EqualsUtil;
+
+import java.util.Objects;
 
 import javax.persistence.Access;
 import javax.persistence.AccessType;
@@ -30,6 +31,7 @@ import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
+import javax.persistence.Index;
 import javax.persistence.JoinColumn;
 import javax.persistence.NamedQueries;
 import javax.persistence.NamedQuery;
@@ -43,11 +45,28 @@ import javax.persistence.UniqueConstraint;
  */
 @Entity
 @Access(AccessType.FIELD)
-@Table(name = "mh_role", uniqueConstraints = @UniqueConstraint(columnNames = { "name", "organization" }))
+@Table(
+    name = "oc_role",
+    uniqueConstraints = @UniqueConstraint(columnNames = { "name", "organization" }),
+    indexes = {
+        @Index(name = "IX_oc_role_pk", columnList = "name, organization"),
+    }
+)
 @NamedQueries({
-        @NamedQuery(name = "Role.findByQuery", query = "select r from JpaRole r where r.organization.id=:org and UPPER(r.name) like :query or UPPER(r.description) like :query"),
-        @NamedQuery(name = "Role.findByName", query = "Select r FROM JpaRole r where r.name = :name and r.organization.id = :org"),
-        @NamedQuery(name = "Role.findAll", query = "Select r FROM JpaRole r where r.organization.id = :org") })
+    @NamedQuery(
+        name = "Role.findByQuery",
+        query = "select r from JpaRole r "
+            + "where r.organization.id=:org and UPPER(r.name) like :query or UPPER(r.description) like :query"
+    ),
+    @NamedQuery(
+        name = "Role.findByName",
+        query = "Select r FROM JpaRole r where r.name = :name and r.organization.id = :org"
+    ),
+    @NamedQuery(
+        name = "Role.findAll",
+        query = "Select r FROM JpaRole r where r.organization.id = :org"
+    ),
+})
 public final class JpaRole implements Role {
   @Id
   @Column(name = "id")
@@ -149,7 +168,11 @@ public final class JpaRole implements Role {
   }
 
   @Override
-  public Organization getOrganization() {
+  public String getOrganizationId() {
+    return organization.getId();
+  }
+
+  public JpaOrganization getJpaOrganization() {
     return organization;
   }
 
@@ -160,20 +183,22 @@ public final class JpaRole implements Role {
 
   @Override
   public int hashCode() {
-    return EqualsUtil.hash(name, organization);
+    return EqualsUtil.hash(name, getOrganizationId());
   }
 
   @Override
   public boolean equals(Object obj) {
-    if (!(obj instanceof Role))
+    if (!(obj instanceof Role)) {
       return false;
+    }
     Role other = (Role) obj;
-    return name.equals(other.getName()) && organization.equals(other.getOrganization());
+    return name.equals(other.getName())
+            && Objects.equals(getOrganizationId(), other.getOrganizationId());
   }
 
   @Override
   public String toString() {
-    return new StringBuilder(name).append(":").append(organization).toString();
+    return name + ":" + getOrganizationId();
   }
 
 }

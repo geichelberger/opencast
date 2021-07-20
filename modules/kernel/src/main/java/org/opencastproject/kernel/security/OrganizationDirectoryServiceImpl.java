@@ -28,7 +28,6 @@ import static org.opencastproject.util.data.Tuple.tuple;
 
 import org.opencastproject.kernel.security.persistence.OrganizationDatabase;
 import org.opencastproject.kernel.security.persistence.OrganizationDatabaseException;
-import org.opencastproject.security.api.DefaultOrganization;
 import org.opencastproject.security.api.Organization;
 import org.opencastproject.security.api.OrganizationDirectoryListener;
 import org.opencastproject.security.api.OrganizationDirectoryService;
@@ -40,6 +39,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.osgi.service.cm.ConfigurationAdmin;
 import org.osgi.service.cm.ConfigurationException;
 import org.osgi.service.cm.ManagedServiceFactory;
+import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Reference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,7 +51,6 @@ import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -58,6 +58,14 @@ import java.util.concurrent.Executors;
  * Implements the organizational directory. As long as no organizations are published in the service registry, the
  * directory will contain the default organization as the only instance.
  */
+@Component(
+  property = {
+    "service.pid=org.opencastproject.organization",
+    "service.description=Organization Directory Service"
+  },
+  immediate = true,
+  service = { OrganizationDirectoryService.class, ManagedServiceFactory.class }
+)
 public class OrganizationDirectoryServiceImpl implements OrganizationDirectoryService, ManagedServiceFactory {
 
   /** The logger */
@@ -76,7 +84,10 @@ public class OrganizationDirectoryServiceImpl implements OrganizationDirectorySe
   public static final String ORG_NAME_KEY = "name";
 
   /** The managed property that specifies the organization server name */
-  public static final String ORG_SERVER_KEY = "server";
+  public static final String ORG_SERVER_PREFIX = "prop.org.opencastproject.host.";
+
+  /** The default in case no server is configured */
+  public static final String DEFAULT_SERVER = "localhost";
 
   /** The managed property that specifies the server port */
   public static final String ORG_PORT_KEY = "port";
@@ -99,45 +110,26 @@ public class OrganizationDirectoryServiceImpl implements OrganizationDirectorySe
   /** The list of directory listeners */
   private final List<OrganizationDirectoryListener> listeners = new ArrayList<OrganizationDirectoryListener>();
 
-  /**
-   * The default organization. This is a hack needed by the capture agent implementation see MH-9363
-   */
-  private final Organization defaultOrganization = new DefaultOrganization();
-
-  /**
-   * The list of organizations to handle later. This is a hack needed by the capture agent implementation see MH-9363
-   */
-  private final Map<String, Dictionary> unhandledOrganizations = new HashMap<String, Dictionary>();
-
   private OrgCache cache;
 
   /** OSGi DI */
+  @Reference(name = "persistence")
   public void setOrgPersistence(OrganizationDatabase setOrgPersistence) {
     this.persistence = setOrgPersistence;
     this.cache = new OrgCache(60000, persistence);
-    for (Entry<String, Dictionary> entry : unhandledOrganizations.entrySet()) {
-      try {
-        updated(entry.getKey(), entry.getValue());
-      } catch (ConfigurationException e) {
-        logger.error(e.getMessage());
-      }
-    }
   }
 
   /**
    * @param configAdmin
    *          the configAdmin to set
    */
+  @Reference(name = "configAdmin")
   public void setConfigurationAdmin(ConfigurationAdmin configAdmin) {
     this.configAdmin = configAdmin;
   }
 
   @Override
   public Organization getOrganization(final String id) throws NotFoundException {
-    if (persistence == null) {
-      logger.debug("No persistence available: Returning default organization for id {}", id);
-      return defaultOrganization;
-    }
     Organization org = cache.get(id);
     if (org == null)
       throw new NotFoundException();
@@ -146,10 +138,6 @@ public class OrganizationDirectoryServiceImpl implements OrganizationDirectorySe
 
   @Override
   public Organization getOrganization(final URL url) throws NotFoundException {
-    if (persistence == null) {
-      logger.debug("No persistence available: Returning default organization for url {}", url);
-      return defaultOrganization;
-    }
     Organization org = cache.get(url);
     if (org == null)
       throw new NotFoundException();
@@ -158,12 +146,6 @@ public class OrganizationDirectoryServiceImpl implements OrganizationDirectorySe
 
   @Override
   public List<Organization> getOrganizations() {
-    if (persistence == null) {
-      logger.debug("No persistence available: Returning only default organization");
-      List<Organization> orgs = new ArrayList<Organization>();
-      orgs.add(defaultOrganization);
-      return orgs;
-    }
     return cache.getAll();
   }
 
@@ -191,25 +173,15 @@ public class OrganizationDirectoryServiceImpl implements OrganizationDirectorySe
   @Override
   @SuppressWarnings("rawtypes")
   public void updated(String pid, Dictionary properties) throws ConfigurationException {
-    if (persistence == null) {
-      logger.debug("No persistence available: Ignoring organization update for pid='{}'", pid);
-      unhandledOrganizations.put(pid, properties);
-      return;
-    }
     logger.debug("Updating organization pid='{}'", pid);
 
     // Gather the properties
     final String id = (String) properties.get(ORG_ID_KEY);
     final String name = (String) properties.get(ORG_NAME_KEY);
-    final String server = (String) properties.get(ORG_SERVER_KEY);
 
     // Make sure the configuration meets the minimum requirements
     if (StringUtils.isBlank(id))
       throw new ConfigurationException(ORG_ID_KEY, ORG_ID_KEY + " must be set");
-    if (StringUtils.isBlank(server))
-      throw new ConfigurationException(ORG_SERVER_KEY, ORG_SERVER_KEY + " must be set");
-
-    String[] serverUrls = StringUtils.split(server, ",");
 
     final String portAsString = StringUtils.trimToNull((String) properties.get(ORG_PORT_KEY));
     final int port = portAsString != null ? Integer.parseInt(portAsString) : 80;
@@ -218,12 +190,26 @@ public class OrganizationDirectoryServiceImpl implements OrganizationDirectorySe
 
     // Build the properties map
     final Map<String, String> orgProperties = new HashMap<String, String>();
+    ArrayList<String> serverUrls = new ArrayList();
+
     for (Enumeration<?> e = properties.keys(); e.hasMoreElements();) {
       final String key = (String) e.nextElement();
+
       if (!key.startsWith(ORG_PROPERTY_PREFIX)) {
         continue;
       }
+
+      if (key.startsWith(ORG_SERVER_PREFIX)) {
+        String tenantSpecificHost = StringUtils.trimToNull((String) properties.get(key));
+        serverUrls.add(tenantSpecificHost);
+      }
+
       orgProperties.put(key.substring(ORG_PROPERTY_PREFIX.length()), (String) properties.get(key));
+    }
+
+    if (serverUrls.isEmpty()) {
+      logger.debug("No server URL configured for organization " + name + ", setting default localhost");
+      serverUrls.add(DEFAULT_SERVER);
     }
 
     // Load the existing organization or create a new one

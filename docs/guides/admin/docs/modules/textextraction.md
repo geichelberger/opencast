@@ -44,22 +44,30 @@ analysis.
 
 For example, if you want OCR for German content, you want to run something like this:
 
-    tesseract in.tif out.txt -l deu -psm 3
+    tesseract in.tif out.txt -l deu --psm 3
 
-- The arguments `in.tif` and `out.txt` are automatically set by Opencast.
-- The argument `-l` specifies the language files used by Tesseract. `deu` specifies the German language. Multiple
+* The arguments `in.tif` and `out.txt` are automatically set by Opencast.
+* The argument `-l` specifies the language files used by Tesseract. `deu` specifies the German language. Multiple
   languages may be specified, separated by plus characters. Please make sure that you have installed the language packs
   you want to use on every worker (E.g. `yum install tesseract-langpack-deu`).
-- Finally `-psm 3` specifies the layout analysis for Tesseract. The value `3` means *Fully automatic page segmentation,
+* Finally `--psm 3` specifies the layout analysis for Tesseract. The value `3` means *Fully automatic page segmentation,
   but no orientation and script detection* which is actually the default. Hence in this case, the argument could simply
   be omitted. If you know more about your input videos, you might want to use different options here (not likely).
+  This option might be just `-psm` with only one dash in your system.
 
 In Opencast, you can modify this options in the `custom.properties` file by setting the following option:
 
-    org.opencastproject.textanalyzer.tesseract.options=-l deu -psm 3
+    org.opencastproject.textanalyzer.tesseract.options=-l deu --psm 3
 
 It is highly recommended to configure Tesseract to use your local language. It will improve the recognition a lot and
 only this will enable the recognition of special characters specific to your local language.
+
+If you supply a reference to a list of additional words using `--user-words`, the path to that file must not be enclosed
+in quotation marks.
+
+Newer versions of Tesseract come with additional neural nets LSTM. Its performance might be significantly different
+from the previous Tesseract engine. Its usage might be specified using `--oem N` with `N` being a number documented in
+your Tesseract manual.
 
 
 ### Encoding (Image Preprocessing)
@@ -79,7 +87,7 @@ For this, edit the `/etc/opencast/encoding/opencast-images.properties` and modif
 extraction:
 
     profile.text-analysis.http.ffmpeg.command = -ss #{time} -i #{in.video.path} \
-	    -filter:v boxblur=1:1,curves=all=0.4/0#{space}0.6/1 \
+      -filter:v boxblur=1:1,curves=all=0.4/0#{space}0.6/1 \
       -frames:v 1 -pix_fmt:v gray -r 1 #{out.dir}/#{out.name}#{out.suffix}
 
 This profile will create a gray, high contrast image. The additional light blur will reduce or remove noise and thicken
@@ -99,9 +107,9 @@ errors, for testing and debugging, you want no filtering at all.
 Starting with version 1.6, Opencast provides three different kinds of implementation for filtering which can be just
 swapped out at any time:
 
- - dictionary-none
- - dictionary-regexp (default)
- - dictionary-hunspell
+* dictionary-none
+* dictionary-regexp (default)
+* dictionary-hunspell
 
 
 #### No Filtering (dictionary-none)
@@ -112,14 +120,22 @@ unmodified. There is no additional configuration needed or even possible. Of cou
 
 #### Using a Regular Expression (dictionary-regexp)
 
-Starting with 1.6, this is the default implementation for the DictionaryService. It is quite fast and easy to configure
-but is limited in terms of filtering capabilities as it will not check if a recognized word actually makes sense.
+Starting with 1.6, this is the default implementation for the DictionaryService. It is limited in terms of filtering
+capabilities as it will not check if a recognized word actually makes sense. Here is how this service works: If
+configured with a valid pattern that compiles to a regular expression, then this pattern is used, otherwise a fall-
+back to the default expression `\w+`. The pattern is repeatedly applied to the extracted text, until the end is
+reached. Each match is returned, separated by a space character.
 
 The default expression for this module is `\w+` which will let upper- and lowercase characters as well as digits pass
 through, but will block all other characters. For the German language, for example, this would mean that all special
 characters would be blocked as well. So you want to configure Opencast to let them pass as well.
 
-You can do that by modifying the `pattern` in
+Example:
+    * pattern: `\w+`
+    * text input: "aäa bbb"
+    * text output: "a a bbb"
+
+If this is undesired, modify the `pattern` in
 `etc/org.opencastproject.dictionary.regexp.DictionaryServiceImpl.cfg`:
 
 For German, a suitable pattern could be:
@@ -128,7 +144,7 @@ For German, a suitable pattern could be:
 
 This expression will let all words pass which contain upper- and lowercase [a-z], digits and German special characters
 as well as punctuation at the end of a word. Additionally, it requires that the words are at least two characters long
-which will filter out most of the common noise.
+which will filter out most of the common noise. Note the double-escaping of `\w`.
 
 A similar pattern that could be used for Spanish would be:
 
@@ -141,8 +157,8 @@ Last, the `dictionary-hunspell` will check words based on a spell checker and a 
 the tool `hunspell` is used which is one of the most common spell checkers on Linux and should be available from the
 system repositories for most common operating systems.
 
-For the Hunspell based DictionaryService, there are two configuration options.  One is for the binary and one for the
-arguments to use for filtering.
+For the Hunspell based DictionaryService, there are two configuration options: One specifies the location of the binary
+and one is for the arguments to use for filtering.
 
 By default, Opencast will just call `hunspell` without an absolute path. This will work as long as hunspell is in the
 systems path which should be the case unless you have built and installed it manually. In that case, the binary can be

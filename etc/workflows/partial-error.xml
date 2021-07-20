@@ -6,10 +6,9 @@
   <operations>
 
     <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
-    <!-- Notify                                                            -->
+    <!-- Mark as failed                                                    -->
     <!--                                                                   -->
-    <!-- Add comments in order to mark the recording for review and send   -->
-    <!-- e-mails to administrators.                                        -->
+    <!-- Mark recording as failed,                               -->
     <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
 
     <!-- Mark the recording for review -->
@@ -17,7 +16,7 @@
     <operation
       id="comment"
       fail-on-error="false"
-      description="Mark the recording for cutting">
+      description="Mark the recording for review because of a failure">
       <configurations>
         <configuration key="description">Processing failed</configuration>
         <configuration key="reason">EVENTS.EVENTS.DETAILS.COMMENTS.REASONS.PROCESSING_FAILURE</configuration>
@@ -32,16 +31,21 @@
       fail-on-error="false"
       description="Preserve the current recording state">
       <configurations>
-        <configuration key="source-flavors">*/source,dublincore/*</configuration>
+        <configuration key="source-flavors">*/source,dublincore/*,security/*</configuration>
       </configurations>
     </operation>
 
-    <!-- Cleanup the temporary files from the working file repository -->
+    <!-- Clean up the temporary files from the working file repository -->
 
     <operation
       id="cleanup"
       fail-on-error="false"
       description="Cleaning up">
+      <configurations>
+        <configuration key="delete-external">true</configuration>
+        <!-- FixMe Don't clean up ACLs until workflow service no longer looks for them in the WFR. -->
+        <configuration key="preserve-flavors">security/*</configuration>
+      </configurations>
     </operation>
 
   </operations>

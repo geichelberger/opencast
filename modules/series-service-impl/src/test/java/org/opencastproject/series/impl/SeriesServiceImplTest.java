@@ -28,6 +28,7 @@ import static org.junit.Assert.assertTrue;
 import static org.opencastproject.util.data.Collections.list;
 import static org.opencastproject.util.persistence.PersistenceUtil.newTestEntityManagerFactory;
 
+import org.opencastproject.elasticsearch.index.AbstractSearchIndex;
 import org.opencastproject.message.broker.api.MessageSender;
 import org.opencastproject.metadata.dublincore.DublinCore;
 import org.opencastproject.metadata.dublincore.DublinCoreCatalog;
@@ -67,6 +68,8 @@ import org.osgi.service.component.ComponentContext;
 import java.io.File;
 import java.io.InputStream;
 import java.util.List;
+import java.util.Optional;
+import java.util.function.Function;
 
 /**
  * Test for Series Service.
@@ -119,11 +122,18 @@ public class SeriesServiceImplTest {
     MessageSender messageSender = EasyMock.createNiceMock(MessageSender.class);
     EasyMock.replay(messageSender);
 
+    AbstractSearchIndex esIndex = EasyMock.createNiceMock(AbstractSearchIndex.class);
+    EasyMock.expect(esIndex.addOrUpdateSeries(EasyMock.anyString(), EasyMock.anyObject(Function.class),
+            EasyMock.anyString(), EasyMock.anyObject(User.class))).andReturn(Optional.empty()).atLeastOnce();
+    EasyMock.replay(esIndex);
+
     seriesService = new SeriesServiceImpl();
     seriesService.setPersistence(seriesDatabase);
     seriesService.setIndex(index);
     seriesService.setSecurityService(securityService);
     seriesService.setMessageSender(messageSender);
+    seriesService.setAdminUiIndex(esIndex);
+    seriesService.setExternalApiIndex(esIndex);
 
     BundleContext bundleContext = EasyMock.createNiceMock(BundleContext.class);
     EasyMock.expect(bundleContext.getProperty((String) EasyMock.anyObject())).andReturn("System Admin");
@@ -372,6 +382,44 @@ public class SeriesServiceImplTest {
             new AccessControlEntry("b", Permissions.Action.WRITE.toString(), false));
     AccessControlList b = new AccessControlList(new AccessControlEntry("b", Permissions.Action.WRITE.toString(), false),
             new AccessControlEntry("b", Permissions.Action.READ.toString(), false));
+    assertFalse(AccessControlUtil.equals(a, b));
+  }
+
+  @Test
+  public void testACLEquality5() {
+    AccessControlList a = new AccessControlList(
+            new AccessControlEntry("a", Permissions.Action.WRITE.toString(), false),
+            new AccessControlEntry("a", Permissions.Action.WRITE.toString(), false));
+    AccessControlList b = new AccessControlList(
+            new AccessControlEntry("a", Permissions.Action.WRITE.toString(), false),
+            new AccessControlEntry("b", Permissions.Action.READ.toString(), false));
+    assertFalse(AccessControlUtil.equals(a, b));
+  }
+
+  @Test
+  public void testACLEquality6() {
+    AccessControlList a = new AccessControlList(
+            new AccessControlEntry("a", Permissions.Action.WRITE.toString(), false),
+            new AccessControlEntry("a", Permissions.Action.WRITE.toString(), false),
+            new AccessControlEntry("b", Permissions.Action.READ.toString(), true));
+    AccessControlList b = new AccessControlList(
+            new AccessControlEntry("a", Permissions.Action.WRITE.toString(), false),
+            new AccessControlEntry("b", Permissions.Action.READ.toString(), true));
+    assertTrue(AccessControlUtil.equals(a, b));
+  }
+
+  @Test
+  public void testACLEquality7() {
+    // It is possible to apply this contradictory ACL to a series or event in OC,
+    // where "a" is allowed AND disallowed from writing to the resource.
+    // See MH-13089
+    AccessControlList a = new AccessControlList(
+            new AccessControlEntry("a", Permissions.Action.WRITE.toString(), false),
+            new AccessControlEntry("a", Permissions.Action.WRITE.toString(), true),
+            new AccessControlEntry("b", Permissions.Action.READ.toString(), true));
+    AccessControlList b = new AccessControlList(
+            new AccessControlEntry("a", Permissions.Action.WRITE.toString(), false),
+            new AccessControlEntry("b", Permissions.Action.READ.toString(), true));
     assertFalse(AccessControlUtil.equals(a, b));
   }
 

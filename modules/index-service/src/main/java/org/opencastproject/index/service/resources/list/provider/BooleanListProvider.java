@@ -21,10 +21,8 @@
 
 package org.opencastproject.index.service.resources.list.provider;
 
-import org.opencastproject.index.service.exception.ListProviderException;
-import org.opencastproject.index.service.resources.list.api.ResourceListProvider;
-import org.opencastproject.index.service.resources.list.api.ResourceListQuery;
-import org.opencastproject.security.api.Organization;
+import org.opencastproject.list.api.ResourceListProvider;
+import org.opencastproject.list.api.ResourceListQuery;
 import org.opencastproject.util.data.Option;
 
 import org.apache.commons.lang3.StringUtils;
@@ -50,7 +48,7 @@ public class BooleanListProvider implements ResourceListProvider {
   }
 
   @Override
-  public Map<String, String> getList(String listName, ResourceListQuery query, Organization organization) throws ListProviderException {
+  public Map<String, String> getList(String listName, ResourceListQuery query) {
     Map<String, String> result = new HashMap<String, String>();
 
     String listNameTrimmed = StringUtils.trimToEmpty(listName);
@@ -63,19 +61,6 @@ public class BooleanListProvider implements ResourceListProvider {
       result.put("false", NO);
 
     return result;
-  }
-
-  /**
-   * Parse boolean value from the given string wrapped in an {@link Option}.
-   *
-   * @param filterValue boolean value as string
-   * @return boolean value wrapped in a {@link Option} or {@link Option#none()}
-   */
-  public static <Boolean> Option<Boolean> parseOptValue(Option<String> filterValue) {
-    if (filterValue.isSome())
-      return parseValue(filterValue.get());
-
-    return Option.none();
   }
 
   /**

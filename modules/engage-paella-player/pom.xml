@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <artifactId>opencast-engage-paella-player</artifactId>
   <packaging>bundle</packaging>
@@ -7,36 +7,13 @@
   <parent>
     <groupId>org.opencastproject</groupId>
     <artifactId>base</artifactId>
-    <version>5-SNAPSHOT</version>
+    <version>11-SNAPSHOT</version>
     <relativePath>../../pom.xml</relativePath>
   </parent>
   <properties>
     <opencast.basedir>${project.basedir}/../..</opencast.basedir>
-    <checkstyle.skip>false</checkstyle.skip>
   </properties>
-  
-  <dependencies>
-    <dependency>
-      <groupId>org.opencastproject</groupId>
-      <artifactId>opencast-common</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-    <!-- osgi support -->
-    <dependency>
-      <groupId>org.osgi</groupId>
-      <artifactId>org.osgi.core</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.osgi</groupId>
-      <artifactId>org.osgi.compendium</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>commons-io</groupId>
-      <artifactId>commons-io</artifactId>
-    </dependency>            
-  </dependencies>
-
+  <dependencies />
   <profiles>
     <profile>
       <id>frontend-no-prebuilt</id>
@@ -61,7 +38,7 @@
                 </configuration>
               </execution>
               <execution>
-                <id>npm install</id>
+                <id>npm ci</id>
                 <goals>
                   <goal>exec</goal>
                 </goals>
@@ -69,9 +46,21 @@
                 <configuration>
                   <executable>npm</executable>
                   <arguments>
-                    <argument>install</argument>
-                    <argument>--registry</argument>
-                    <argument>${nexus.npm}</argument>
+                    <argument>ci</argument>
+                  </arguments>
+                </configuration>
+              </execution>
+              <execution>
+                <id>esline</id>
+                <goals>
+                  <goal>exec</goal>
+                </goals>
+                <phase>validate</phase>
+                <configuration>
+                  <executable>npm</executable>
+                  <arguments>
+                    <argument>run</argument>
+                    <argument>eslint</argument>
                   </arguments>
                 </configuration>
               </execution>
@@ -93,8 +82,8 @@
         </plugins>
       </build>
     </profile>
-  
-  
+
+
     <profile>
       <id>frontend</id>
       <activation>
@@ -113,8 +102,7 @@
                   <goal>install-node-and-npm</goal>
                 </goals>
                 <configuration>
-                  <nodeVersion>v8.1.4</nodeVersion>
-                  <npmVersion>5.2.0</npmVersion>
+                  <nodeVersion>${node.version}</nodeVersion>
                 </configuration>
               </execution>
 
@@ -131,15 +119,24 @@
 
               <execution>
                 <phase>validate</phase>
-                <id>npm install</id>
+                <id>npm ci</id>
                 <goals>
                   <goal>npm</goal>
                 </goals>
                 <configuration>
-                  <arguments>install</arguments>
+                  <arguments>ci</arguments>
                 </configuration>
               </execution>
-
+              <execution>
+                <phase>validate</phase>
+                <id>eslint</id>
+                <goals>
+                  <goal>npm</goal>
+                </goals>
+                <configuration>
+                  <arguments>run eslint</arguments>
+                </configuration>
+              </execution>
               <execution>
                 <phase>process-resources</phase>
                 <id>gulp build</id>
@@ -156,9 +153,13 @@
       </build>
     </profile>
   </profiles>
-  
+
   <build>
     <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+      </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-resources-plugin</artifactId>
@@ -193,18 +194,9 @@
             <Bundle-SymbolicName>${project.artifactId}</Bundle-SymbolicName>
             <Build-Number>${buildNumber}</Build-Number>
             <Private-Package>ui.*</Private-Package>
-            <Http-Alias>/engage/paella/ui</Http-Alias>
+            <Http-Alias>/paella/ui</Http-Alias>
             <Http-Classpath>/ui</Http-Classpath>
             <Http-Welcome>watch.html</Http-Welcome>
-            <Import-Package>
-              javax.ws.rs;version=2.0.1,
-              javax.ws.rs.core;version=2.0.1,
-              *
-            </Import-Package>
-            <Export-Package>org.opencastproject.engage.paella</Export-Package>
-            <Service-Component>
-              OSGI-INF/paella-config-file.xml
-            </Service-Component>            
           </instructions>
         </configuration>
         <executions>

@@ -23,11 +23,15 @@ package org.opencastproject.mediapackage;
 
 import static org.apache.commons.io.IOUtils.toInputStream;
 
+import org.opencastproject.util.XmlSafeParser;
 import org.opencastproject.util.data.Function;
 
-import org.xml.sax.InputSource;
+import org.xml.sax.SAXException;
 
+import java.io.IOException;
 import java.io.StringWriter;
+import java.util.Collection;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -93,18 +97,13 @@ public final class MediaPackageElementParser {
     Unmarshaller m = null;
     try {
       m = MediaPackageImpl.context.createUnmarshaller();
-      return (MediaPackageElement) m.unmarshal(new InputSource(toInputStream(xml)));
+      return (MediaPackageElement) m.unmarshal(XmlSafeParser.parse(toInputStream(xml)));
     } catch (JAXBException e) {
       throw new MediaPackageException(e.getLinkedException() != null ? e.getLinkedException() : e);
+    } catch (IOException | SAXException e) {
+      throw new MediaPackageException(e);
     }
   }
-
-  /** {@link #getFromXml(String)} as function. */
-  public static final Function<String, MediaPackageElement> getFromXml = new Function.X<String, MediaPackageElement>() {
-    @Override public MediaPackageElement xapply(String s) throws Exception {
-      return getFromXml(s);
-    }
-  };
 
   /**
    * Serializes media package element list to a string.
@@ -115,14 +114,16 @@ public final class MediaPackageElementParser {
    * @throws MediaPackageException
    *         if serialization fails
    */
-  public static String getArrayAsXml(List<? extends MediaPackageElement> elements) throws MediaPackageException {
+  public static String getArrayAsXml(Collection<? extends MediaPackageElement> elements) throws MediaPackageException {
     // TODO write real serialization function
+    if (elements == null || elements.isEmpty()) return "";
     try {
       StringBuilder builder = new StringBuilder();
-      builder.append(getAsXml(elements.get(0)));
-      for (int i = 1; i < elements.size(); i++) {
+      Iterator<? extends MediaPackageElement> it = elements.iterator();
+      builder.append(getAsXml(it.next()));
+      while (it.hasNext()) {
         builder.append("###");
-        builder.append(getAsXml(elements.get(i)));
+        builder.append(getAsXml(it.next()));
       }
       return builder.toString();
     } catch (Exception e) {
@@ -133,12 +134,6 @@ public final class MediaPackageElementParser {
       }
     }
   }
-
-  public static final Function<String, List<MediaPackageElement>> getArrayFromXmlFn = new Function.X<String, List<MediaPackageElement>>() {
-    @Override public List<MediaPackageElement> xapply(String xml) throws Exception {
-      return (List<MediaPackageElement>) getArrayFromXml(xml);
-    }
-  };
 
   /**
    * Parses the serialized media package element list.
@@ -155,6 +150,7 @@ public final class MediaPackageElementParser {
       List<MediaPackageElement> elements = new LinkedList<MediaPackageElement>();
       String[] xmlArray = xml.split("###");
       for (String xmlElement : xmlArray) {
+        if ("".equals(xmlElement.trim())) continue;
         elements.add(getFromXml(xmlElement.trim()));
       }
       return elements;
@@ -164,6 +160,24 @@ public final class MediaPackageElementParser {
       } else {
         throw new MediaPackageException(e);
       }
+    }
+  }
+
+  /**
+   * Same as getArrayFromXml(), but throwing a RuntimeException instead of a checked exception. Useful in streams.
+   *
+   * @param xml
+   *         String to be parsed
+   * @return parsed media package element list
+   *
+   * @throws MediaPackageRuntimeException
+   *         if de-serialization fails
+   */
+  public static List<? extends MediaPackageElement> getArrayFromXmlUnchecked(String xml) {
+    try {
+      return getArrayFromXml(xml);
+    } catch (MediaPackageException e) {
+      throw new MediaPackageRuntimeException(e);
     }
   }
 

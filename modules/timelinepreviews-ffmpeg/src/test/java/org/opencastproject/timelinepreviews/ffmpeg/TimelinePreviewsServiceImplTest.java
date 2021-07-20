@@ -30,7 +30,7 @@ import org.opencastproject.job.api.JobImpl;
 import org.opencastproject.mediapackage.MediaPackageElement;
 import org.opencastproject.mediapackage.MediaPackageElementParser;
 import org.opencastproject.mediapackage.MediaPackageElements;
-import org.opencastproject.mediapackage.identifier.IdBuilderFactory;
+import org.opencastproject.mediapackage.identifier.IdImpl;
 import org.opencastproject.mediapackage.track.TrackImpl;
 import org.opencastproject.mediapackage.track.VideoStreamImpl;
 import org.opencastproject.serviceregistry.api.ServiceRegistry;
@@ -44,7 +44,6 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.io.File;
-import java.io.InputStream;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -72,7 +71,7 @@ public class TimelinePreviewsServiceImplTest {
     track.setMimeType(MimeTypes.MJPEG);
     track.addStream(new VideoStreamImpl());
     track.setDuration(mediaDuration);
-    track.setIdentifier(IdBuilderFactory.newInstance().newIdBuilder().createNew().compact());
+    track.setIdentifier(IdImpl.fromUUID().toString());
   }
 
   /**
@@ -134,11 +133,11 @@ public class TimelinePreviewsServiceImplTest {
   public void testProcess() throws Exception {
     File file = new File(track.getURI());
     Workspace workspace = EasyMock.createNiceMock(Workspace.class);
-    EasyMock.expect(workspace.get((URI) EasyMock.anyObject()))
+    EasyMock.expect(workspace.get(EasyMock.anyObject()))
             .andReturn(file);
-    Capture filenameCapture = new Capture();
+    Capture<String> filenameCapture = Capture.newInstance();
     EasyMock.expect(workspace.putInCollection(
-            EasyMock.anyString(), (String) EasyMock.capture(filenameCapture), (InputStream) EasyMock.anyObject()))
+            EasyMock.anyString(), EasyMock.capture(filenameCapture), EasyMock.anyObject()))
             .andReturn(new URI("timelinepreviews.png"));
     EasyMock.replay(workspace);
 

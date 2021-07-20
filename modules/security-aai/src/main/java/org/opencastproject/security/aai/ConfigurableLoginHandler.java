@@ -43,8 +43,10 @@ import org.osgi.service.cm.ConfigurationException;
 import org.osgi.service.cm.ManagedService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.Dictionary;
@@ -93,6 +95,10 @@ public class ConfigurableLoginHandler implements ShibbolethLoginHandler, RolePro
   /** Name of the optional configuration property specifying a list of home organizations */
   private static final String CFG_HEADER_HOME_ORGANIZATION_KEY = "header.home_organization";
 
+  /** Name of the optional configuration property specifying the name of the HTTP request header where affiliations
+      can be extracted */
+  private static final String CFG_HEADER_AFFILIATION_KEY = "header.affiliation";
+
   /** Shibboleth roles configuration */
 
   /**
@@ -126,6 +132,15 @@ public class ConfigurableLoginHandler implements ShibbolethLoginHandler, RolePro
   /** Default value of the configuration property CFG_ROLE_FEDERATION_KEY */
   private static final String CFG_ROLE_FEDERATION_DEFAULT = "ROLE_AAI_USER";
 
+  /**
+   * Name of the configuration property that specifies the prefix of the affiliation role for Shibboleth
+   * authenticated users. The role will be of the form ROLE_AFFILIATION_PREFIX + SHIBBOLETH_EDUPERSONAFFILIATION
+   */
+  private static final String CFG_ROLE_AFFILIATION_PREFIX_KEY = "role.affiliation.prefix";
+
+  /** Default value of configuration property CFG_ROLE_USER_PREFIX_KEY */
+  private static final String CFG_ROLE_AFFILIATION_PREFIX_DEFAULT = "ROLE_AAI_USER_AFFILIATION_";
+
   /** The logging facility */
   private static final Logger logger = LoggerFactory.getLogger(ConfigurableLoginHandler.class);
 
@@ -153,6 +168,9 @@ public class ConfigurableLoginHandler implements ShibbolethLoginHandler, RolePro
   /** Header to extract the home organization */
   private String headerHomeOrganization = null;
 
+  /** Header to extract the affiliation */
+  private String headerAffiliation = null;
+
   /** Role assigned to all Shibboleth authenticated users */
   private String roleFederationMember = CFG_ROLE_FEDERATION_DEFAULT;
 
@@ -164,6 +182,9 @@ public class ConfigurableLoginHandler implements ShibbolethLoginHandler, RolePro
 
   /** Suffix of the home organization membership role */
   private String roleOrganizationSuffix = CFG_ROLE_ORGANIZATION_SUFFIX_DEFAULT;
+
+  /** Prefix of the affiliation role */
+  private String roleAffiliationPrefix = CFG_ROLE_AFFILIATION_PREFIX_DEFAULT;
 
   /*
    * It is the bundle kernel what will need to instantiate the ConfigurableLoginHandler
@@ -253,6 +274,14 @@ public class ConfigurableLoginHandler implements ShibbolethLoginHandler, RolePro
       logger.warn("Optional header '{}' is not configured ", CFG_HEADER_HOME_ORGANIZATION_KEY);
     }
 
+    String cfgAffiliation = StringUtils.trimToNull((String) properties.get(CFG_HEADER_AFFILIATION_KEY));
+    if (cfgAffiliation != null) {
+      headerAffiliation = cfgAffiliation;
+      logger.info("Header '{}' set to '{}'", CFG_HEADER_AFFILIATION_KEY, headerAffiliation);
+    } else {
+      logger.warn("Optional header '{}' is not configured ", CFG_HEADER_AFFILIATION_KEY);
+    }
+
     /* Shibboleth roles configuration */
 
     String cfgRoleFederationMember = StringUtils.trimToNull((String) properties.get(CFG_ROLE_FEDERATION_KEY));
@@ -299,6 +328,18 @@ public class ConfigurableLoginHandler implements ShibbolethLoginHandler, RolePro
       logger.info("AAI organization membership role suffix '{}' is not configured, using default '{}'",
               CFG_ROLE_ORGANIZATION_SUFFIX_KEY, roleOrganizationSuffix);
     }
+
+    String cfgRoleAffiliationPrefix = StringUtils.trimToNull((String) properties.get(
+            CFG_ROLE_AFFILIATION_PREFIX_KEY));
+    if (cfgRoleAffiliationPrefix != null) {
+      roleAffiliationPrefix = cfgRoleAffiliationPrefix;
+      logger.info("AAI affiliation role prefix '{}' set to '{}'", CFG_ROLE_AFFILIATION_PREFIX_KEY,
+              cfgRoleAffiliationPrefix);
+    } else {
+      roleAffiliationPrefix = CFG_ROLE_AFFILIATION_PREFIX_DEFAULT;
+      logger.info("AAI affiliation role prefix '{}' is not configured, using default '{}'",
+              CFG_ROLE_AFFILIATION_PREFIX_KEY, roleAffiliationPrefix);
+    }
   }
 
   /**
@@ -342,7 +383,7 @@ public class ConfigurableLoginHandler implements ShibbolethLoginHandler, RolePro
     // Load the user reference
     JpaUserReference userReference = userReferenceProvider.findUserReference(id, organization.getId());
     if (userReference == null) {
-      throw new IllegalStateException("User reference '" + id + "' was not found");
+      throw new UsernameNotFoundException("User reference '" + id + "' was not found");
     }
 
     // Update the reference
@@ -425,6 +466,16 @@ public class ConfigurableLoginHandler implements ShibbolethLoginHandler, RolePro
     if (StringUtils.equals(id, bootstrapUserId)) {
       roles.add(new JpaRole(GLOBAL_ADMIN_ROLE, organization));
     }
+    if (headerAffiliation != null) {
+      String affiliation = request.getHeader(headerAffiliation);
+      if (affiliation != null) {
+        List<String> affiliations = Arrays.asList(affiliation.split(";"));
+        for (String eachAffiliation : affiliations) {
+          roles.add(new JpaRole(roleAffiliationPrefix + eachAffiliation, organization));
+        }
+      }
+    }
+
     return roles;
   }
 
@@ -441,18 +492,6 @@ public class ConfigurableLoginHandler implements ShibbolethLoginHandler, RolePro
       return new JpaOrganization(org.getId(), org.getName(), org.getServers(), org.getAdminRole(),
            org.getAnonymousRole(), org.getProperties());
     }
-  }
-
-  /**
-   * @see org.opencastproject.security.api.RoleProvider#getRoles()
-   */
-  @Override
-  public Iterator<Role> getRoles() {
-    JaxbOrganization organization = JaxbOrganization.fromOrganization(securityService.getOrganization());
-    HashSet<Role> roles = new HashSet<Role>();
-    roles.add(new JaxbRole(roleFederationMember, organization));
-    roles.add(new JaxbRole(organization.getAnonymousRole(), organization));
-    return roles.iterator();
   }
 
   /**
@@ -476,25 +515,30 @@ public class ConfigurableLoginHandler implements ShibbolethLoginHandler, RolePro
    */
   @Override
   public Iterator<Role> findRoles(String query, Role.Target target, int offset, int limit) {
-    if (query == null)
+    if (query == null) {
       throw new IllegalArgumentException("Query must be set");
-    HashSet<Role> foundRoles = new HashSet<Role>();
-    for (Iterator<Role> it = getRoles(); it.hasNext();) {
-      Role role = it.next();
-      if (like(role.getName(), query) || like(role.getDescription(), query))
-        foundRoles.add(role);
     }
-    return offsetLimitCollection(offset, limit, foundRoles).iterator();
+    JaxbOrganization organization = JaxbOrganization.fromOrganization(securityService.getOrganization());
+    HashSet<Role> roles = new HashSet<>(2);
+    final String[] roleNames = new String[] {roleFederationMember, organization.getAnonymousRole()};
+    for (String name: roleNames) {
+      if (like(name, query)) {
+        roles.add(new JaxbRole(name, organization));
+      }
+    }
+    return offsetLimitCollection(offset, limit, roles).iterator();
   }
 
   private <T> HashSet<T> offsetLimitCollection(int offset, int limit, HashSet<T> entries) {
     HashSet<T> result = new HashSet<T>();
     int i = 0;
     for (T entry : entries) {
-      if (limit != 0 && result.size() >= limit)
+      if (limit != 0 && result.size() >= limit) {
         break;
-      if (i >= offset)
+      }
+      if (i >= offset) {
         result.add(entry);
+      }
       i++;
     }
     return result;

@@ -31,6 +31,7 @@ import org.opencastproject.distribution.api.DownloadDistributionService;
 import org.opencastproject.distribution.aws.s3.api.AwsS3DistributionService;
 import org.opencastproject.job.api.Job;
 import org.opencastproject.mediapackage.MediaPackage;
+import org.opencastproject.mediapackage.MediaPackageElement;
 import org.opencastproject.mediapackage.MediaPackageException;
 import org.opencastproject.mediapackage.MediaPackageParser;
 import org.opencastproject.serviceregistry.api.RemoteBase;
@@ -44,6 +45,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -99,7 +101,7 @@ public class AwsS3DistributionServiceRemoteImpl extends RemoteBase implements Aw
   public Job distribute(String channelId, final MediaPackage mediaPackage, Set<String> elementIds,
           boolean checkAvailability)
           throws DistributionException {
-    logger.info(format("Distributing %s elements to %s@%s", elementIds.size(), channelId, distributionChannel));
+    logger.info("Distributing {} elements to {}@{}", elementIds.size(), channelId, distributionChannel);
     final HttpPost req = post(param(PARAM_CHANNEL_ID, channelId),
             param(PARAM_MEDIAPACKAGE, MediaPackageParser.getAsXml(mediaPackage)),
             param(PARAM_ELEMENT_ID, gson.toJson(elementIds)),
@@ -121,7 +123,7 @@ public class AwsS3DistributionServiceRemoteImpl extends RemoteBase implements Aw
 
   @Override
   public Job retract(String channelId, MediaPackage mediaPackage, Set<String> elementIds) throws DistributionException {
-    logger.info(format("Retracting %s elements from %s@%s", elementIds.size(), channelId, distributionChannel));
+    logger.info("Retracting {} elements from {}@{}", elementIds.size(), channelId, distributionChannel);
     final HttpPost req = post("/retract",
             param(PARAM_MEDIAPACKAGE, MediaPackageParser.getAsXml(mediaPackage)),
             param(PARAM_ELEMENT_ID, gson.toJson(elementIds)),
@@ -135,8 +137,41 @@ public class AwsS3DistributionServiceRemoteImpl extends RemoteBase implements Aw
   }
 
   @Override
-  public Job restore(String channelId, MediaPackage mediaPackage, String elementId, String fileName) throws DistributionException {
-    logger.info(format("Restoring %s from %s@%s", elementId, channelId, distributionChannel));
+  public List<MediaPackageElement> distributeSync(String channelId, MediaPackage mediapackage, Set<String> elementIds,
+         boolean checkAvailability) throws DistributionException {
+    logger.info("Distributing {} elements to {}@{}", elementIds.size(), channelId, distributionChannel);
+    final HttpPost req = post("/distributesync", param(PARAM_CHANNEL_ID, channelId),
+        param(PARAM_MEDIAPACKAGE, MediaPackageParser.getAsXml(mediapackage)),
+        param(PARAM_ELEMENT_ID, gson.toJson(elementIds)),
+        param(PARAM_CHECK_AVAILABILITY, Boolean.toString(checkAvailability)));
+    for (List<MediaPackageElement> elements : join(runRequest(req, elementsFromHttpResponse))) {
+      return elements;
+    }
+    throw new DistributionException(format("Unable to distribute '%s' elements of "
+            + "mediapackage '%s' using a remote destribution service proxy",
+        elementIds.size(), mediapackage.getIdentifier().toString()));
+  }
+
+  @Override
+  public List<MediaPackageElement> retractSync(String channelId, MediaPackage mediaPackage, Set<String> elementIds)
+          throws DistributionException {
+    logger.info("Retracting {} elements from {}@{}", elementIds.size(), channelId, distributionChannel);
+    final HttpPost req = post("/retractsync",
+        param(PARAM_MEDIAPACKAGE, MediaPackageParser.getAsXml(mediaPackage)),
+        param(PARAM_ELEMENT_ID, gson.toJson(elementIds)),
+        param(PARAM_CHANNEL_ID, channelId));
+    for (List<MediaPackageElement> elements : join(runRequest(req, elementsFromHttpResponse))) {
+      return elements;
+    }
+    throw new DistributionException(format("Unable to retract '%s' elements of "
+            + "mediapackage '%s' using a remote destribution service proxy",
+        elementIds.size(), mediaPackage.getIdentifier().toString()));
+  }
+
+  @Override
+  public Job restore(String channelId, MediaPackage mediaPackage, String elementId, String fileName)
+          throws DistributionException {
+    logger.info("Restoring {} from {}@{}", elementId, channelId, distributionChannel);
     final HttpPost req = post("/restore", param(PARAM_MEDIAPACKAGE, MediaPackageParser.getAsXml(mediaPackage)),
             param(PARAM_ELEMENT_ID, elementId), param(PARAM_CHANNEL_ID, channelId), param(PARAM_FILENAME, fileName));
     for (Job job : join(runRequest(req, jobFromHttpResponse))) {
@@ -149,7 +184,7 @@ public class AwsS3DistributionServiceRemoteImpl extends RemoteBase implements Aw
 
   @Override
   public Job restore(String channelId, MediaPackage mediaPackage, String elementId) throws DistributionException {
-    logger.info(format("Restoring %s from %s@%s", elementId, channelId, distributionChannel));
+    logger.info("Restoring {} from {}@{}", elementId, channelId, distributionChannel);
     final HttpPost req = post("/restore", param(PARAM_MEDIAPACKAGE, MediaPackageParser.getAsXml(mediaPackage)),
             param(PARAM_ELEMENT_ID, elementId), param(PARAM_CHANNEL_ID, channelId));
     for (Job job : join(runRequest(req, jobFromHttpResponse))) {
@@ -162,7 +197,7 @@ public class AwsS3DistributionServiceRemoteImpl extends RemoteBase implements Aw
 
   @Override
   public Job distribute(String pubChannelId, MediaPackage mediaPackage, Set<String> downloadIds,
-    boolean checkAvailability, boolean preserveReference) throws DistributionException, MediaPackageException {
+      boolean checkAvailability, boolean preserveReference) throws DistributionException, MediaPackageException {
     throw new UnsupportedOperationException("Not supported yet.");
   //stub function
   }

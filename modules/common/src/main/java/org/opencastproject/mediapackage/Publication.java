@@ -49,6 +49,11 @@ public interface Publication extends MediaPackageElement {
   void addTrack(Track track);
 
   /**
+   * Removes all tracks from this publication.
+   */
+  void clearTracks();
+
+  /**
    * Returns the attachments that are part of this publication.
    *
    * @return the attachments
@@ -62,6 +67,8 @@ public interface Publication extends MediaPackageElement {
    *          the attachment to add
    */
   void addAttachment(Attachment attachment);
+
+  void removeAttachmentById(String attachmentId);
 
   /**
    * Returns the catalogs associated with this publication.

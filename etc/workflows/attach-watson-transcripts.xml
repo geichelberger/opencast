@@ -10,6 +10,7 @@
   <configuration_panel />
 
   <operations>
+
     <!-- Attach caption/transcript -->
 
     <operation id="attach-watson-transcription"
@@ -19,21 +20,22 @@
       <configurations>
         <!-- This is filled out by the transcription service when starting this workflow -->
         <configuration key="transcription-job-id">${transcriptionJobId}</configuration>
-        <configuration key="target-flavor">captions/timedtext</configuration>
-        <configuration key="target-caption-format">webvtt</configuration>
+        <!-- Caption generated will have the default flavor based on the target-caption-format and language e.g. captions/vtt+en -->
+        <configuration key="target-caption-format">vtt</configuration>
+        <configuration key="target-tag">engage-download</configuration>
       </configurations>
     </operation>
 
     <!-- Merge caption/transcript to existing publication and republish -->
 
-    <operation id="publish-engage" 
-      fail-on-error="true" 
+    <operation id="publish-engage"
+      fail-on-error="true"
       exception-handler-workflow="partial-error"
       description="Distribute and publish to engage server">
       <configurations>
-        <configuration key="download-source-flavors">captions/timedtext</configuration>
+        <configuration key="download-source-tags">engage-download</configuration>
         <configuration key="strategy">merge</configuration>
-        <configuration key="check-availability">true</configuration>
+        <configuration key="check-availability">false</configuration>
       </configurations>
     </operation>
 
@@ -48,13 +50,16 @@
       </configurations>
     </operation>
 
-    <!-- Clean the system from work artifacts -->
+    <!-- Clean up work artifacts -->
 
     <operation
-      id="include"
-      description="Remove temporary processing artifacts">
+        id="cleanup"
+        fail-on-error="false"
+        description="Remove temporary processing artifacts">
       <configurations>
-        <configuration key="workflow-id">partial-cleanup</configuration>
+        <configuration key="delete-external">true</configuration>
+        <!-- FixMe Don't clean up ACLs until workflow service no longer looks for them in the WFR. -->
+        <configuration key="preserve-flavors">security/*</configuration>
       </configurations>
     </operation>
 

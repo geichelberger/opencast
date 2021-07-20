@@ -20,14 +20,14 @@
  */
 package org.opencastproject.external.endpoint;
 
-import static com.jayway.restassured.RestAssured.given;
+import static io.restassured.RestAssured.given;
 import static javax.servlet.http.HttpServletResponse.SC_OK;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-import static org.opencastproject.rest.RestServiceTestEnv.localhostRandomPort;
-import static org.opencastproject.rest.RestServiceTestEnv.testEnvForClasses;
+import static org.opencastproject.test.rest.RestServiceTestEnv.localhostRandomPort;
+import static org.opencastproject.test.rest.RestServiceTestEnv.testEnvForClasses;
 
-import org.opencastproject.rest.RestServiceTestEnv;
+import org.opencastproject.test.rest.RestServiceTestEnv;
 
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
@@ -61,7 +61,7 @@ public class BaseEndpointTest {
 
     JSONObject json = (JSONObject) parser.parse(response);
     assertEquals("https://api.opencast.org", json.get("url"));
-    assertEquals("v1.0.0", json.get("version"));
+    assertEquals("v1.6.0", json.get("version"));
   }
 
   /** Test case for {@link BaseEndpoint#getUserInfo()} */
@@ -122,9 +122,15 @@ public class BaseEndpointTest {
 
     JSONObject json = (JSONObject) parser.parse(response);
     JSONArray version = (JSONArray) json.get("versions");
-    assertEquals("v1.0.0", json.get("default"));
+    assertEquals("v1.6.0", json.get("default"));
     assertTrue(version.contains("v1.0.0"));
-    assertEquals(1, version.size());
+    assertTrue(version.contains("v1.1.0"));
+    assertTrue(version.contains("v1.2.0"));
+    assertTrue(version.contains("v1.3.0"));
+    assertTrue(version.contains("v1.4.0"));
+    assertTrue(version.contains("v1.5.0"));
+    assertTrue(version.contains("v1.6.0"));
+    assertEquals(7, version.size());
   }
 
   /** Test case for {@link BaseEndpoint#getVersionDefault()} */
@@ -134,7 +140,7 @@ public class BaseEndpointTest {
             .asString();
 
     JSONObject json = (JSONObject) parser.parse(response);
-    assertEquals("v1.0.0", json.get("default"));
+    assertEquals("v1.6.0", json.get("default"));
   }
 
   /** Test case for {@link BaseEndpoint#recreateIndex()} */

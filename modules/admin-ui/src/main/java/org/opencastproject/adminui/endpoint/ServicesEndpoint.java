@@ -28,8 +28,7 @@ import static org.opencastproject.util.doc.rest.RestParameter.Type.STRING;
 
 import org.opencastproject.index.service.resources.list.query.ServicesListQuery;
 import org.opencastproject.index.service.util.RestUtils;
-import org.opencastproject.matterhorn.search.SearchQuery;
-import org.opencastproject.matterhorn.search.SortCriterion;
+import org.opencastproject.serviceregistry.api.HostRegistration;
 import org.opencastproject.serviceregistry.api.ServiceRegistry;
 import org.opencastproject.serviceregistry.api.ServiceState;
 import org.opencastproject.serviceregistry.api.ServiceStatistics;
@@ -39,6 +38,8 @@ import org.opencastproject.util.doc.rest.RestParameter;
 import org.opencastproject.util.doc.rest.RestQuery;
 import org.opencastproject.util.doc.rest.RestResponse;
 import org.opencastproject.util.doc.rest.RestService;
+import org.opencastproject.util.requests.SortCriterion;
+import org.opencastproject.util.requests.SortCriterion.Order;
 
 import com.entwinemedia.fn.data.json.JValue;
 import com.entwinemedia.fn.data.json.Jsons;
@@ -46,6 +47,9 @@ import com.entwinemedia.fn.data.json.Jsons;
 import org.apache.commons.lang3.StringUtils;
 import org.json.simple.JSONAware;
 import org.json.simple.JSONObject;
+import org.osgi.service.component.annotations.Activate;
+import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Reference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,6 +59,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -74,9 +79,21 @@ import javax.ws.rs.core.Response;
               + "<em>This service is for exclusive use by the module admin-ui. Its API might change "
               + "anytime without prior notice. Any dependencies other than the admin UI will be strictly ignored. "
               + "DO NOT use this for integration of third-party applications.<em>"})
+@Component(
+  immediate = true,
+  service = ServicesEndpoint.class,
+  property = {
+    "service.description=Admin UI - Services facade Endpoint",
+    "opencast.service.type=org.opencastproject.adminui.endpoint.ServicesEndpoint",
+    "opencast.service.path=/admin-ng/services"
+  }
+)
 public class ServicesEndpoint {
   private static final Logger logger = LoggerFactory.getLogger(ServicesEndpoint.class);
   private ServiceRegistry serviceRegistry;
+
+  private static final String SERVICE_STATUS_TRANSLATION_PREFIX = "SYSTEMS.SERVICES.STATUS.";
+
 
   @GET
   @Path("services.json")
@@ -88,7 +105,7 @@ public class ServicesEndpoint {
           @RestParameter(name = "sort", description = "The sort order.  May include any "
                   + "of the following: host, name, running, queued, completed,  meanRunTime, meanQueueTime, "
                   + "status. The sort suffix must be :asc for ascending sort order and :desc for descending.", isRequired = false, type = STRING)
-  }, reponses = { @RestResponse(description = "Returns the list of services from Opencast", responseCode = HttpServletResponse.SC_OK) }, returnDescription = "The list of services")
+  }, responses = { @RestResponse(description = "Returns the list of services from Opencast", responseCode = HttpServletResponse.SC_OK) }, returnDescription = "The list of services")
   public Response getServices(@QueryParam("limit") final int limit, @QueryParam("offset") final int offset,
           @QueryParam("filter") String filter, @QueryParam("sort") String sort) throws Exception {
 
@@ -102,6 +119,9 @@ public class ServicesEndpoint {
     String fHostname = null;
     if (query.getHostname().isSome())
       fHostname = StringUtils.trimToNull(query.getHostname().get());
+    String fNodeName = null;
+    if (query.getNodeName().isSome())
+      fNodeName = StringUtils.trimToNull(query.getNodeName().get());
     String fStatus = null;
     if (query.getStatus().isSome())
       fStatus = StringUtils.trimToNull(query.getStatus().get());
@@ -109,13 +129,17 @@ public class ServicesEndpoint {
     if (query.getFreeText().isSome())
       fFreeText = StringUtils.trimToNull(query.getFreeText().get());
 
+    List<HostRegistration> servers = serviceRegistry.getHostRegistrations();
     List<Service> services = new ArrayList<Service>();
     for (ServiceStatistics stats : serviceRegistry.getServiceStatistics()) {
-      Service service = new Service(stats);
+      Service service = new Service(stats, findServerByHost(stats.getServiceRegistration().getHost(), servers));
       if (fName != null && !StringUtils.equalsIgnoreCase(service.getName(), fName))
         continue;
 
       if (fHostname != null && !StringUtils.equalsIgnoreCase(service.getHost(), fHostname))
+        continue;
+
+      if (fNodeName != null && !StringUtils.equalsIgnoreCase(service.getNodeName(), fNodeName))
         continue;
 
       if (fStatus != null && !StringUtils.equalsIgnoreCase(service.getStatus().toString(), fStatus))
@@ -135,6 +159,7 @@ public class ServicesEndpoint {
 
       if (fFreeText != null && !StringUtils.containsIgnoreCase(service.getName(), fFreeText)
                 && !StringUtils.containsIgnoreCase(service.getHost(), fFreeText)
+                && !StringUtils.containsIgnoreCase(service.getNodeName(), fFreeText)
                 && !StringUtils.containsIgnoreCase(service.getStatus().toString(), fFreeText))
         continue;
 
@@ -149,7 +174,7 @@ public class ServicesEndpoint {
           SortCriterion sortCriterion = sortCriteria.iterator().next();
           Collections.sort(services, new ServiceStatisticsComparator(
                   sortCriterion.getFieldName(),
-                  sortCriterion.getOrder() == SearchQuery.Order.Ascending));
+                  sortCriterion.getOrder() == Order.Ascending));
         } catch (Exception ex) {
           logger.warn("Failed to sort services collection.", ex);
         }
@@ -171,6 +196,8 @@ public class ServicesEndpoint {
     public static final String COMPLETED_NAME = "completed";
     /** Host model field name. */
     public static final String HOST_NAME = "hostname";
+    /** Node name model field name. */
+    public static final String NODE_NAME = "nodeName";
     /** MeanQueueTime model field name. */
     public static final String MEAN_QUEUE_TIME_NAME = "meanQueueTime";
     /** MeanRunTime model field name. */
@@ -187,9 +214,12 @@ public class ServicesEndpoint {
     /** Wrapped {@code ServiceStatistics} instance. */
     private final ServiceStatistics serviceStatistics;
 
+    private final Optional<HostRegistration> server;
+
     /** Constructor, set {@code ServiceStatistics} instance to a final private property. */
-    Service(ServiceStatistics serviceStatistics) {
+    Service(ServiceStatistics serviceStatistics, Optional<HostRegistration> server) {
       this.serviceStatistics = serviceStatistics;
+      this.server = server;
     }
 
     /**
@@ -206,6 +236,14 @@ public class ServicesEndpoint {
      */
     public String getHost() {
       return serviceStatistics.getServiceRegistration().getHost();
+    }
+
+    /**
+     * Returns service host name.
+     * @return service host name
+     */
+    public String getNodeName() {
+      return server.isPresent() ? server.get().getNodeName() : "";
     }
 
     /**
@@ -264,6 +302,7 @@ public class ServicesEndpoint {
       Map<String, String> serviceMap = new HashMap<String, String>();
       serviceMap.put(COMPLETED_NAME, Integer.toString(getCompletedJobs()));
       serviceMap.put(HOST_NAME, getHost());
+      serviceMap.put(NODE_NAME, getNodeName());
       serviceMap.put(MEAN_QUEUE_TIME_NAME, Long.toString(getMeanQueueTime()));
       serviceMap.put(MEAN_RUN_TIME_NAME, Long.toString(getMeanRunTime()));
       serviceMap.put(NAME_NAME, getName());
@@ -287,11 +326,11 @@ public class ServicesEndpoint {
      * @return a json representation of a service as {@code JValue}
      */
     public JValue toJSON() {
-      return obj(f(COMPLETED_NAME, v(getCompletedJobs())), f(HOST_NAME, v(getHost(), Jsons.BLANK)),
+      return obj(f(COMPLETED_NAME, v(getCompletedJobs())), f(HOST_NAME, v(getHost(), Jsons.BLANK)), f(NODE_NAME, v(getNodeName(), Jsons.BLANK)),
               f(MEAN_QUEUE_TIME_NAME, v(getMeanQueueTime())), f(MEAN_RUN_TIME_NAME, v(getMeanRunTime())),
               f(NAME_NAME, v(getName(), Jsons.BLANK)), f(QUEUED_NAME, v(getQueuedJobs())),
               f(RUNNING_NAME, v(getRunningJobs())),
-              f(STATUS_NAME, v(getStatus().name(), Jsons.BLANK)));
+              f(STATUS_NAME, v(SERVICE_STATUS_TRANSLATION_PREFIX + getStatus().name(), Jsons.BLANK)));
     }
   }
 
@@ -311,6 +350,8 @@ public class ServicesEndpoint {
         this.sortBy = Service.COMPLETED_NAME;
       } else if (StringUtils.equalsIgnoreCase(Service.HOST_NAME, sortBy)) {
         this.sortBy = Service.HOST_NAME;
+      } else if (StringUtils.equalsIgnoreCase(Service.NODE_NAME, sortBy)) {
+        this.sortBy = Service.NODE_NAME;
       } else if (StringUtils.equalsIgnoreCase(Service.MEAN_QUEUE_TIME_NAME, sortBy)) {
         this.sortBy = Service.MEAN_QUEUE_TIME_NAME;
       } else if (StringUtils.equalsIgnoreCase(Service.MEAN_RUN_TIME_NAME, sortBy)) {
@@ -345,6 +386,9 @@ public class ServicesEndpoint {
         case Service.HOST_NAME:
           result = s1.getHost().compareToIgnoreCase(s2.getHost());
           break;
+        case Service.NODE_NAME:
+          result = s1.getNodeName().compareToIgnoreCase(s2.getNodeName());
+          break;
         case Service.MEAN_QUEUE_TIME_NAME:
           result = (int) (s1.getMeanQueueTime() - s2.getMeanQueueTime());
           break;
@@ -369,6 +413,7 @@ public class ServicesEndpoint {
   }
 
   /** OSGI activate method. */
+  @Activate
   public void activate() {
     logger.info("ServicesEndpoint is activated!");
   }
@@ -377,7 +422,16 @@ public class ServicesEndpoint {
    * @param serviceRegistry
    *          the serviceRegistry to set
    */
+  @Reference
   public void setServiceRegistry(ServiceRegistry serviceRegistry) {
     this.serviceRegistry = serviceRegistry;
+  }
+
+  /**
+   * @param hostname of server to find in list
+   * @param servers, list of known servers
+   */
+  private Optional<HostRegistration> findServerByHost(String hostname, List<HostRegistration> servers) {
+    return servers.stream().filter(o -> o.getBaseUrl().equals(hostname)).findFirst();
   }
 }

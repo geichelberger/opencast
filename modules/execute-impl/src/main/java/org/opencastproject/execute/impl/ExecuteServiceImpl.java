@@ -110,7 +110,7 @@ public class ExecuteServiceImpl extends AbstractJobProducer implements ExecuteSe
   private Dictionary properties = null;
 
   /** The approximate load placed on the system by running an execute operation */
-  public static final float DEFAULT_EXECUTE_JOB_LOAD = 1.0f;
+  public static final float DEFAULT_EXECUTE_JOB_LOAD = 0.1f;
 
   /** The key to look for in the service configuration file to override the {@link DEFAULT_EXECUTE_JOB_LOAD} */
   public static final String EXECUTE_JOB_LOAD_KEY = "job.load.execute";
@@ -146,41 +146,6 @@ public class ExecuteServiceImpl extends AbstractJobProducer implements ExecuteSe
     }
 
     this.bundleContext = cc.getBundleContext();
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * @see org.opencastproject.execute.api.ExecuteService#execute(java.lang.String, java.lang.String,
-   *      org.opencastproject.mediapackage.MediaPackageElement)
-   */
-  @Override
-  public Job execute(String exec, String params, MediaPackageElement inElement) throws ExecuteException {
-    return execute(exec, params, inElement, null, null, executeJobLoad);
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * @see org.opencastproject.execute.api.ExecuteService#execute(java.lang.String, java.lang.String,
-   *      org.opencastproject.mediapackage.MediaPackageElement, float)
-   */
-  @Override
-  public Job execute(String exec, String params, MediaPackageElement inElement, float load) throws ExecuteException {
-    return execute(exec, params, inElement, null, null, load);
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * @see org.opencastproject.execute.api.ExecuteService#execute(java.lang.String, java.lang.String,
-   *      org.opencastproject.mediapackage.MediaPackageElement, java.lang.String,
-   *      org.opencastproject.mediapackage.MediaPackageElement.Type)
-   */
-  @Override
-  public Job execute(String exec, String params, MediaPackageElement inElement, String outFileName, Type expectedType)
-          throws ExecuteException, IllegalArgumentException {
-    return execute(exec, params, inElement, null, null, executeJobLoad);
   }
 
   /**
@@ -228,19 +193,6 @@ public class ExecuteServiceImpl extends AbstractJobProducer implements ExecuteSe
     } catch (MediaPackageException e) {
       throw new ExecuteException("Error serializing an element", e);
     }
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * @see org.opencastproject.execute.api.ExecuteService#execute(java.lang.String, java.lang.String,
-   *      org.opencastproject.mediapackage.MediaPackage, java.lang.String,
-   *      org.opencastproject.mediapackage.MediaPackageElement.Type)
-   */
-  @Override
-  public Job execute(String exec, String params, MediaPackage mp, String outFileName, Type expectedType)
-          throws ExecuteException {
-    return execute(exec, params, mp, outFileName, expectedType, 1.0f);
   }
 
   /**
@@ -516,7 +468,7 @@ public class ExecuteServiceImpl extends AbstractJobProducer implements ExecuteSe
             return MediaPackageElementParser.getAsXml(MediaPackageElementBuilderFactory.newInstance()
                     .newElementBuilder().elementFromURI(newURI, expectedType, null));
           } else {
-             throw new ExecuteException("Expected output file does not exist: " + outFile.getAbsolutePath());
+            throw new ExecuteException("Expected output file does not exist: " + outFile.getAbsolutePath());
           }
         }
         return "";

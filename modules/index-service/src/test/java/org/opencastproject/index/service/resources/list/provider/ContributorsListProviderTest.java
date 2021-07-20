@@ -21,9 +21,9 @@
 
 package org.opencastproject.index.service.resources.list.provider;
 
-import org.opencastproject.index.service.exception.ListProviderException;
-import org.opencastproject.index.service.impl.index.AbstractSearchIndex;
-import org.opencastproject.index.service.resources.list.query.ResourceListQueryImpl;
+import org.opencastproject.elasticsearch.index.AbstractSearchIndex;
+import org.opencastproject.list.api.ListProviderException;
+import org.opencastproject.list.impl.ResourceListQueryImpl;
 import org.opencastproject.security.api.SecurityService;
 import org.opencastproject.security.api.User;
 import org.opencastproject.security.api.UserDirectoryService;
@@ -38,6 +38,7 @@ import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -135,7 +136,7 @@ public class ContributorsListProviderTest {
 
   @Test
   public void testUsernamesList() {
-    Map<String, String> list = contributorsListProvider.getList(ContributorsListProvider.NAMES_TO_USERNAMES, null, null);
+    Map<String, String> list = contributorsListProvider.getList(ContributorsListProvider.NAMES_TO_USERNAMES, null);
 
     Assert.assertTrue(list.containsKey(user1.getUsername()));
     Assert.assertTrue(list.containsKey(user2.getUsername()));
@@ -152,8 +153,30 @@ public class ContributorsListProviderTest {
   }
 
   @Test
+  public void testUsernamesListWithExcludeUserProvider() {
+    Map<String, Object> configuration = new HashMap<>();
+    configuration.put("exclude.user.provider", "provider1");
+    contributorsListProvider.modified(configuration);
+
+    Map<String, String> list = contributorsListProvider.getList(ContributorsListProvider.NAMES_TO_USERNAMES, null);
+
+    Assert.assertFalse(list.containsKey(user1.getUsername()));
+    Assert.assertFalse(list.containsKey(user2.getUsername()));
+    Assert.assertFalse(list.containsKey(user3.getUsername()));
+
+    Assert.assertTrue(list.containsValue(user1.getName()));
+    Assert.assertFalse(list.containsValue(user2.getName()));
+    Assert.assertFalse(list.containsValue(user3.getUsername()));
+
+    Assert.assertTrue(list.containsKey("User 5"));
+    Assert.assertTrue(list.containsValue("User 5"));
+
+    Assert.assertEquals(2, list.size());
+  }
+
+  @Test
   public void testListSimple() throws ListProviderException {
-    Map<String, String> list = contributorsListProvider.getList(ContributorsListProvider.DEFAULT, null, null);
+    Map<String, String> list = contributorsListProvider.getList(ContributorsListProvider.DEFAULT, null);
 
     Assert.assertTrue(list.containsKey(user1.getName()));
     Assert.assertTrue(list.containsKey(user2.getName()));
@@ -168,15 +191,34 @@ public class ContributorsListProviderTest {
   }
 
   @Test
+  public void testListSimpleWithExcludeUserProvider() {
+    Map<String, Object> configuration = new HashMap<>();
+    configuration.put("exclude.user.provider", "provider1");
+    contributorsListProvider.modified(configuration);
+
+    Map<String, String> list = contributorsListProvider.getList(ContributorsListProvider.DEFAULT, null);
+
+    Assert.assertTrue(list.containsKey(user1.getName()));
+    Assert.assertTrue(list.containsValue("User 1"));
+    Assert.assertFalse(list.containsKey(user2.getName()));
+    Assert.assertFalse(list.containsKey(user3.getName()));
+
+    Assert.assertTrue(list.containsKey("User 5"));
+    Assert.assertTrue(list.containsValue("User 5"));
+
+    Assert.assertEquals(2, list.size());
+  }
+
+  @Test
   public void testListQuery() {
     ResourceListQueryImpl query = new ResourceListQueryImpl();
     query.setLimit(0);
     query.setOffset(0);
-    Assert.assertEquals(5, contributorsListProvider.getList(ContributorsListProvider.NAMES_TO_USERNAMES, query, null).size());
+    Assert.assertEquals(5, contributorsListProvider.getList(ContributorsListProvider.NAMES_TO_USERNAMES, query).size());
     query.setOffset(3);
-    Assert.assertEquals(2, contributorsListProvider.getList(ContributorsListProvider.NAMES_TO_USERNAMES, query, null).size());
+    Assert.assertEquals(2, contributorsListProvider.getList(ContributorsListProvider.NAMES_TO_USERNAMES, query).size());
     query.setOffset(0);
     query.setLimit(1);
-    Assert.assertEquals(1, contributorsListProvider.getList(ContributorsListProvider.NAMES_TO_USERNAMES, query, null).size());
+    Assert.assertEquals(1, contributorsListProvider.getList(ContributorsListProvider.NAMES_TO_USERNAMES, query).size());
   }
 }

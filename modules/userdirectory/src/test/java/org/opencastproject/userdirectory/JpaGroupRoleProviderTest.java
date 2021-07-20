@@ -40,22 +40,22 @@ import org.opencastproject.security.impl.jpa.JpaUser;
 import org.opencastproject.util.NotFoundException;
 import org.opencastproject.util.data.Collections;
 
-import org.apache.commons.collections.IteratorUtils;
-import org.apache.http.HttpStatus;
+import org.apache.commons.collections4.IteratorUtils;
 import org.easymock.EasyMock;
-import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 
 import java.io.Serializable;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import javax.ws.rs.core.Response;
-
 public class JpaGroupRoleProviderTest {
+  @Rule
+  public ExpectedException thrown = ExpectedException.none();
 
   private JpaGroupRoleProvider provider = null;
   private static JpaOrganization org1 = new JpaOrganization("org1", "org1", "localhost", 80, "admin", "anon", null);
@@ -81,14 +81,9 @@ public class JpaGroupRoleProviderTest {
 
     provider = new JpaGroupRoleProvider();
     provider.setSecurityService(securityService);
-    provider.setMessageSender(messageSender);
     provider.setEntityManagerFactory(newTestEntityManagerFactory(JpaUserAndRoleProvider.PERSISTENCE_UNIT));
     provider.activate(null);
-  }
 
-  @After
-  public void tearDown() throws Exception {
-    provider.deactivate();
   }
 
   @Test
@@ -150,7 +145,7 @@ public class JpaGroupRoleProviderTest {
     JpaUser user = new JpaUser("user", "pass1", org1, "User", "user@localhost", "opencast", true,
             Collections.set(new JpaRole("ROLE_USER", org1)));
 
-    // Set the security sevice
+    // Set the security service
     SecurityService securityService = EasyMock.createNiceMock(SecurityService.class);
     EasyMock.expect(securityService.getUser()).andReturn(user).anyTimes();
     EasyMock.expect(securityService.getOrganization()).andReturn(org1).anyTimes();
@@ -159,33 +154,27 @@ public class JpaGroupRoleProviderTest {
 
     try {
       // try add ROLE_USER
-      Response updateGroupResponse = provider.updateGroup(group.getGroupId(), group.getName(), group.getDescription(),
-              "ROLE_USER, " + SecurityConstants.GLOBAL_ADMIN_ROLE, null);
-      assertNotNull(updateGroupResponse);
-      assertEquals(HttpStatus.SC_FORBIDDEN, updateGroupResponse.getStatus());
+      thrown.expect(UnauthorizedException.class);
+      provider.updateGroup(group.getGroupId(),
+              group.getName(), group.getDescription(), "ROLE_USER, " + SecurityConstants.GLOBAL_ADMIN_ROLE, null);
 
       // try remove ROLE_ADMIN
-      updateGroupResponse = provider.updateGroup(group.getGroupId(), group.getName(), group.getDescription(),
-              "ROLE_USER", null);
-      assertNotNull(updateGroupResponse);
-      assertEquals(HttpStatus.SC_FORBIDDEN, updateGroupResponse.getStatus());
+      thrown.expect(UnauthorizedException.class);
+      provider.updateGroup(group.getGroupId(), group.getName(), group.getDescription(), "ROLE_USER", null);
+
     } catch (NotFoundException e) {
       fail("The existing group isn't found");
     }
   }
 
   @Test
-  public void testRemoveGroupNotAllowedAsNonAdminUser() throws UnauthorizedException {
+  public void testRemoveGroupNotAllowedAsNonAdminUser() throws NotFoundException, Exception {
     JpaGroup group = new JpaGroup("test", org1, "Test", "Test group", Collections.set(
             new JpaRole(SecurityConstants.GLOBAL_ADMIN_ROLE, org1)));
-    try {
-      provider.addGroup(group);
-      Group loadGroup = provider.loadGroup(group.getGroupId(), group.getOrganization().getId());
-      assertNotNull(loadGroup);
-      assertEquals(group.getGroupId(), loadGroup.getGroupId());
-    } catch (Exception e) {
-      fail("The group should be added");
-    }
+    provider.addGroup(group);
+    Group loadGroup = provider.loadGroup(group.getGroupId(), group.getOrganization().getId());
+    assertNotNull(loadGroup);
+    assertEquals(group.getGroupId(), loadGroup.getGroupId());
 
     JpaUser user = new JpaUser("user", "pass1", org1, "User", "user@localhost", "opencast", true,
             Collections.set(new JpaRole("ROLE_USER", org1)));
@@ -197,17 +186,17 @@ public class JpaGroupRoleProviderTest {
     EasyMock.replay(securityService);
     provider.setSecurityService(securityService);
 
-    Response removeGroupResponse = provider.removeGroup(group.getGroupId());
-    assertNotNull(removeGroupResponse);
-    assertEquals(HttpStatus.SC_FORBIDDEN, removeGroupResponse.getStatus());
+    thrown.expect(UnauthorizedException.class);
+    provider.removeGroup(group.getGroupId());
   }
 
   @Test
-  public void testDuplicateGroupCreation() {
-    Response response = provider.createGroup("Test 1", "Test group", "ROLE_ASTRO_101_SPRING_2011_STUDENT", "admin");
-    assertEquals(HttpStatus.SC_CREATED, response.getStatus());
-    response = provider.createGroup("Test 1", "Test group 2", "ROLE_ASTRO_101_SPRING_2011_STUDENT", "admin");
-    assertEquals(HttpStatus.SC_CONFLICT, response.getStatus());
+  public void testDuplicateGroupCreation() throws IllegalArgumentException, UnauthorizedException, ConflictException {
+    // create the group, not exception thrown
+    provider.createGroup("Test 1", "Test group", "ROLE_ASTRO_101_SPRING_2011_STUDENT", "admin");
+    // try create again and expect a conflict
+    thrown.expect(ConflictException.class);
+    provider.createGroup("Test 1", "Test group 2", "ROLE_ASTRO_101_SPRING_2011_STUDENT", "admin");
   }
 
   @Test
@@ -221,38 +210,6 @@ public class JpaGroupRoleProviderTest {
     // duplicate group, but add group does an update so it will pass
     provider.addGroup(new JpaGroup("test1", org1, "Test 1", "Test group 1", roles1, members));
     assertEquals("Test 1", provider.loadGroup("test1", org1.getId()).getName());
-  }
-
-  @Test
-  @SuppressWarnings("unchecked")
-  public void testRoles() throws Exception {
-    Set<JpaRole> authorities = new HashSet<JpaRole>();
-    authorities.add(new JpaRole("ROLE_ASTRO_101_SPRING_2011_STUDENT", org1));
-    authorities.add(new JpaRole("ROLE_ASTRO_109_SPRING_2012_STUDENT", org1));
-    Set<String> members = new HashSet<String>();
-    members.add("admin");
-
-    JpaGroup group = new JpaGroup("test", org1, "Test", "Test group", authorities, members);
-    provider.addGroup(group);
-
-    authorities.clear();
-    authorities.add(new JpaRole("ROLE_ASTRO_122_SPRING_2011_STUDENT", org1));
-    authorities.add(new JpaRole("ROLE_ASTRO_124_SPRING_2012_STUDENT", org1));
-
-    JpaGroup group2 = new JpaGroup("test2", org1, "Test2", "Test 2 group", authorities, members);
-    provider.addGroup(group2);
-
-    authorities.clear();
-    authorities.add(new JpaRole("ROLE_ASTRO_134_SPRING_2011_STUDENT", org2));
-    authorities.add(new JpaRole("ROLE_ASTRO_144_SPRING_2012_STUDENT", org2));
-
-    JpaGroup group3 = new JpaGroup("test2", org2, "Test2", "Test 2 group", authorities, members);
-    provider.addGroup(group3);
-
-    List<Role> roles = IteratorUtils.toList(provider.getRoles());
-    Assert.assertEquals("There should be four role", 6, roles.size());
-    roles.contains(new JpaRole(group.getRole(), org1));
-    roles.contains(new JpaRole(group2.getRole(), org1));
   }
 
   @Test

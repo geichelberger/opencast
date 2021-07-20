@@ -32,6 +32,7 @@ import static org.opencastproject.util.EqualsUtil.hash;
 import org.opencastproject.util.RequireUtil;
 import org.opencastproject.util.XmlNamespaceBinding;
 import org.opencastproject.util.XmlNamespaceContext;
+import org.opencastproject.util.XmlSafeParser;
 
 import com.entwinemedia.fn.Fn;
 import com.entwinemedia.fn.Fns;
@@ -42,6 +43,10 @@ import org.apache.commons.lang3.StringUtils;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
+import org.w3c.dom.bootstrap.DOMImplementationRegistry;
+import org.w3c.dom.ls.DOMImplementationLS;
+import org.w3c.dom.ls.LSOutput;
+import org.w3c.dom.ls.LSSerializer;
 import org.xml.sax.Attributes;
 
 import java.io.ByteArrayOutputStream;
@@ -58,16 +63,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import javax.annotation.Nonnull;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.transform.OutputKeys;
-import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerException;
-import javax.xml.transform.TransformerFactory;
-import javax.xml.transform.dom.DOMSource;
-import javax.xml.transform.stream.StreamResult;
 
 /**
  * This is a basic implementation for handling simple catalogs of metadata. It provides utility methods to store
@@ -105,6 +104,9 @@ public abstract class XMLCatalogImpl extends CatalogImpl implements XMLCatalog {
 
   /** Namespace prefix for XML schema instance. */
   public static final String XSI_NS_PREFIX = "xsi";
+
+  /** To marshaling empty fields to remove existing values during merge, default is not to marshal empty elements */
+  protected boolean includeEmpty = false;
 
   /**
    * Expanded name of the XSI type attribute.
@@ -251,7 +253,12 @@ public abstract class XMLCatalogImpl extends CatalogImpl implements XMLCatalog {
    *          the element
    */
   private void addElement(CatalogEntry element) {
-    if (element == null || StringUtils.trimToNull(element.getValue()) == null)
+
+    // Option includeEmpty allows marshaling empty elements
+    // for deleting existing values during a catalog merge
+    if (element == null)
+      return;
+    if (StringUtils.trimToNull(element.getValue()) == null && !includeEmpty)
       return;
     List<CatalogEntry> values = data.get(element.getEName());
     if (values == null) {
@@ -450,34 +457,10 @@ public abstract class XMLCatalogImpl extends CatalogImpl implements XMLCatalog {
    *           If the xml parser environment is not correctly configured
    */
   protected Document newDocument() throws ParserConfigurationException {
-    DocumentBuilderFactory docBuilderFactory = DocumentBuilderFactory.newInstance();
+    DocumentBuilderFactory docBuilderFactory = XmlSafeParser.newDocumentBuilderFactory();
     docBuilderFactory.setNamespaceAware(true);
     DocumentBuilder docBuilder = docBuilderFactory.newDocumentBuilder();
     return docBuilder.newDocument();
-  }
-
-  /**
-   * Serializes the given xml document to the associated file. Please note that this method does <em>not</em> close the
-   * output stream. Anyone using this method is responsible for doing it by itself.
-   *
-   * @param document
-   *          the document
-   * @param docType
-   *          the document type definition (dtd)
-   * @throws TransformerException
-   *           if serialization fails
-   */
-  protected void saveToXml(Node document, String docType, OutputStream out) throws TransformerException, IOException {
-    StreamResult streamResult = new StreamResult(out);
-    TransformerFactory tf = TransformerFactory.newInstance();
-    Transformer serializer = tf.newTransformer();
-    serializer.setOutputProperty(OutputKeys.ENCODING, "UTF-8");
-    if (docType != null)
-      serializer.setOutputProperty(OutputKeys.DOCTYPE_SYSTEM, docType);
-    serializer.setOutputProperty(OutputKeys.INDENT, "yes");
-    serializer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "4");
-    serializer.transform(new DOMSource(document), streamResult);
-    out.flush();
   }
 
   /**
@@ -492,14 +475,22 @@ public abstract class XMLCatalogImpl extends CatalogImpl implements XMLCatalog {
   /**
    * Get a prefix from {@link #bindings} but throw a {@link NamespaceBindingException} if none found.
    */
-  @Nonnull
-  protected String getPrefix(@Nonnull String namespaceURI) {
+  protected String getPrefix(String namespaceURI) {
     final String prefix = bindings.getPrefix(namespaceURI);
     if (prefix != null) {
       return prefix;
     } else {
       throw new NamespaceBindingException(format("Namespace URI %s is not bound to a prefix", namespaceURI));
     }
+  }
+
+  /**
+   * @see org.opencastproject.mediapackage.XMLCatalog#includeEmpty(boolean)
+   */
+  @Override
+  public
+  void includeEmpty(boolean includeEmpty) {
+    this.includeEmpty = includeEmpty;
   }
 
   /**
@@ -511,7 +502,6 @@ public abstract class XMLCatalogImpl extends CatalogImpl implements XMLCatalog {
    * @throws NamespaceBindingException
    *           if the namespace name is not bound to a prefix
    */
-  @Nonnull
   protected String toQName(EName eName) {
     if (eName.hasNamespace()) {
       return toQName(getPrefix(eName.getNamespaceURI()), eName.getLocalName());
@@ -532,7 +522,6 @@ public abstract class XMLCatalogImpl extends CatalogImpl implements XMLCatalog {
    * @throws NamespaceBindingException
    *           if the namespace name is not bound to a prefix
    */
-  @Nonnull
   protected EName toEName(String prefix, String localName) {
     return new EName(bindings.getNamespaceURI(prefix), localName);
   }
@@ -746,7 +735,7 @@ public abstract class XMLCatalogImpl extends CatalogImpl implements XMLCatalog {
      * - attribute comparison (e_name -&gt; value)
      */
     @Override
-    public int compareTo(@Nonnull CatalogEntry o) {
+    public int compareTo(CatalogEntry o) {
       int c;
       c = getEName().compareTo(o.getEName());
       if (c != 0) {
@@ -821,14 +810,19 @@ public abstract class XMLCatalogImpl extends CatalogImpl implements XMLCatalog {
   public void toXml(OutputStream out, boolean format) throws IOException {
     try {
       Document doc = this.toXml();
-      DOMSource domSource = new DOMSource(doc);
-      StreamResult result = new StreamResult(out);
-      Transformer transformer = TransformerFactory.newInstance().newTransformer();
-      transformer.transform(domSource, result);
+      DOMImplementationRegistry reg = DOMImplementationRegistry.newInstance();
+      DOMImplementationLS impl = (DOMImplementationLS) reg.getDOMImplementation("LS");
+      LSSerializer serializer = impl.createLSSerializer();
+      serializer.getDomConfig().setParameter("format-pretty-print", format);
+      LSOutput output = impl.createLSOutput();
+      output.setByteStream(out);
+      serializer.write(doc, output);
     } catch (ParserConfigurationException e) {
       throw new IOException("unable to parse document");
     } catch (TransformerException e) {
       throw new IOException("unable to transform dom to a stream");
+    } catch (ClassNotFoundException | IllegalAccessException | InstantiationException e) {
+      throw new IOException("unable to serialize DOM");
     }
   }
 

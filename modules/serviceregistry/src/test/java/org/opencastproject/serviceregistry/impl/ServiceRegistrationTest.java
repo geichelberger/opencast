@@ -95,9 +95,9 @@ public class ServiceRegistrationTest {
     serviceRegistry.unregisterHost(LOCALHOST);
 
     // register the hosts
-    serviceRegistry.registerHost(LOCALHOST, "127.0.0.1", 1024, 1, 1);
-    serviceRegistry.registerHost(REMOTEHOST_1, "127.0.0.1", 1024, 1, 1);
-    serviceRegistry.registerHost(REMOTEHOST_2, "127.0.0.1", 1024, 1, 1);
+    serviceRegistry.registerHost(LOCALHOST, "127.0.0.1", "local", 1024, 1, 1);
+    serviceRegistry.registerHost(REMOTEHOST_1, "127.0.0.1", "remote1", 1024, 1, 1);
+    serviceRegistry.registerHost(REMOTEHOST_2, "127.0.0.1", "remote2", 1024, 1, 1);
 
     // register some service instances
     regType1Localhost = (ServiceRegistrationJpaImpl) serviceRegistry.registerService(JOB_TYPE_1, LOCALHOST, PATH_1);
@@ -160,7 +160,7 @@ public class ServiceRegistrationTest {
 
     // Create a job and mark it as running.
     Job job = serviceRegistry.createJob(regType1Localhost.getHost(), regType1Localhost.getServiceType(), OPERATION_NAME_1, null,
-            null, false, null);
+            null, false, null, 1.0f);
     job.setStatus(Job.Status.RUNNING);
     job = serviceRegistry.updateJob(job);
 
@@ -391,7 +391,7 @@ public class ServiceRegistrationTest {
     updatedService3 = getUpdatedService(regType1Remotehost2);
     Assert.assertEquals(ServiceState.NORMAL, updatedService1.getServiceState());
     Assert.assertEquals(ServiceState.NORMAL, updatedService2.getServiceState());
-    Assert.assertEquals(ServiceState.ERROR, updatedService3.getServiceState());
+    Assert.assertEquals(ServiceState.WARNING, updatedService3.getServiceState());
   }
 
   /**

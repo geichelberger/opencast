@@ -38,9 +38,12 @@ import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.UsernamePasswordCredentials;
+import org.apache.http.client.CredentialsProvider;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.HttpPost;
-import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.impl.client.BasicCredentialsProvider;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.message.BasicNameValuePair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,11 +51,8 @@ import org.slf4j.LoggerFactory;
 import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
-import java.util.SortedMap;
-import java.util.TreeMap;
 
 /**
  * Workflow Operation for POSTing a MediaPackage via HTTP
@@ -69,24 +69,8 @@ public class MediaPackagePostOperationHandler extends AbstractWorkflowOperationH
     this.searchService = searchService;
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * @see org.opencastproject.workflow.api.WorkflowOperationHandler#getConfigurationOptions()
-   */
-  @Override
-    public SortedMap<String, String> getConfigurationOptions() {
-      return Configuration.OPTIONS;
-    }
-
-  /**
-   * {@inheritDoc}
-   *
-   * @see org.opencastproject.workflow.api.WorkflowOperationHandler#start(org.opencastproject.workflow.api.WorkflowInstance,
-   *      JobContext)
-   */
   public WorkflowOperationResult start(final WorkflowInstance workflowInstance, JobContext context)
-    throws WorkflowOperationException {
+          throws WorkflowOperationException {
 
     // get configuration
     WorkflowOperationInstance currentOperation = workflowInstance.getCurrentOperation();
@@ -95,22 +79,22 @@ public class MediaPackagePostOperationHandler extends AbstractWorkflowOperationH
     MediaPackage workflowMP = workflowInstance.getMediaPackage();
     MediaPackage mp = workflowMP;
 
-    /* Check if we need to replace the Mediapackage we got with the published
-     * Mediapackage from the Search Service */
+    // check if we need to replace the media package we got with the published
+    // media package from the search service
     if (config.mpFromSearch()) {
       SearchQuery searchQuery = new SearchQuery();
       searchQuery.withId(mp.getIdentifier().toString());
       SearchResult result = searchService.getByQuery(searchQuery);
       if (result.size() != 1) {
-          throw new WorkflowOperationException("Received multiple results for identifier"
-              + "\"" + mp.getIdentifier().toString() + "\" from search service. ");
+        throw new WorkflowOperationException("Received multiple results for identifier"
+            + "\"" + mp.getIdentifier().toString() + "\" from search service. ");
       }
-      logger.info("Getting Mediapackage from Search Service");
+      logger.info("Getting media package from search service");
       mp = result.getItems()[0].getMediaPackage();
     }
 
-    logger.info("Submitting \"" + mp.getTitle() + "\" (" + mp.getIdentifier().toString() + ") as "
-        + config.getFormat().name() + " to " + config.getUrl().toString());
+    logger.info("Submitting {} ({}) as {} to {}",
+        mp.getTitle(), mp.getIdentifier(), config.getFormat().name(), config.getUrl());
 
     try {
       // serialize MediaPackage to target format
@@ -121,13 +105,13 @@ public class MediaPackagePostOperationHandler extends AbstractWorkflowOperationH
         mpStr = MediaPackageParser.getAsXml(mp);
       }
 
-      // Log mediapackge
+      // Log media packge
       if (config.debug()) {
         logger.info(mpStr);
       }
 
-      // constrcut message body
-      List<NameValuePair> data = new ArrayList<NameValuePair>();
+      // construct message body
+      List<NameValuePair> data = new ArrayList<>();
       data.add(new BasicNameValuePair("mediapackage", mpStr));
       data.addAll(config.getAdditionalFields());
 
@@ -136,15 +120,18 @@ public class MediaPackagePostOperationHandler extends AbstractWorkflowOperationH
       post.setEntity(new UrlEncodedFormEntity(data, config.getEncoding()));
 
       // execute POST
-      DefaultHttpClient client = new DefaultHttpClient();
+      HttpClientBuilder clientBuilder = HttpClientBuilder.create();
 
       // Handle authentication
       if (config.authenticate()) {
         URL targetUrl = config.getUrl().toURL();
-        client.getCredentialsProvider().setCredentials(
+        CredentialsProvider provider = new BasicCredentialsProvider();
+        provider.setCredentials(
             new AuthScope(targetUrl.getHost(), targetUrl.getPort()),
             config.getCredentials());
+        clientBuilder.setDefaultCredentialsProvider(provider);
       }
+      CloseableHttpClient client = clientBuilder.build();
 
       HttpResponse response = client.execute(post);
 
@@ -152,17 +139,15 @@ public class MediaPackagePostOperationHandler extends AbstractWorkflowOperationH
       int status = response.getStatusLine().getStatusCode();
       if ((status >= 200) && (status < 300)) {
         if (config.debug()) {
-          logger.info("Successfully submitted \"" + mp.getTitle()
-              + "\" (" + mp.getIdentifier().toString() + ") to " + config.getUrl().toString()
-              + ": " + status);
+          logger.info("Successfully submitted '{}' ({}) to {}: {}", mp.getTitle(), mp.getIdentifier(),
+              config.getUrl(), status);
         }
       } else if (status == 418) {
-        logger.warn("Submitted \"" + mp.getTitle() + "\" ("
-            + mp.getIdentifier().toString() + ") to " + config.getUrl().toString()
-            + ": The target claims to be a teapot. "
-            + "The Reason for this is probably an insane programmer.");
+        logger.warn("Submitted '{}' ({}) to {}: The target claims to be a teapot. "
+                + "The Reason for this is probably an insane developer. Go and help that person!",
+            mp.getTitle(), mp.getIdentifier(), config.getUrl());
       } else {
-        throw new WorkflowOperationException("Faild to submit \"" + mp.getTitle()
+        throw new WorkflowOperationException("Failed to submit \"" + mp.getTitle()
             + "\" (" + mp.getIdentifier().toString() + "), " + config.getUrl().toString()
             + " answered with: " + Integer.toString(status));
       }
@@ -170,7 +155,6 @@ public class MediaPackagePostOperationHandler extends AbstractWorkflowOperationH
       if (e instanceof WorkflowOperationException) {
         throw (WorkflowOperationException) e;
       } else {
-        logger.error("Submitting mediapackage failed: {}", e.toString());
         throw new WorkflowOperationException(e);
       }
     }
@@ -182,7 +166,7 @@ public class MediaPackagePostOperationHandler extends AbstractWorkflowOperationH
 
     public enum Format {
       XML, JSON
-    };
+    }
 
     // Key for the WorkflowOperation Configuration
     public static final String PROPERTY_URL = "url";
@@ -193,27 +177,6 @@ public class MediaPackagePostOperationHandler extends AbstractWorkflowOperationH
     public static final String PROPERTY_AUTHPASSWD = "auth.password";
     public static final String PROPERTY_DEBUG = "debug";
     public static final String PROPERTY_MEDIAPACKAGE_TYPE = "mediapackage.type";
-    public static final TreeMap<String, String> OPTIONS;
-
-    static {
-      OPTIONS = new TreeMap<String, String>();
-      OPTIONS.put(Configuration.PROPERTY_URL,
-          "The URL to which the MediaPackage will be submitted");
-      OPTIONS.put(Configuration.PROPERTY_FORMAT,
-          "The output format for the MediaPackage (default: XML)");
-      OPTIONS.put(Configuration.PROPERTY_ENCODING,
-          "Message Encoding (default: UTF-8)");
-      OPTIONS.put(Configuration.PROPERTY_AUTH,
-          "The authentication method to use (no/http-digest)");
-      OPTIONS.put(Configuration.PROPERTY_AUTHUSER,
-          "The username to use for authentication");
-      OPTIONS.put(Configuration.PROPERTY_AUTHPASSWD,
-          "The password to use for authentication");
-      OPTIONS.put(Configuration.PROPERTY_DEBUG,
-          "If this options is set the message body returned by target host is dumped to log (default: no)");
-      OPTIONS.put(Configuration.PROPERTY_MEDIAPACKAGE_TYPE,
-          "Type of Mediapackage to send (workflow, search; default: search)");
-    }
 
     // Configuration values
     private URI url;
@@ -261,22 +224,19 @@ public class MediaPackagePostOperationHandler extends AbstractWorkflowOperationH
         }
 
         // Configure debug mode
-        if (keys.contains(PROPERTY_DEBUG))
-        {
+        if (keys.contains(PROPERTY_DEBUG)) {
           String debugstr = operation.getConfiguration(PROPERTY_DEBUG).trim().toUpperCase();
           debug = "YES".equals(debugstr) || "TRUE".equals(debugstr);
         }
 
         // Configure debug mode
-        if (keys.contains(PROPERTY_MEDIAPACKAGE_TYPE))
-        {
+        if (keys.contains(PROPERTY_MEDIAPACKAGE_TYPE)) {
           String cfgval = operation.getConfiguration(PROPERTY_MEDIAPACKAGE_TYPE).trim().toUpperCase();
           mpFromSearch = "SEARCH".equals(cfgval);
         }
 
         // get additional form fields
-        for (Iterator<String> iter = operation.getConfigurationKeys().iterator(); iter.hasNext();) {
-          String key = iter.next();
+        for (String key : operation.getConfigurationKeys()) {
           if (key.startsWith("+")) {
             String value = operation.getConfiguration(key);
             additionalFields.add(new BasicNameValuePair(key.substring(1), value));

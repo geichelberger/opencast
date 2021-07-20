@@ -26,23 +26,47 @@ import org.opencastproject.assetmanager.api.Value;
 import org.opencastproject.assetmanager.api.Version;
 import org.opencastproject.assetmanager.impl.RuntimeTypes;
 
-import com.entwinemedia.fn.Fn;
 import com.entwinemedia.fn.Fx;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.Date;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
+import javax.persistence.EntityManager;
+import javax.persistence.EntityTransaction;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
+import javax.persistence.Index;
+import javax.persistence.NamedQueries;
+import javax.persistence.NamedQuery;
 import javax.persistence.Table;
 import javax.persistence.Temporal;
 import javax.persistence.TemporalType;
+import javax.persistence.TypedQuery;
 
 @Entity(name = "Property")
-@Table(name = "mh_assets_properties")
-
+@Table(name = "oc_assets_properties", indexes = {
+    @Index(name = "IX_oc_assets_properties_val_date", columnList = ("val_date")),
+    @Index(name = "IX_oc_assets_properties_val_long", columnList = ("val_long")),
+    @Index(name = "IX_oc_assets_properties_val_string", columnList = ("val_string")),
+    @Index(name = "IX_oc_assets_properties_val_bool", columnList = ("val_bool")),
+    @Index(name = "IX_oc_assets_properties_mediapackage_id", columnList = ("mediapackage_id")),
+    @Index(name = "IX_oc_assets_properties_namespace", columnList = ("namespace")),
+    @Index(name = "IX_oc_assets_properties_property_name", columnList = ("property_name")) })
+@NamedQueries({
+    @NamedQuery(name = "Property.selectByMediaPackageAndNamespace", query = "select p from Property p where "
+            + "p.mediaPackageId = :mediaPackageId and p.namespace = :namespace"),
+    @NamedQuery(name = "Property.delete", query = "delete from Property p where p.mediaPackageId = :mediaPackageId"),
+    @NamedQuery(name = "Property.deleteByNamespace", query = "delete from Property p "
+            + "where p.mediaPackageId = :mediaPackageId and p.namespace = :namespace")})
 public class PropertyDto {
+  private static final Logger logger = LoggerFactory.getLogger(PropertyDto.class);
+
   /** Surrogate key. */
   @Id
   @GeneratedValue
@@ -108,38 +132,62 @@ public class PropertyDto {
     return dto;
   }
 
-  public static final Fn<PropertyDto, Property> toProperty = new Fn<PropertyDto, Property>() {
-    @Override public Property apply(PropertyDto a) {
-      return a.toProperty();
-    }
-  };
-
   private static void setValue(final PropertyDto dto, final Value value) {
     value.decompose(
-            new Fx<String>() {
-              @Override public void apply(String a) {
-                dto.stringValue = a;
-              }
-            }.toFn(),
-            new Fx<Date>() {
-              @Override public void apply(Date a) {
-                dto.dateValue = a;
-              }
-            }.toFn(),
-            new Fx<Long>() {
-              @Override public void apply(Long a) {
-                dto.longValue = a;
-              }
-            }.toFn(),
-            new Fx<Boolean>() {
-              @Override public void apply(Boolean a) {
-                dto.boolValue = a;
-              }
-            }.toFn(),
-            new Fx<Version>() {
-              @Override public void apply(Version a) {
-                dto.longValue = RuntimeTypes.convert(a).value();
-              }
-            }.toFn());
+        new Fx<String>() {
+          @Override public void apply(String a) {
+            dto.stringValue = a;
+          }
+        }.toFn(),
+        new Fx<Date>() {
+          @Override public void apply(Date a) {
+            dto.dateValue = a;
+          }
+        }.toFn(),
+        new Fx<Long>() {
+          @Override public void apply(Long a) {
+            dto.longValue = a;
+          }
+        }.toFn(),
+        new Fx<Boolean>() {
+          @Override public void apply(Boolean a) {
+            dto.boolValue = a;
+          }
+        }.toFn(),
+        new Fx<Version>() {
+          @Override public void apply(Version a) {
+            dto.longValue = RuntimeTypes.convert(a).value();
+          }
+        }.toFn());
+  }
+
+  public static int delete(EntityManager em, final String mediaPackageId) {
+    return delete(em, mediaPackageId, null);
+  }
+
+  public static int delete(EntityManager em, final String mediaPackageId, final String namespace) {
+    TypedQuery<PropertyDto> query;
+    if (namespace == null) {
+      query = em.createNamedQuery("Property.delete", PropertyDto.class)
+              .setParameter("mediaPackageId", mediaPackageId);
+    } else {
+      query = em.createNamedQuery("Property.deleteByNamespace", PropertyDto.class)
+              .setParameter("mediaPackageId", mediaPackageId)
+              .setParameter("namespace", namespace);
+    }
+    logger.debug("Executing query {}", query);
+    EntityTransaction tx = em.getTransaction();
+    tx.begin();
+    final int num = query.executeUpdate();
+    tx.commit();
+    return num;
+  }
+
+  public static List<Property> select(EntityManager em, final String mediaPackageId, final String namespace) {
+    TypedQuery<PropertyDto> query = em.createNamedQuery("Property.selectByMediaPackageAndNamespace", PropertyDto.class)
+              .setParameter("mediaPackageId", mediaPackageId)
+              .setParameter("namespace", namespace);
+    logger.debug("Executing query {}", query);
+    return query.getResultList().parallelStream().map(PropertyDto::toProperty).collect(Collectors.toList());
   }
 }

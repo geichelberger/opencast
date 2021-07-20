@@ -46,7 +46,9 @@ import org.opencastproject.metadata.mpeg7.Video;
 import org.opencastproject.serviceregistry.api.ServiceRegistryException;
 import org.opencastproject.util.MimeTypes;
 import org.opencastproject.util.NotFoundException;
+import org.opencastproject.util.UnknownFileTypeException;
 import org.opencastproject.workflow.api.AbstractWorkflowOperationHandler;
+import org.opencastproject.workflow.api.ConfiguredTagsAndFlavors;
 import org.opencastproject.workflow.api.WorkflowInstance;
 import org.opencastproject.workflow.api.WorkflowOperationException;
 import org.opencastproject.workflow.api.WorkflowOperationInstance;
@@ -69,8 +71,6 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
-import java.util.SortedMap;
-import java.util.TreeMap;
 import java.util.concurrent.ExecutionException;
 
 /**
@@ -81,21 +81,6 @@ public class SegmentPreviewsWorkflowOperationHandler extends AbstractWorkflowOpe
   /** The logging facility */
   private static final Logger logger = LoggerFactory.getLogger(SegmentPreviewsWorkflowOperationHandler.class);
 
-  /** The configuration options for this handler */
-  private static final SortedMap<String, String> CONFIG_OPTIONS;
-
-  static {
-    CONFIG_OPTIONS = new TreeMap<>();
-    CONFIG_OPTIONS.put("source-flavor", "The \"flavor\" of the track to use as a video source input");
-    CONFIG_OPTIONS.put("source-tags",
-            "The required tags that must exist on the track for the track to be used as a video source");
-    CONFIG_OPTIONS.put("encoding-profile", "The encoding profile to use for generating the image");
-    CONFIG_OPTIONS.put("reference-flavor", "The \"flavor\" of the track to used as the reference");
-    CONFIG_OPTIONS.put("reference-tags", "The \"tags\" of the track to used as the reference");
-    CONFIG_OPTIONS.put("target-flavor", "The flavor to apply to the extracted images");
-    CONFIG_OPTIONS.put("target-tags", "The tags to apply to the extracted images");
-  }
-
   /** The composer service */
   private ComposerService composerService = null;
 
@@ -104,16 +89,6 @@ public class SegmentPreviewsWorkflowOperationHandler extends AbstractWorkflowOpe
 
   /** The local workspace */
   private Workspace workspace = null;
-
-  /**
-   * {@inheritDoc}
-   *
-   * @see org.opencastproject.workflow.api.WorkflowOperationHandler#getConfigurationOptions()
-   */
-  @Override
-  public SortedMap<String, String> getConfigurationOptions() {
-    return CONFIG_OPTIONS;
-  }
 
   /**
    * Callback for the OSGi declarative services configuration.
@@ -167,7 +142,7 @@ public class SegmentPreviewsWorkflowOperationHandler extends AbstractWorkflowOpe
 
     // Create the images
     try {
-      return createPreviews(src, workflowInstance.getCurrentOperation());
+      return createPreviews(src, workflowInstance);
     } catch (Exception e) {
       throw new WorkflowOperationException(e);
     }
@@ -178,7 +153,6 @@ public class SegmentPreviewsWorkflowOperationHandler extends AbstractWorkflowOpe
    * Encode tracks from MediaPackage using profiles stored in properties and updates current MediaPackage.
    *
    * @param mediaPackage
-   * @param properties
    * @return the operation result containing the updated mediapackage
    * @throws EncoderException
    * @throws ExecutionException
@@ -187,16 +161,20 @@ public class SegmentPreviewsWorkflowOperationHandler extends AbstractWorkflowOpe
    * @throws NotFoundException
    * @throws WorkflowOperationException
    */
-  private WorkflowOperationResult createPreviews(final MediaPackage mediaPackage, WorkflowOperationInstance operation)
+  private WorkflowOperationResult createPreviews(final MediaPackage mediaPackage, WorkflowInstance wi)
           throws EncoderException, InterruptedException, ExecutionException, NotFoundException, MediaPackageException,
           IOException, WorkflowOperationException {
     long totalTimeInQueue = 0;
 
+    WorkflowOperationInstance operation = wi.getCurrentOperation();
+
     // Read the configuration properties
-    String sourceVideoFlavor = StringUtils.trimToNull(operation.getConfiguration("source-flavor"));
-    String sourceTags = StringUtils.trimToNull(operation.getConfiguration("source-tags"));
-    String targetImageTags = StringUtils.trimToNull(operation.getConfiguration("target-tags"));
-    String targetImageFlavor = StringUtils.trimToNull(operation.getConfiguration("target-flavor"));
+    ConfiguredTagsAndFlavors tagsAndFlavors = getTagsAndFlavors(wi,
+        Configuration.many, Configuration.one, Configuration.many, Configuration.one);
+    MediaPackageElementFlavor sourceVideoFlavor = tagsAndFlavors.getSingleSrcFlavor();
+    List<String> sourceTagSet = tagsAndFlavors.getSrcTags();
+    List<String> targetImageTags = tagsAndFlavors.getTargetTags();
+    MediaPackageElementFlavor targetImageFlavor = tagsAndFlavors.getSingleTargetFlavor();
     String encodingProfileName = StringUtils.trimToNull(operation.getConfiguration("encoding-profile"));
     String referenceFlavor = StringUtils.trimToNull(operation.getConfiguration("reference-flavor"));
     String referenceTags = StringUtils.trimToNull(operation.getConfiguration("reference-tags"));
@@ -206,13 +184,11 @@ public class SegmentPreviewsWorkflowOperationHandler extends AbstractWorkflowOpe
     if (profile == null)
       throw new IllegalStateException("Encoding profile '" + encodingProfileName + "' was not found");
 
-    List<String> sourceTagSet = asList(sourceTags);
-
     // Select the tracks based on the tags and flavors
     Set<Track> videoTrackSet = new HashSet<>();
     for (Track track : mediaPackage.getTracksByTags(sourceTagSet)) {
       if (sourceVideoFlavor == null
-              || (track.getFlavor() != null && sourceVideoFlavor.equals(track.getFlavor().toString()))) {
+              || (track.getFlavor() != null && sourceVideoFlavor.equals(track.getFlavor()))) {
         if (!track.hasVideo())
           continue;
         videoTrackSet.add(track);
@@ -221,7 +197,7 @@ public class SegmentPreviewsWorkflowOperationHandler extends AbstractWorkflowOpe
 
     if (videoTrackSet.size() == 0) {
       logger.debug("Mediapackage {} has no suitable tracks to extract images based on tags {} and flavor {}",
-              mediaPackage, sourceTags, sourceVideoFlavor);
+              mediaPackage, sourceTagSet, sourceVideoFlavor);
       return createResult(mediaPackage, Action.CONTINUE);
     } else {
 
@@ -306,16 +282,19 @@ public class SegmentPreviewsWorkflowOperationHandler extends AbstractWorkflowOpe
 
             // Add the flavor, either from the operation configuration or from the composer
             if (targetImageFlavor != null) {
-              composedImage.setFlavor(MediaPackageElementFlavor.parseFlavor(targetImageFlavor));
+              composedImage.setFlavor(targetImageFlavor);
               logger.debug("Preview image has flavor '{}'", composedImage.getFlavor());
             }
 
             // Set the mimetype
-            if (profile.getMimeType() != null)
-              composedImage.setMimeType(MimeTypes.parseMimeType(profile.getMimeType()));
+            try {
+              composedImage.setMimeType(MimeTypes.fromURI(composedImage.getURI()));
+            } catch (UnknownFileTypeException e) {
+              logger.warn("Mime type unknown for file {}. Setting none.", composedImage.getURI(), e);
+            }
 
             // Add tags
-            for (String tag : asList(targetImageTags)) {
+            for (String tag : targetImageTags) {
               logger.trace("Tagging image with '{}'", tag);
               composedImage.addTag(tag);
             }

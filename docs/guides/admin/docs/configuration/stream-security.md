@@ -12,9 +12,9 @@ not be possible.
 
 On a high level, to use Stream security, these steps are required:
 
-- Install and configure the URL signing service and signing providers
-- Configure Opencast services (and, optionally, 3rd party services) that use the signing infrastructure to sign requests
-- Install and configure verification components
+* Install and configure the URL signing service and signing providers
+* Configure Opencast services (and, optionally, 3rd party services) that use the signing infrastructure to sign requests
+* Install and configure verification components
 
 URL Signing Service Installation
 --------------------------------
@@ -22,12 +22,39 @@ URL Signing Service Installation
 There are three modules that are built by default and need to be present on each Opencast node in order to initiate URL
 signing:
 
-- urlsigning-common
-- urlsigning-service-api
-- urlsigning-service-impl
+* urlsigning-common
+* urlsigning-service-api
+* urlsigning-service-impl
 
 If these modules are present, the URL signing service will be available, to which the URL signing providers can then
 register themselves.
+
+
+Minimal Configuration Example
+-----------------------------
+
+This is a minimal configuration example which requires valid tokens for all static file downloads:
+
+`etc/org.opencastproject.security.urlsigning.filter.UrlSigningFilter.cfg`:
+
+```properties
+enabled=true
+url.regex.files=.*localhost:8080/static/.*
+```
+
+`etc/org.opencastproject.security.urlsigning.provider.impl.GenericUrlSigningProvider.cfg`
+
+```properties
+key.default.secret=THISISNOSECUREKEY
+key.default.url=http://localhost:8080/static/
+```
+
+`etc/org.opencastproject.security.urlsigning.verifier.impl.UrlSigningVerifierImpl.cfg`:
+
+```properties
+key.default=THISISNOSECUREKEY
+```
+
 
 Configuration of Signing Providers
 ----------------------------------
@@ -39,29 +66,39 @@ The GenericUrlSigningProvider that comes with Opencast has its own configuration
 All signing providers follow the same configuration structure and support multiple configuration blocks, providing the
 settings for separate distributions (i.e. download or streaming servers, services or paths).
 
-Each configuration block consists of the following items:
+Each signing key configuration consists of the following attributes:
 
-- **Key ID:** Key identifier, e.g. `demoKeyOne`
-- **Key secret:** Key value, e.g. `25DA2BA549CB62EF297977845259A`. The key-length is not predefined, but a key length of
-  at least 128 bit is recommended. Any larger value will not increase security of the underlying algorithm.
-- **URL prefix:** The URL signing provider will only sign URLs that start with this value. This allows to support
-  multiple distributions and different key pairs.
+* **Key ID:** Key identifier, e.g. `demoKeyOne`
+* **Key secret:** Key value, e.g. `25DA2BA549CB62EF297977845259A`. The key-length is not predefined, but a key length of
+  at least 128 bit is recommended. Any larger value will not increase security of the underlying algorithm
+* **URL prefix:** The URL signing provider will only sign URLs that start with this value. This allows to support
+  multiple distributions and different key pairs
+* **Organization:** Keys can be restricted to organizations so that different organizations use different keys.
+  This attribute is optional. If not specified, the key can be used by all organizations
 
 A typical configuration looks like this:
 
-    id.1=demoKeyOne
-    key.1=6EDB5EDDCF994B7432C371D7C274F
-    url.1=http://download.opencast.org/engage
+    key.demoKeyOne.secret=6EDB5EDDCF994B7432C371D7C274F
+    key.demoKeyOne.url=http://download.opencast.org/engage
 
-    id.2=demoKeyTwo
-    key.2=6EDB5EDDCF994B7432C371D7C274F
-    url.2=http://download.opencast.org/custom
+    key.demoKeyTwo.secret=6EDB5EDDCF994B7432C371D7C274F
+    key.demoKeyTwo.url=http://download.opencast.org/custom
+    key.demoKeyTwo.organization=mh_default_org
 
-The properties defined in the configuration file take a numeric suffix that must start at `1` and increase in single
-increments. In the example above these can be seen as: `.1` and `.2`. As soon as there is a missing number it will stop
-looking for further entries.
+It is also possible to use one key for multiple URL prefixes:
 
-Note that id and key form a fixed pair, while the same key can be used in more than one configuration block.
+    key.demoKeyThree.secret=6EDB5EDDCF994B7432C371D7C274F
+    key.demoKeyThree.url.http=http://download.opencast.org/custom
+    key.demoKeyThree.url.https=https://download.opencast.org/custom
+    key.demoKeyThree.url.streaming=http://streaming.opencast.org/custom
+    key.demoKeyThree.organization=mh_default_org
+
+
+A Java regular expression can be defined to identify URLs to be excluded from URL signing.
+Any URL that matches this anchored regex will not be signed.
+
+    exclude.url.pattern=.*/.*/unprotected/.*/.*
+
 
 Configuration of URL Signing Timeout Values
 -------------------------------------------
@@ -95,7 +132,8 @@ provider to have one key for any URL that begins with one scheme, such as http, 
 signed with a single key. Or it could be configured so that each different scheme and hostname pair would have a
 different keys protecting each host’s URLs separately etc. Having the timing configurations separate from the key
 configuration allows the different types of URLs to be signed differently depending on the needs of the users without
-needing to configure this timing for all of the different keys. 
+needing to configure this timing for all of the different keys.
+<!-- _Very wordy.If this paragraph of examples is necessary, consider making it a list instead (and not full complete sentences) -->
 
 ### Signing for Opencast-internal access
 
@@ -117,7 +155,7 @@ which are not properly signed or have expired will be rejected.
 
 Out of the box, Opencast provides an internal verification component:
 
-- Opencast internal UrlSigningFilter
+* Opencast internal UrlSigningFilter
 
 The following section is dedicated to the installation and configuration of the Opencast internal UrlSigningFilter. The
 stream security architecture allows the implementation for URL verification for third-party applications which are not
@@ -127,8 +165,8 @@ covered in this documentation.
 
 The Servlet filter providing the verification of requests to Opencast internal resources is implemented in the bundles:
 
-- urlsigning-verifier-service-api
-- urlsigning-verifier-service-impl
+* urlsigning-verifier-service-api
+* urlsigning-verifier-service-impl
 
 The filter uses a set of regular expressions to determine which requests to an Opencast instance need to be verified.
 
@@ -141,24 +179,18 @@ enabled.
 
 Two things need to be configured for the Opencast verification filter:
 
-- key pairs used to verify the signatures
-- paths and endpoints that need to be protected
+* key pairs used to verify the signatures
+* paths and endpoints that need to be protected
 
 The configuration is located at:
 
     etc/org.opencastproject.security.urlsigning.verifier.impl.UrlSigningVerifierImpl.cfg
 
-First of all, the key pairs used to sign must be configured in order to allow the filter to verify the signatures. More
-than one key pair can be defined by increasing the counter (1, 2, 3, ...) in steps of 1. If you miss any numbers it will
-stop looking for further configurations.
-
 Example:
 
-    id.1=demoKeyOne
-    key.1=6EDB5EDDCF994B7432C371D7C274F
+    key.demoKeyOne=6EDB5EDDCF994B7432C371D7C274F
 
-    id.2=demoKeyTwo
-    key.2=C843C21ECF59F2B38872A1BCAA774
+    key.demoKeyTwo=C843C21ECF59F2B38872A1BCAA774
 
 The entries in this file need to have the same values for the signing providers configuration.
 
@@ -183,11 +215,11 @@ Example:
 
     strict=true
 
-    url.regex.1=.*files\/collection\/.*
-    url.regex.2=.*files\/mediapackage\/.*
-    url.regex.3=(?\=(.*staticfiles.*))(?=^(?!.*staticfiles.*url|.*docs.*).*$)(.*)
-    url.regex.4=.*archive\/archive\/mediapackage\/.*\/.*\/.*
-    url.regex.5=.*static.*
+    url.regex.collection=.*files\/collection\/.*
+    url.regex.mediapackage=.*files\/mediapackage\/.*
+    url.regex.staticfiles=(?\=(.*staticfiles.*))(?=^(?!.*staticfiles.*url|.*docs.*).*$)(.*)
+    url.regex.archive=.*archive\/archive\/mediapackage\/.*\/.*\/.*
+    url.regex.static=.*static.*
 
 Testing
 -------
@@ -195,9 +227,9 @@ Testing
 Once all components of Stream Security are installed and properly configured, it is important to verify that the system
 is working as expected. It is especially important to try to access resources that should *not* be accessible.
 
-There are ways to test in a structured way which will be explained below.
+The following explains how to test if Stream Security has been correctly configured.
 
-### Creating Signed URLs with Signing Endpoint
+### Step 1: Creating Signed URLs with Signing Endpoint
 
 The signing service provides a REST endpoint, which allows for the signing of arbitrary URLs. For manual use it is
 recommended to visit the endpoint’s documentation page at `http://localhost:8080/signing/docs`.
@@ -211,17 +243,17 @@ checked again to ensure that at least one signing provider is responsible for th
 If the service is fully operational, the response code will be *200 OK* and the response body either *true* (accepted)
 or *false* (refused).
 
-### Signing the URL
+### Step 2: Signing the URL
 
 On the same documentation page URLs can be signed using the `/signing/sign` endpoint, and the access policy may be
 specified in that form as well. With this, several scenarios can be tested. Examples are:
 
-- URLs that have already expired or will expire at a known date
-- URLs that are not yet valid (if you provided a validFrom data in the access policy)
-- URLs that are missing some or all of the signing parameters (policy, keyId or signature)
-- URLs that are attempting to use signing parameters (policy and signature) from a different signed URL
+* URLs that have already expired or will expire at a known date
+* URLs that are not yet valid (if you provided a validFrom data in the access policy)
+* URLs that are missing some or all of the signing parameters (policy, keyId or signature)
+* URLs that are attempting to use signing parameters (policy and signature) from a different signed URL
 
-### Verifying the URL
+### Step 3: Verifying the URL
 
 The signed URLs can then be passed to the appropriate testing tool (web browser, cURL, player, …) to test the
 functionality of the verification component(s). The following table is the return codes associated with different
@@ -240,7 +272,7 @@ rejection conditions:
 The components that verify a URL is signed will run before a request is checked to be valid, so if a non-existent URL is
 signed for example, the above conditions will need to be fixed before a missing (404) response code will be returned.
 
-### Inspect policy
+### Step 4: Inspect policy
 
 The generated policy which is added to the signed URLs can be inspected. It needs to be decoded from Base64 and the
 result must be a JSON document that contains exactly the values which have been passed during signing.
@@ -267,12 +299,12 @@ Decoding this Base64 encoded policy
 
 Inspecting and modifying the policy is useful for advanced testing, such as:
 
-- URLs where the policy was modified after signing
-- URLs where the policy was modified and resigned with a different key
+* URLs where the policy was modified after signing
+* URLs where the policy was modified and resigned with a different key
 
 ## Further information
 
-For an overview of Stream Security:
+For an overview of Stream Security: <!-- _This info is already given at the very beginning of the page! -->
 
 * [Stream Security Overview](../modules/stream-security.md)
 

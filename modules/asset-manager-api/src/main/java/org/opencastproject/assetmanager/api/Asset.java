@@ -20,6 +20,7 @@
  */
 package org.opencastproject.assetmanager.api;
 
+import org.opencastproject.util.Checksum;
 import org.opencastproject.util.MimeType;
 
 import com.entwinemedia.fn.data.Opt;
@@ -27,7 +28,8 @@ import com.entwinemedia.fn.data.Opt;
 import java.io.InputStream;
 
 /**
- * An asset is a {@link org.opencastproject.mediapackage.MediaPackageElement} under the control of the {@link AssetManager}.
+ * An asset is a {@link org.opencastproject.mediapackage.MediaPackageElement}
+ * under the control of the {@link AssetManager}.
  */
 public interface Asset {
   /** Return the identifier of the asset. */
@@ -50,4 +52,10 @@ public interface Asset {
 
   /** Tell about the availability of the asset. */
   Availability getAvailability();
+
+  /** Get the store ID of the asset store where this snapshot currently lives */
+  String getStorageId();
+
+  /** Get the checksum */
+  Checksum getChecksum();
 }

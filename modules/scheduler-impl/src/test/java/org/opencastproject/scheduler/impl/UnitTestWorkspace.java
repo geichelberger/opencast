@@ -49,7 +49,7 @@ public class UnitTestWorkspace implements Workspace {
   private final File baseDir;
 
   public UnitTestWorkspace() {
-    baseDir = new File(new File(IoSupport.getSystemTmpDir()), "schedulertest");
+    baseDir = new File(SchedulerServiceImplTest.baseDir, "workspace");
     logger.info("Creating workspace under " + baseDir.getAbsolutePath());
     baseDir.mkdirs();
     clean();
@@ -117,7 +117,8 @@ public class UnitTestWorkspace implements Workspace {
 
   @Override
   public void delete(String mediaPackageID, String mediaPackageElementID) throws NotFoundException, IOException {
-    throw new RuntimeException("Not yet implemented");
+    final File file = IoSupport.file(baseDir.getAbsolutePath(), mediaPackageID, mediaPackageElementID);
+    FileUtils.deleteDirectory(file);
   }
 
   @Override
@@ -133,18 +134,7 @@ public class UnitTestWorkspace implements Workspace {
   }
 
   @Override
-  public void deleteFromCollection(String collectionId, String fileName, boolean removeCollection) throws NotFoundException, IOException {
-    throw new RuntimeException("Not yet implemented");
-  }
-
-  @Override
   public URI getURI(String mediaPackageID, String mediaPackageElementID) throws IllegalArgumentException {
-    throw new RuntimeException("Not yet implemented");
-  }
-
-  @Override
-  public URI getURI(String mediaPackageID, String mediaPackageElementID, String filename)
-          throws IllegalArgumentException {
     throw new RuntimeException("Not yet implemented");
   }
 
@@ -155,12 +145,6 @@ public class UnitTestWorkspace implements Workspace {
 
   @Override
   public URI moveTo(URI collectionURI, String toMediaPackage, String toMediaPackageElement, String toFileName)
-          throws NotFoundException, IOException, IllegalArgumentException {
-    throw new RuntimeException("Not yet implemented");
-  }
-
-  @Override
-  public URI copyTo(URI collectionURI, String toMediaPackage, String toMediaPackageElement, String toFileName)
           throws NotFoundException, IOException, IllegalArgumentException {
     throw new RuntimeException("Not yet implemented");
   }
@@ -187,6 +171,11 @@ public class UnitTestWorkspace implements Workspace {
 
   @Override
   public void cleanup(Id mediaPackageId) throws IOException {
+    // Nothing to do
+  }
+
+  @Override
+  public void cleanup(Id mediaPackageId, boolean filesOnly) throws IOException {
     // Nothing to do
   }
 

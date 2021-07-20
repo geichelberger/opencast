@@ -23,17 +23,15 @@ package org.opencastproject.adminui.endpoint;
 
 import static org.opencastproject.util.persistence.PersistenceUtil.newTestEntityManagerFactory;
 
-import org.opencastproject.adminui.impl.index.AdminUISearchIndex;
-import org.opencastproject.index.service.impl.index.series.Series;
-import org.opencastproject.index.service.impl.index.series.SeriesSearchQuery;
-import org.opencastproject.index.service.impl.index.theme.ThemeSearchQuery;
-import org.opencastproject.matterhorn.search.SearchResult;
-import org.opencastproject.matterhorn.search.SearchResultItem;
-import org.opencastproject.matterhorn.search.impl.SearchResultImpl;
-import org.opencastproject.message.broker.api.MessageSender;
-import org.opencastproject.messages.MailServiceException;
+import org.opencastproject.adminui.index.AdminUISearchIndex;
+import org.opencastproject.elasticsearch.api.SearchResult;
+import org.opencastproject.elasticsearch.api.SearchResultItem;
+import org.opencastproject.elasticsearch.impl.SearchResultImpl;
+import org.opencastproject.elasticsearch.index.series.Series;
+import org.opencastproject.elasticsearch.index.series.SeriesSearchQuery;
+import org.opencastproject.elasticsearch.index.theme.IndexTheme;
+import org.opencastproject.elasticsearch.index.theme.ThemeSearchQuery;
 import org.opencastproject.security.api.DefaultOrganization;
-import org.opencastproject.security.api.JaxbRole;
 import org.opencastproject.security.api.JaxbUser;
 import org.opencastproject.security.api.Organization;
 import org.opencastproject.security.api.SecurityService;
@@ -49,13 +47,11 @@ import org.opencastproject.util.data.Option;
 
 import org.easymock.Capture;
 import org.easymock.EasyMock;
-import org.easymock.IAnswer;
 import org.junit.Ignore;
 import org.osgi.framework.BundleContext;
 import org.osgi.service.component.ComponentContext;
 
 import java.io.ByteArrayInputStream;
-import java.io.Serializable;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.Hashtable;
@@ -79,7 +75,7 @@ public class TestThemesEndpoint extends ThemesEndpoint {
     addData();
   }
 
-  private void addData() throws MailServiceException, ThemesServiceDatabaseException {
+  private void addData() throws ThemesServiceDatabaseException {
     Theme theme = new Theme(Option.some(theme1Id), creationDate, true, user, "The Theme name", "The Theme description",
             true, "bumper-file", true, "trailer-file", true, "title,room,date", "title-background-file", true,
             "license-background-file", "The license description", true, "watermark-file", "top-left");
@@ -87,8 +83,7 @@ public class TestThemesEndpoint extends ThemesEndpoint {
   }
 
   private void setupServices() throws Exception {
-    user = new JaxbUser("test", null, "Test User", "test@test.com", "test", new DefaultOrganization(),
-            new HashSet<JaxbRole>());
+    user = new JaxbUser("test", null, "Test User", "test@test.com", "test", new DefaultOrganization(), new HashSet<>());
 
     UserDirectoryService userDirectoryService = EasyMock.createNiceMock(UserDirectoryService.class);
     EasyMock.expect(userDirectoryService.loadUser((String) EasyMock.anyObject())).andReturn(user).anyTimes();
@@ -102,32 +97,15 @@ public class TestThemesEndpoint extends ThemesEndpoint {
     SeriesService seriesService = EasyMock.createNiceMock(SeriesService.class);
     EasyMock.replay(seriesService);
 
-    MessageSender messageSender = EasyMock.createNiceMock(MessageSender.class);
-    messageSender.sendObjectMessage(EasyMock.anyObject(String.class),
-            EasyMock.anyObject(MessageSender.DestinationType.class), EasyMock.anyObject(Serializable.class));
-    EasyMock.expectLastCall().anyTimes();
-    EasyMock.replay(messageSender);
-
     // Create AdminUI Search Index
-    AdminUISearchIndex adminUISearchIndex = EasyMock.createMock(AdminUISearchIndex.class);
-    final Capture<ThemeSearchQuery> themeQueryCapture = new Capture<ThemeSearchQuery>();
+    AdminUISearchIndex adminUISearchIndex = EasyMock.createNiceMock(AdminUISearchIndex.class);
+    final Capture<ThemeSearchQuery> themeQueryCapture = EasyMock.newCapture();
     EasyMock.expect(adminUISearchIndex.getByQuery(EasyMock.capture(themeQueryCapture)))
-            .andAnswer(new IAnswer<SearchResult<org.opencastproject.index.service.impl.index.theme.Theme>>() {
-
-              @Override
-              public SearchResult<org.opencastproject.index.service.impl.index.theme.Theme> answer() throws Throwable {
-                return createThemeCaptureResult(themeQueryCapture);
-              }
-            });
-    final Capture<SeriesSearchQuery> seriesQueryCapture = new Capture<SeriesSearchQuery>();
+            .andAnswer(() -> createThemeCaptureResult(themeQueryCapture)).anyTimes();
+    final Capture<SeriesSearchQuery> seriesQueryCapture = EasyMock.newCapture();
     EasyMock.expect(adminUISearchIndex.getByQuery(EasyMock.capture(seriesQueryCapture)))
-            .andAnswer(new IAnswer<SearchResult<Series>>() {
-
-              @Override
-              public SearchResult<Series> answer() throws Throwable {
-                return createSeriesCaptureResult(seriesQueryCapture);
-              }
-            });
+            .andAnswer(() -> createSeriesCaptureResult(seriesQueryCapture));
+    EasyMock.expect(adminUISearchIndex.getIndexName()).andReturn("adminui").anyTimes();
     EasyMock.replay(adminUISearchIndex);
 
     themesServiceDatabaseImpl = new ThemesServiceDatabaseImpl();
@@ -135,7 +113,7 @@ public class TestThemesEndpoint extends ThemesEndpoint {
             .setEntityManagerFactory(newTestEntityManagerFactory(ThemesServiceDatabaseImpl.PERSISTENCE_UNIT));
     themesServiceDatabaseImpl.setUserDirectoryService(userDirectoryService);
     themesServiceDatabaseImpl.setSecurityService(securityService);
-    themesServiceDatabaseImpl.setMessageSender(messageSender);
+    themesServiceDatabaseImpl.setAdminUiIndex(adminUISearchIndex);
     themesServiceDatabaseImpl.activate(null);
 
     StaticFileService staticFileService = EasyMock.createNiceMock(StaticFileService.class);
@@ -151,7 +129,7 @@ public class TestThemesEndpoint extends ThemesEndpoint {
 
     ComponentContext componentContext = EasyMock.createNiceMock(ComponentContext.class);
     EasyMock.expect(componentContext.getBundleContext()).andReturn(bundleContext).anyTimes();
-    EasyMock.expect(componentContext.getProperties()).andReturn(new Hashtable<String, Object>()).anyTimes();
+    EasyMock.expect(componentContext.getProperties()).andReturn(new Hashtable<>()).anyTimes();
     EasyMock.replay(componentContext);
 
     StaticFileRestService staticFileRestService = new StaticFileRestService();
@@ -166,23 +144,23 @@ public class TestThemesEndpoint extends ThemesEndpoint {
     this.setIndex(adminUISearchIndex);
   }
 
-  private SearchResult<org.opencastproject.index.service.impl.index.theme.Theme> createThemeCaptureResult(
+  private SearchResult<IndexTheme> createThemeCaptureResult(
           final Capture<ThemeSearchQuery> myCapture) {
-    SearchResultImpl<org.opencastproject.index.service.impl.index.theme.Theme> searchResults = new SearchResultImpl<org.opencastproject.index.service.impl.index.theme.Theme>(
+    SearchResultImpl<IndexTheme> searchResults = new SearchResultImpl<IndexTheme>(
             myCapture.getValue(), 0, 0);
     if (myCapture.hasCaptured()) {
       if (myCapture.getValue().getIdentifiers().length == 1 && myCapture.getValue().getIdentifiers()[0] == theme1Id) {
-        SearchResultItem<org.opencastproject.index.service.impl.index.theme.Theme> searchResultItem = getThemeSearchResultItem(
+        SearchResultItem<IndexTheme> searchResultItem = getThemeSearchResultItem(
                 theme1Id, "theme-1-name");
         searchResults.addResultItem(searchResultItem);
       } else if (myCapture.getValue().getIdentifiers().length == 0) {
-        SearchResultItem<org.opencastproject.index.service.impl.index.theme.Theme> searchResultItem1 = getThemeSearchResultItem(
+        SearchResultItem<IndexTheme> searchResultItem1 = getThemeSearchResultItem(
                 theme1Id, "theme-1-name");
         searchResults.addResultItem(searchResultItem1);
-        SearchResultItem<org.opencastproject.index.service.impl.index.theme.Theme> searchResultItem2 = getThemeSearchResultItem(
+        SearchResultItem<IndexTheme> searchResultItem2 = getThemeSearchResultItem(
                 theme2Id, "theme-2-name");
         searchResults.addResultItem(searchResultItem2);
-        SearchResultItem<org.opencastproject.index.service.impl.index.theme.Theme> searchResultItem3 = getThemeSearchResultItem(
+        SearchResultItem<IndexTheme> searchResultItem3 = getThemeSearchResultItem(
                 theme3Id, "theme-3-name");
         searchResults.addResultItem(searchResultItem3);
       }
@@ -191,16 +169,16 @@ public class TestThemesEndpoint extends ThemesEndpoint {
   }
 
   @SuppressWarnings("unchecked")
-  private SearchResultItem<org.opencastproject.index.service.impl.index.theme.Theme> getThemeSearchResultItem(Long id,
+  private SearchResultItem<IndexTheme> getThemeSearchResultItem(Long id,
           String name) {
-    org.opencastproject.index.service.impl.index.theme.Theme theme = new org.opencastproject.index.service.impl.index.theme.Theme(
+    IndexTheme theme = new IndexTheme(
             id, defaultOrg.getId());
     theme.setCreationDate(creationDate);
     theme.setName(name);
     theme.setCreator("Test User");
     theme.setBumperFile("uuid1");
     theme.setWatermarkFile("uuid2");
-    SearchResultItem<org.opencastproject.index.service.impl.index.theme.Theme> searchResultItem = EasyMock
+    SearchResultItem<IndexTheme> searchResultItem = EasyMock
             .createMock(SearchResultItem.class);
     EasyMock.expect(searchResultItem.getSource()).andReturn(theme);
     EasyMock.expect(searchResultItem.compareTo(EasyMock.anyObject(SearchResultItem.class))).andReturn(1);

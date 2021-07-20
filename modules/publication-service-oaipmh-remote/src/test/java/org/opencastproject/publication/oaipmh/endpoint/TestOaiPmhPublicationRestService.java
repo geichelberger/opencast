@@ -24,7 +24,10 @@ import static org.junit.Assert.assertEquals;
 
 import org.opencastproject.job.api.Job;
 import org.opencastproject.mediapackage.MediaPackage;
+import org.opencastproject.mediapackage.MediaPackageElement;
+import org.opencastproject.mediapackage.MediaPackageElementFlavor;
 import org.opencastproject.mediapackage.MediaPackageException;
+import org.opencastproject.mediapackage.Publication;
 import org.opencastproject.publication.api.OaiPmhPublicationService;
 import org.opencastproject.publication.api.PublicationException;
 import org.opencastproject.util.NotFoundException;
@@ -46,7 +49,12 @@ public class TestOaiPmhPublicationRestService extends OaiPmhPublicationRestServi
     final OaiPmhPublicationService pubSvc = EasyMock.createNiceMock(OaiPmhPublicationService.class);
     // delegate calls to #publish to check the creator
     EasyMock.expect(
-            pubSvc.publish(EasyMock.<MediaPackage>anyObject(), EasyMock.anyString(), EasyMock.<Set<String>>anyObject(), EasyMock.<Set<String>>anyObject(), EasyMock.anyBoolean()))
+            pubSvc.publish(
+                EasyMock.<MediaPackage>anyObject(),
+                EasyMock.anyString(),
+                EasyMock.<Set<String>>anyObject(),
+                EasyMock.<Set<String>>anyObject(),
+                EasyMock.anyBoolean()))
             .andDelegateTo(new PubSvcDelegate()).anyTimes();
     EasyMock.replay(pubSvc);
     setService(pubSvc);
@@ -67,10 +75,36 @@ public class TestOaiPmhPublicationRestService extends OaiPmhPublicationRestServi
       return job;
     }
 
-    // no used
+    @Override
+    public Job replace(MediaPackage mediaPackage, String repository,
+           Set<? extends MediaPackageElement> downloadElements, Set<? extends MediaPackageElement> streamingElements,
+           Set<MediaPackageElementFlavor> retractDownloadFlavors,
+           Set<MediaPackageElementFlavor> retractStreamingFlavors,
+           Set<? extends Publication> publications, boolean checkAvailability) throws PublicationException {
+      return null;
+    }
+
+    @Override
+    public Publication replaceSync(
+        MediaPackage mediaPackage, String repository, Set<? extends MediaPackageElement> downloadElements,
+        Set<? extends MediaPackageElement> streamingElements, Set<MediaPackageElementFlavor> retractDownloadFlavors,
+        Set<MediaPackageElementFlavor> retractStreamingFlavors,
+        Set<? extends Publication> publications, boolean checkAvailability) throws PublicationException {
+      return null;
+    }
+
+    // not used
     @Override
     public Job retract(MediaPackage mediaPackage, String repository) throws PublicationException, NotFoundException {
       return null;
     }
+
+    // not used
+    @Override
+    public Job updateMetadata(MediaPackage mediaPackage, String repository, Set<String> flavors, Set<String> tags,
+            boolean checkAvailability) throws PublicationException, MediaPackageException {
+      return null;
+    }
+
   }
 }

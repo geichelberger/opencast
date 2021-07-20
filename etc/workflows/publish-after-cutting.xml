@@ -6,7 +6,10 @@
   <tags>
     <tag>editor</tag>
   </tags>
-  <description/>
+  <displayOrder>1000</displayOrder>
+  <description>
+    Process and publish media.
+  </description>
   <configuration_panel/>
 
   <operations>
@@ -20,17 +23,9 @@
         <configuration key="publishToEngage">true</configuration>
         <configuration key="publishToApi">true</configuration>
         <configuration key="publishToYouTube">false</configuration>
-      </configurations>
-    </operation>
-
-    <!-- Import properties -->
-    <operation
-        id="import-wf-properties"
-        fail-on-error="true"
-        exception-handler-workflow="partial-error"
-        description="Load processing settings">
-      <configurations>
-      <configuration key="source-flavor">processing/defaults</configuration>
+        <configuration key="thumbnailType">0</configuration>
+        <configuration key="thumbnailPosition">1</configuration>
+        <configuration key="flagQuality720p">true</configuration>
       </configurations>
     </operation>
 
@@ -49,24 +44,6 @@
         <configuration key="description">Recording has not been cut yet.</configuration>
         <configuration key="reason">EVENTS.EVENTS.DETAILS.COMMENTS.REASONS.CUTTING</configuration>
         <configuration key="action">resolve</configuration>
-      </configurations>
-    </operation>
-
-    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
-    <!-- Prepare asset                                                     -->
-    <!--                                                                   -->
-    <!-- Prepare the recording for asset management, including creation of -->
-    <!-- previews, audio waveforms and storing of the recording data in    -->
-    <!-- the asset area for further processing.                            -->
-    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
-
-    <!-- Prepare work versions of the source material for further processing -->
-
-    <operation
-      id="include"
-      description="Prepare the recording for further processing">
-      <configurations>
-        <configuration key="workflow-id">partial-work</configuration>
       </configurations>
     </operation>
 
@@ -104,22 +81,24 @@
       </configurations>
     </operation>
 
-    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
-    <!-- Cleanup                                                           -->
-    <!--                                                                   -->
-    <!-- Remove work artifacts.                                            -->
-    <!-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -->
-
-    <!-- Clean the system from work artifacts -->
+    <!-- Clean up work artifacts -->
 
     <operation
-      id="include"
-      description="Remove temporary processing artifacts">
+        id="cleanup"
+        fail-on-error="false"
+        description="Remove temporary processing artifacts">
       <configurations>
-        <configuration key="workflow-id">partial-cleanup</configuration>
+        <configuration key="delete-external">true</configuration>
+        <!-- FixMe Don't clean up ACLs until workflow service no longer looks for them in the WFR. -->
+        <configuration key="preserve-flavors">security/*</configuration>
       </configurations>
     </operation>
 
   </operations>
+
+  <state-mappings>
+    <state-mapping state="running">EVENTS.EVENTS.STATE_MAPPING.PUBLISHING</state-mapping>
+    <state-mapping state="failing">EVENTS.EVENTS.STATE_MAPPING.PUBLISHING</state-mapping>
+  </state-mappings>
 
 </definition>

@@ -24,6 +24,7 @@ package org.opencastproject.event.handler;
 import org.opencastproject.mediapackage.Catalog;
 import org.opencastproject.mediapackage.MediaPackage;
 import org.opencastproject.mediapackage.MediaPackageElements;
+import org.opencastproject.mediapackage.MediaPackageException;
 import org.opencastproject.message.broker.api.series.SeriesItem;
 import org.opencastproject.metadata.dublincore.DublinCore;
 import org.opencastproject.metadata.dublincore.DublinCoreCatalog;
@@ -156,10 +157,11 @@ public class WorkflowPermissionsUpdatedEventHandler {
 
       while (result.size() > 0) {
         for (WorkflowInstance instance : result.getItems()) {
-          if (!instance.isActive())
+          if (!instance.isActive()) {
             continue;
+          }
 
-          Organization org = instance.getOrganization();
+          Organization org = organizationDirectoryService.getOrganization(instance.getOrganizationId());
           securityService.setOrganization(org);
 
           MediaPackage mp = instance.getMediaPackage();
@@ -167,7 +169,14 @@ public class WorkflowPermissionsUpdatedEventHandler {
           // Update the series XACML file
           if (SeriesItem.Type.UpdateAcl.equals(seriesItem.getType())) {
             // Build a new XACML file for this mediapackage
-            authorizationService.setAcl(mp, AclScope.Series, seriesItem.getAcl());
+            try {
+              if (seriesItem.getOverrideEpisodeAcl()) {
+                authorizationService.removeAcl(mp, AclScope.Episode);
+              }
+              authorizationService.setAcl(mp, AclScope.Series, seriesItem.getAcl());
+            } catch (MediaPackageException e) {
+              logger.error("Error setting ACL for media package {}", mp.getIdentifier(), e);
+            }
           }
 
           // Update the series dublin core
@@ -219,12 +228,8 @@ public class WorkflowPermissionsUpdatedEventHandler {
         q = q.withStartPage(offset);
         result = workflowService.getWorkflowInstancesForAdministrativeRead(q);
       }
-    } catch (WorkflowException e) {
-      logger.warn(e.getMessage());
-    } catch (UnauthorizedException e) {
-      logger.warn(e.getMessage());
-    } catch (IOException e) {
-      logger.warn(e.getMessage());
+    } catch (WorkflowException | NotFoundException | IOException | UnauthorizedException e) {
+      logger.warn("Unable to handle update event for series {}: {}", seriesItem, e.getMessage());
     } finally {
       securityService.setOrganization(prevOrg);
       securityService.setUser(prevUser);

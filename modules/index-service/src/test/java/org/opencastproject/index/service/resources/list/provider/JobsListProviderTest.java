@@ -21,15 +21,14 @@
 
 package org.opencastproject.index.service.resources.list.provider;
 
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import org.opencastproject.index.service.exception.ListProviderException;
-import org.opencastproject.index.service.resources.list.api.ResourceListQuery;
 import org.opencastproject.index.service.resources.list.query.JobsListQuery;
 import org.opencastproject.job.api.Job;
+import org.opencastproject.list.api.ListProviderException;
+import org.opencastproject.list.api.ResourceListQuery;
 import org.opencastproject.workflow.api.WorkflowDatabaseException;
 import org.opencastproject.workflow.api.WorkflowDefinition;
 import org.opencastproject.workflow.api.WorkflowDefinitionImpl;
@@ -79,8 +78,8 @@ public class JobsListProviderTest {
   public void testStatusListName() throws ListProviderException, WorkflowDatabaseException {
     ResourceListQuery query = new JobsListQuery();
 
-    assertEquals(4, jobsListProvider.getList(JobsListProvider.LIST_STATUS, query, null).size());
-    for (Entry<String, String> entry : jobsListProvider.getList(JobsListProvider.LIST_STATUS, query, null).entrySet()) {
+    assertEquals(4, jobsListProvider.getList(JobsListProvider.LIST_STATUS, query).size());
+    for (Entry<String, String> entry : jobsListProvider.getList(JobsListProvider.LIST_STATUS, query).entrySet()) {
       try {
         Job.Status.valueOf(entry.getKey());
       } catch (IllegalArgumentException ex) {
@@ -96,10 +95,10 @@ public class JobsListProviderTest {
     ResourceListQuery query = new JobsListQuery();
 
     assertEquals(workflowDefinitions.size(),
-            jobsListProvider.getList(JobsListProvider.LIST_WORKFLOW, query, null).size());
+            jobsListProvider.getList(JobsListProvider.LIST_WORKFLOW, query).size());
 
     for (Entry<String, String> entry : jobsListProvider.getList(
-            JobsListProvider.LIST_WORKFLOW, query, null).entrySet()) {
+            JobsListProvider.LIST_WORKFLOW, query).entrySet()) {
 
       boolean match = false;
       for (WorkflowDefinition wfD : workflowDefinitions) {

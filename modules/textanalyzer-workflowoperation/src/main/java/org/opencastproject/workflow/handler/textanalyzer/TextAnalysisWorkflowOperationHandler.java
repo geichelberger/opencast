@@ -84,8 +84,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.SortedMap;
-import java.util.TreeMap;
 import java.util.concurrent.ExecutionException;
 
 /**
@@ -107,18 +105,8 @@ public class TextAnalysisWorkflowOperationHandler extends AbstractWorkflowOperat
   /** Name of the constant used to retreive the stability threshold */
   public static final String OPT_STABILITY_THRESHOLD = "stabilitythreshold";
 
-  /** The configuration options for this handler */
-  private static final SortedMap<String, String> CONFIG_OPTIONS;
-
   /** The stability threshold */
   private int stabilityThreshold = DEFAULT_STABILITY_THRESHOLD;
-
-  static {
-    CONFIG_OPTIONS = new TreeMap<String, String>();
-    CONFIG_OPTIONS.put("source-flavor", "The flavor of the input tracks");
-    CONFIG_OPTIONS.put("source-tags", "The required tags that must exist on the segments catalog");
-    CONFIG_OPTIONS.put("target-tags", "The tags to apply to the resulting mpeg-7 catalog");
-  }
 
   /** The local workspace */
   private Workspace workspace = null;
@@ -131,16 +119,6 @@ public class TextAnalysisWorkflowOperationHandler extends AbstractWorkflowOperat
 
   /** The composer service */
   protected ComposerService composer = null;
-
-  /**
-   * {@inheritDoc}
-   *
-   * @see org.opencastproject.workflow.api.WorkflowOperationHandler#getConfigurationOptions()
-   */
-  @Override
-  public SortedMap<String, String> getConfigurationOptions() {
-    return CONFIG_OPTIONS;
-  }
 
   /**
    * Callback for the OSGi declarative services configuration that will set the text analysis service.
@@ -173,12 +151,6 @@ public class TextAnalysisWorkflowOperationHandler extends AbstractWorkflowOperat
     this.mpeg7CatalogService = catalogService;
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * @see org.opencastproject.workflow.api.WorkflowOperationHandler#start(org.opencastproject.workflow.api.WorkflowInstance,
-   *      JobContext)
-   */
   @Override
   public WorkflowOperationResult start(WorkflowInstance workflowInstance, JobContext context)
           throws WorkflowOperationException {
@@ -262,12 +234,13 @@ public class TextAnalysisWorkflowOperationHandler extends AbstractWorkflowOperat
         List<VideoSegment> videoSegments = new LinkedList<VideoSegment>();
         while (segmentIterator.hasNext()) {
           Segment segment = segmentIterator.next();
-          if ((segment instanceof VideoSegment))
+          if ((segment instanceof VideoSegment)) {
             videoSegments.add((VideoSegment) segment);
+          }
         }
 
         // argument array for image extraction
-        long[] times = new long[videoSegments.size()];
+        double[] times = new double[videoSegments.size()];
 
         for (int i = 0; i < videoSegments.size(); i++) {
           VideoSegment videoSegment = videoSegments.get(i);
@@ -276,10 +249,11 @@ public class TextAnalysisWorkflowOperationHandler extends AbstractWorkflowOperat
 
           // Choose a time
           MediaPackageReference reference = null;
-          if (catalogRef == null)
+          if (catalogRef == null) {
             reference = new MediaPackageReferenceImpl();
-          else
+          } else {
             reference = new MediaPackageReferenceImpl(catalogRef.getType(), catalogRef.getIdentifier());
+          }
           reference.setProperty("time", segmentTimePoint.toString());
 
           // Have the time for ocr image created. To circumvent problems with slowly building slides, we take the image
@@ -292,26 +266,24 @@ public class TextAnalysisWorkflowOperationHandler extends AbstractWorkflowOperat
 
         // Have the ocr image(s) created.
 
-        // TODO: Note that the way of having one image extracted after the other is suited for
-        // the ffmpeg-based encoder. When switching to other encoding engines such as gstreamer, it might be preferable
-        // to pass in all timepoints to the image extraction method at once.
-        SortedMap<Long, Job> extractImageJobs = new TreeMap<Long, Job>();
+        Job imageJob = composer.image(sourceTrack, IMAGE_EXTRACTION_PROFILE, times);
+        if (!waitForStatus(imageJob).isSuccess()) {
+          throw new WorkflowOperationException("Extracting scene images from " + sourceTrack + " failed");
+        }
+        if (imageJob.getPayload() == null) {
+          throw new WorkflowOperationException(
+                  "The payload of extracting images job from " + sourceTrack + " was null");
+        }
 
-        try {
-          for (long time : times) {
-            extractImageJobs.put(time, composer.image(sourceTrack, IMAGE_EXTRACTION_PROFILE, time));
-          }
-          if (!waitForStatus(extractImageJobs.values().toArray(new Job[extractImageJobs.size()])).isSuccess())
-            throw new WorkflowOperationException("Extracting scene image from " + sourceTrack + " failed");
-          for (Map.Entry<Long, Job> entry : extractImageJobs.entrySet()) {
-            Job job = serviceRegistry.getJob(entry.getValue().getId());
-            Attachment image = (Attachment) MediaPackageElementParser.getFromXml(job.getPayload());
-            images.add(image);
-            totalTimeInQueue += job.getQueueTime();
-          }
-        } catch (EncoderException e) {
-          logger.error("Error creating still image(s) from {}", sourceTrack);
-          throw e;
+        totalTimeInQueue += imageJob.getQueueTime();
+        for (MediaPackageElement imageMpe : MediaPackageElementParser.getArrayFromXml(imageJob.getPayload())) {
+          Attachment image = (Attachment) imageMpe;
+          images.add(image);
+        }
+        if (images.isEmpty() || images.size() != times.length) {
+          throw new WorkflowOperationException(
+                  "There are no images produced for " + sourceTrack
+                          + " or the images count isn't equal the count of the video segments.");
         }
 
         // Run text extraction on each of the images
@@ -340,8 +312,9 @@ public class TextAnalysisWorkflowOperationHandler extends AbstractWorkflowOperat
             continue;
           }
           Mpeg7Catalog videoTextCatalog = loadMpeg7Catalog(catalog);
-          if (videoTextCatalog == null)
+          if (videoTextCatalog == null) {
             throw new IllegalStateException("Text analysis service did not return a valid mpeg7");
+          }
 
           // Add the spatiotemporal decompositions from the new catalog to the existing video segments
           Iterator<Video> videoTextContents = videoTextCatalog.videoContent();
@@ -408,11 +381,13 @@ public class TextAnalysisWorkflowOperationHandler extends AbstractWorkflowOperat
           Catalog catalog = null;
           try {
             Job job = serviceRegistry.getJob(j.getId());
-            if (!Job.Status.FINISHED.equals(job.getStatus()))
+            if (!Job.Status.FINISHED.equals(job.getStatus())) {
               continue;
+            }
             catalog = (Catalog) MediaPackageElementParser.getFromXml(job.getPayload());
-            if (catalog != null)
+            if (catalog != null) {
               workspace.delete(catalog.getURI());
+            }
           } catch (Exception e) {
             if (catalog != null) {
               logger.warn("Unable to delete temporary text file {}: {}", catalog.getURI(), e);
@@ -476,16 +451,19 @@ public class TextAnalysisWorkflowOperationHandler extends AbstractWorkflowOperat
         continue;
       }
       if (sourceFlavor != null) {
-        if (mediaPackageCatalog.getReference() == null)
+        if (mediaPackageCatalog.getReference() == null) {
           continue;
+        }
         Track t = mediaPackage.getTrack(mediaPackageCatalog.getReference().getIdentifier());
-        if (t == null || !t.getFlavor().matches(MediaPackageElementFlavor.parseFlavor(sourceFlavor)))
+        if (t == null || !t.getFlavor().matches(MediaPackageElementFlavor.parseFlavor(sourceFlavor))) {
           continue;
+        }
       }
 
       // Make sure the catalog features at least one of the required tags
-      if (!mediaPackageCatalog.containsTag(sourceTagSet))
+      if (!mediaPackageCatalog.containsTag(sourceTagSet)) {
         continue;
+      }
 
       Mpeg7Catalog mpeg7 = loadMpeg7Catalog(mediaPackageCatalog);
 
@@ -521,11 +499,13 @@ public class TextAnalysisWorkflowOperationHandler extends AbstractWorkflowOperat
         logger.info("The videosegmenter's stability threshold has been set to {} frames", stabilityThreshold);
       } catch (Exception e) {
         stabilityThreshold = DEFAULT_STABILITY_THRESHOLD;
-        logger.warn("Found illegal value '{}' for the videosegmenter stability threshold. Falling back to default value of {} frames", threshold, DEFAULT_STABILITY_THRESHOLD);
+        logger.warn("Found illegal value '{}' for the videosegmenter stability threshold. "
+            + "Falling back to default value of {} frames", threshold, DEFAULT_STABILITY_THRESHOLD);
       }
     } else {
       stabilityThreshold = DEFAULT_STABILITY_THRESHOLD;
-      logger.info("Using the default value of {} frames for the videosegmenter stability threshold", DEFAULT_STABILITY_THRESHOLD);
+      logger.info("Using the default value of {} frames for the videosegmenter stability threshold",
+          DEFAULT_STABILITY_THRESHOLD);
     }
   }
 

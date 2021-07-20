@@ -20,54 +20,40 @@
  */
 package org.opencastproject.oaipmh.persistence.impl;
 
-import static com.entwinemedia.fn.Stream.$;
-import static java.lang.String.format;
-import static org.opencastproject.util.data.functions.Misc.chuck;
-
-import org.opencastproject.authorization.xacml.XACMLUtils;
-import org.opencastproject.mediapackage.Attachment;
-import org.opencastproject.mediapackage.Catalog;
 import org.opencastproject.mediapackage.MediaPackage;
 import org.opencastproject.mediapackage.MediaPackageElement;
-import org.opencastproject.mediapackage.MediaPackageElements;
 import org.opencastproject.mediapackage.MediaPackageParser;
-import org.opencastproject.metadata.dublincore.DublinCore;
-import org.opencastproject.metadata.dublincore.DublinCoreCatalog;
-import org.opencastproject.metadata.dublincore.DublinCoreUtil;
 import org.opencastproject.oaipmh.persistence.OaiPmhDatabase;
 import org.opencastproject.oaipmh.persistence.OaiPmhDatabaseException;
 import org.opencastproject.oaipmh.persistence.OaiPmhElementEntity;
 import org.opencastproject.oaipmh.persistence.OaiPmhEntity;
+import org.opencastproject.oaipmh.persistence.OaiPmhSetDefinition;
+import org.opencastproject.oaipmh.persistence.OaiPmhSetDefinitionFilter;
 import org.opencastproject.oaipmh.persistence.Query;
+import org.opencastproject.oaipmh.persistence.QueryBuilder;
 import org.opencastproject.oaipmh.persistence.SearchResult;
+import org.opencastproject.oaipmh.persistence.SearchResultElementItem;
 import org.opencastproject.oaipmh.persistence.SearchResultItem;
-import org.opencastproject.security.api.AccessControlList;
 import org.opencastproject.security.api.SecurityService;
-import org.opencastproject.security.api.UnauthorizedException;
-import org.opencastproject.series.api.SeriesException;
-import org.opencastproject.series.api.SeriesService;
+import org.opencastproject.util.MimeTypes;
 import org.opencastproject.util.NotFoundException;
 import org.opencastproject.util.XmlUtil;
 import org.opencastproject.workspace.api.Workspace;
 
-import com.entwinemedia.fn.Fn;
-import com.entwinemedia.fn.data.Opt;
-
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.regex.Pattern;
 
-import javax.annotation.Nullable;
 import javax.persistence.EntityManager;
 import javax.persistence.EntityManagerFactory;
 import javax.persistence.EntityTransaction;
@@ -77,27 +63,30 @@ import javax.persistence.criteria.CriteriaBuilder;
 import javax.persistence.criteria.CriteriaQuery;
 import javax.persistence.criteria.Predicate;
 import javax.persistence.criteria.Root;
-import javax.xml.bind.JAXBException;
 
 public abstract class AbstractOaiPmhDatabase implements OaiPmhDatabase {
   /** Logging utilities */
   private static final Logger logger = LoggerFactory.getLogger(AbstractOaiPmhDatabase.class);
 
+  private ReadWriteLock dbAccessLock = new ReentrantReadWriteLock();
+
   public abstract EntityManagerFactory getEmf();
 
   public abstract SecurityService getSecurityService();
 
-  public abstract SeriesService getSeriesService();
-
   public abstract Workspace getWorkspace();
-
-  /** Return the current date. Used in implementation instead of new Date(); to facilitate unit testing. */
-  public Date currentDate() {
-    return new Date();
-  }
 
   @Override
   public void store(MediaPackage mediaPackage, String repository) throws OaiPmhDatabaseException {
+    try {
+      dbAccessLock.writeLock().lock();
+      storeInternal(mediaPackage, repository);
+    } finally {
+      dbAccessLock.writeLock().unlock();
+    }
+  }
+
+  private void storeInternal(MediaPackage mediaPackage, String repository) throws OaiPmhDatabaseException {
     int i = 0;
     boolean success = false;
     while (!success && i < 5) {
@@ -122,7 +111,7 @@ public abstract class AbstractOaiPmhDatabase implements OaiPmhDatabase {
         tx.commit();
         success = true;
       } catch (Exception e) {
-        final String message = ExceptionUtils.getMessage(e.getCause()).toLowerCase();
+        final String message = e.getCause().getMessage().toLowerCase();
         if (message.contains("unique") || message.contains("duplicate")) {
           try {
             Thread.sleep(1100L);
@@ -130,11 +119,11 @@ public abstract class AbstractOaiPmhDatabase implements OaiPmhDatabase {
             throw new OaiPmhDatabaseException(e1);
           }
           i++;
-          logger.info("Storing OAI-PMH entry '{}' from  repository '{}' failed, retry {} times.", new String[] {
-                  mediaPackage.getIdentifier().toString(), repository, Integer.toString(i) });
+          logger.info("Storing OAI-PMH entry '{}' from  repository '{}' failed, retry {} times.",
+                  mediaPackage.getIdentifier(), repository, i);
         } else {
-          logger.error("Could not store mediapackage '{}' to OAI-PMH repository '{}': {}", new String[] {
-                  mediaPackage.getIdentifier().toString(), repository, ExceptionUtils.getStackTrace(e) });
+          logger.error("Could not store mediapackage '{}' to OAI-PMH repository '{}'", mediaPackage.getIdentifier(),
+                  repository, e);
           if (tx != null && tx.isActive())
             tx.rollback();
 
@@ -158,12 +147,10 @@ public abstract class AbstractOaiPmhDatabase implements OaiPmhDatabase {
     entity.setSeries(mediaPackage.getSeries());
     entity.removeAllMediaPackageElements();
 
-    String seriesId = null;
-    boolean seriesXacmlFound = false;
-    DublinCoreCatalog dcSeries = null;
+
     for (MediaPackageElement mpe : mediaPackage.getElements()) {
       if (mpe.getFlavor() == null) {
-        logger.debug("A flavor must be set on mediapackage elements for publishing");
+        logger.debug("A flavor must be set on media package elements for publishing");
         continue;
       }
 
@@ -173,75 +160,40 @@ public abstract class AbstractOaiPmhDatabase implements OaiPmhDatabase {
         continue;
       }
 
+      if (mpe.getMimeType() == null || !mpe.getMimeType().eq(MimeTypes.XML)) {
+        logger.debug("Only media package elements with mime type XML are supported");
+        continue;
+      }
       String catalogXml = null;
-      // read/parse xml content
-      if (mpe.getFlavor().matches(MediaPackageElements.EPISODE) || mpe.getFlavor().matches(MediaPackageElements.SERIES)) {
-        DublinCoreCatalog dcCatalog = DublinCoreUtil.loadDublinCore(getWorkspace(), mpe);
-        catalogXml = toXml(dcCatalog);
-        if (mpe.getFlavor().matches(MediaPackageElements.SERIES)) {
-          dcSeries = dcCatalog;
-          seriesId = dcSeries.getFirst(DublinCore.PROPERTY_IDENTIFIER);
-        }
-      } else {
-        if (mpe.getMimeType() == null || !mpe.getMimeType().isEquivalentTo("text", "xml")) {
-          logger.debug("Only media package elements with mime type XML are supported");
-          continue;
-        }
-        catalogXml = loadCatalogXml(mpe);
-        if (!XmlUtil.parseNs(catalogXml).isRight())
-          throw new OaiPmhDatabaseException(String.format("The catalog %s isn't a valid XML file",
-                  mpe.getURI().toString()));
-
-        if (mpe.getFlavor().matches(MediaPackageElements.XACML_POLICY_SERIES))
-          seriesXacmlFound = true;
+      try (InputStream in = getWorkspace().read(mpe.getURI())) {
+        catalogXml = IOUtils.toString(in, "UTF-8");
+      } catch (Throwable e) {
+        logger.warn("Unable to load catalog {} from media package {}",
+                mpe.getIdentifier(), mediaPackage.getIdentifier().toString(), e);
+        continue;
+      }
+      if (catalogXml == null || StringUtils.isBlank(catalogXml) || !XmlUtil.parseNs(catalogXml).isRight()) {
+        logger.warn("The catalog {} from media package {} isn't a well formatted XML document",
+                mpe.getIdentifier(), mediaPackage.getIdentifier().toString());
+        continue;
       }
 
       entity.addMediaPackageElement(new OaiPmhElementEntity(
               mpe.getElementType().name(), mpe.getFlavor().toString(), catalogXml));
     }
-
-    // ensure series dublincore catalog has been applied if series is set
-    if (seriesId == null && mediaPackage.getSeries() != null) {
-      seriesId = mediaPackage.getSeries();
-      dcSeries = getSeriesDc(seriesId);
-
-      if (dcSeries != null) {
-        entity.addMediaPackageElement(new OaiPmhElementEntity(Catalog.TYPE.name(),
-              MediaPackageElements.SERIES.toString(), toXml(dcSeries)));
-      }
-    }
-
-    // apply series ACL if not done before
-    if (seriesId != null && !seriesXacmlFound) {
-      for (final AccessControlList acl : getSeriesAcl(seriesId)) {
-        for (AccessControlList seriesAcl : getSeriesAcl(seriesId)) {
-          entity.addMediaPackageElement(new OaiPmhElementEntity(Attachment.TYPE.name(),
-                  MediaPackageElements.XACML_POLICY_SERIES.toString(), toXml(mediaPackage, seriesAcl)));
-        }
-      }
-    }
-  }
-
-  @Nullable private String loadCatalogXml(MediaPackageElement element) {
-    InputStream in = null;
-    File file = null;
-    try {
-      file = getWorkspace().get(element.getURI(), true);
-      in = new FileInputStream(file);
-      return IOUtils.toString(in, "UTF-8");
-    } catch (Exception e) {
-      logger.warn("Unable to load catalog '{}'", element);
-      return null;
-    } finally {
-      IOUtils.closeQuietly(in);
-      if (file != null) {
-        FileUtils.deleteQuietly(file);
-      }
-    }
   }
 
   @Override
   public void delete(String mediaPackageId, String repository) throws OaiPmhDatabaseException, NotFoundException {
+    try {
+      dbAccessLock.writeLock().lock();
+      deleteInternal(mediaPackageId, repository);
+    } finally {
+      dbAccessLock.writeLock().unlock();
+    }
+  }
+
+  private void deleteInternal(String mediaPackageId, String repository) throws OaiPmhDatabaseException, NotFoundException {
     int i = 0;
     boolean success = false;
     while (!success && i < 5) {
@@ -254,7 +206,7 @@ public abstract class AbstractOaiPmhDatabase implements OaiPmhDatabase {
 
         OaiPmhEntity oaiPmhEntity = getOaiPmhEntity(mediaPackageId, repository, em);
         if (oaiPmhEntity == null)
-          throw new NotFoundException("No media package with id=" + mediaPackageId + " exists");
+          throw new NotFoundException("No media package with id " + mediaPackageId + " exists");
 
         oaiPmhEntity.setDeleted(true);
         em.merge(oaiPmhEntity);
@@ -263,7 +215,7 @@ public abstract class AbstractOaiPmhDatabase implements OaiPmhDatabase {
       } catch (NotFoundException e) {
         throw e;
       } catch (Exception e) {
-        final String message = ExceptionUtils.getMessage(e.getCause()).toLowerCase();
+        final String message = e.getCause().getMessage().toLowerCase();
         if (message.contains("unique") || message.contains("duplicate")) {
           try {
             Thread.sleep(1100L);
@@ -272,10 +224,10 @@ public abstract class AbstractOaiPmhDatabase implements OaiPmhDatabase {
           }
           i++;
           logger.info("Deleting OAI-PMH entry '{}' from  repository '{}' failed, retry {} times.",
-                  new String[] { mediaPackageId, repository, Integer.toString(i) });
+                  mediaPackageId, repository, i);
         } else {
-          logger.error("Could not delete mediapackage '{}' from OAI-PMH repository '{}': {}",
-                  new String[] { mediaPackageId, repository, ExceptionUtils.getStackTrace(e) });
+          logger.error("Could not delete mediapackage '{}' from OAI-PMH repository '{}'",
+                  mediaPackageId, repository, e);
           if (tx != null && tx.isActive())
             tx.rollback();
 
@@ -290,7 +242,23 @@ public abstract class AbstractOaiPmhDatabase implements OaiPmhDatabase {
 
   @Override
   public SearchResult search(Query query) {
+    try {
+      final int chunkSize = query.getLimit().getOrElse(-1);
+      dbAccessLock.readLock().lock();
+      return searchInternal(query, chunkSize);
+    } finally {
+      dbAccessLock.readLock().unlock();
+    }
+  }
+
+  private SearchResult searchInternal(Query query, int chunkSize) {
     EntityManager em = null;
+    final String requestSetSpec = query.getSetSpec().getOrElseNull();
+    final List<SearchResultItem> filteredItems = new ArrayList<>();
+    Date lastDate = new Date();
+    long resultSize;
+    long resultOffset;
+    long resultLimit;
     try {
       em = getEmf().createEntityManager();
       CriteriaBuilder cb = em.getCriteriaBuilder();
@@ -308,29 +276,156 @@ public abstract class AbstractOaiPmhDatabase implements OaiPmhDatabase {
         predicates.add(cb.equal(c.get("repositoryId"), p));
       for (String p : query.getSeriesId())
         predicates.add(cb.equal(c.get("series"), p));
-      if (!query.isSubsequentRequest()) {
-        for (Date p : query.getModifiedAfter())
-          predicates.add(cb.greaterThanOrEqualTo(c.get("modificationDate").as(Date.class), p));
-      } else {
+      for (Boolean p : query.isDeleted())
+        predicates.add(cb.equal(c.get("deleted"), p));
+      if (query.isSubsequentRequest()) {
         for (Date p : query.getModifiedAfter())
           predicates.add(cb.greaterThan(c.get("modificationDate").as(Date.class), p));
+      } else {
+        for (Date p : query.getModifiedAfter())
+          predicates.add(cb.greaterThanOrEqualTo(c.get("modificationDate").as(Date.class), p));
       }
       for (Date p : query.getModifiedBefore())
         predicates.add(cb.lessThanOrEqualTo(c.get("modificationDate").as(Date.class), p));
 
-      q.where(cb.and(predicates.toArray(new Predicate[predicates.size()])));
+      q.where(cb.and(predicates.toArray(new Predicate[0])));
       q.orderBy(cb.asc(c.get("modificationDate")));
 
       TypedQuery<OaiPmhEntity> typedQuery = em.createQuery(q);
-      for (int maxResult : query.getLimit())
-        typedQuery.setMaxResults(maxResult);
-      for (int startPosition : query.getOffset())
+      if (chunkSize > 0) {
+        typedQuery.setMaxResults(chunkSize);
+      }
+      for (int startPosition : query.getOffset()) {
+        logger.warn("I'm pretty sure things break if this is used");
         typedQuery.setFirstResult(startPosition);
-      return createSearchResult(typedQuery);
+      }
+
+      SearchResult result = createSearchResult(typedQuery);
+
+      if (requestSetSpec != null) {
+        Optional<OaiPmhSetDefinition> requestedSetDef = query.getSetDefinitions().stream().filter(def -> StringUtils.equals(def.getSetSpec(), requestSetSpec)).findFirst();
+        // return empty result if there is no definition for a requested setSpec
+        if (!requestedSetDef.isPresent()) {
+          return new SearchResultImpl(result.getOffset(), result.getLimit(), new ArrayList<>());
+        }
+      }
+
+      for (SearchResultItem item : result.getItems()) {
+        for (OaiPmhSetDefinition setDef : query.getSetDefinitions()) {
+          if (matchSetDef(setDef, item.getElements())) {
+            item.addSetSpec(setDef.getSetSpec());
+          }
+        }
+        if (requestSetSpec == null || item.getSetSpecs().contains(requestSetSpec)) {
+          filteredItems.add(item);
+        }
+      }
+      resultSize = result.size();
+      resultOffset = result.getOffset();
+      resultLimit = result.getLimit();
+      if (requestSetSpec != null && resultSize == chunkSize) {
+        lastDate = result.getItems().get(result.getItems().size() - 1).getModificationDate();
+      }
     } finally {
       if (em != null)
         em.close();
     }
+
+    if (requestSetSpec != null) {
+      // only continue if we got the amount of results we requested in the first place
+      // otherwise, we have no more results and it does not make any sense to continue
+      logger.debug("result.size={}, chunk.size={}", resultSize, chunkSize);
+      if (resultSize == chunkSize) {
+        final int limit = query.getLimit().getOrElse(-1);
+        logger.debug("filteredItems.size={}, query.limit={}", filteredItems.size(), limit);
+        if (filteredItems.size() == 0 || filteredItems.size() < limit) {
+          // No results left after filtering. Automatically request the next range to avoid returning empty results.
+          QueryBuilder subQuery = QueryBuilder.query(query).modifiedAfter(lastDate)
+                  .limit(limit - filteredItems.size())
+                  .subsequentRequest(true);
+          filteredItems.addAll(searchInternal(subQuery.build(), chunkSize).getItems());
+        }
+      }
+    }
+
+    if (query.getLimit().isSome() && filteredItems.size() > query.getLimit().get()) {
+      logger.debug("limit items");
+      return new SearchResultImpl(resultOffset, query.getLimit().get(),
+              filteredItems.subList(0, query.getLimit().get()));
+    }
+    return new SearchResultImpl(resultOffset, resultLimit, filteredItems);
+  }
+
+  /**
+   * Returns true if all set definition filters matches.
+   *
+   * @param setDef set definition to test
+   * @param elements media package elements to test
+   * @return returns true if all set definition filters matches, otherwise false
+   */
+  protected boolean matchSetDef(OaiPmhSetDefinition setDef, List<SearchResultElementItem> elements) {
+    // all filters should match
+    for (OaiPmhSetDefinitionFilter filter : setDef.getFilters()) {
+      if (!matchSetDefFilter(filter, elements)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Returns true if any filter criterion matches
+   *
+   * @param filter filter to test
+   * @param elements media package elements to test filter criteria on
+   * @return true if any filter criteria matches, otherwise false
+   */
+  private boolean matchSetDefFilter(OaiPmhSetDefinitionFilter filter, List<SearchResultElementItem> elements) {
+    // At least one filter criterion should match
+    for (String criterion : filter.getCriteria().keySet()) {
+      if (StringUtils.equals(OaiPmhSetDefinitionFilter.CRITERION_CONTAINS, criterion)) {
+        for (SearchResultElementItem element : elements) {
+          if (!StringUtils.equals(filter.getFlavor(), element.getFlavor())) {
+            continue;
+          }
+          for (String criterionValue : filter.getCriteria().get(criterion)) {
+            if (StringUtils.contains(element.getXml(), criterionValue)) {
+              return true;
+            }
+          }
+        }
+      } else if (StringUtils.equals(OaiPmhSetDefinitionFilter.CRITERION_CONTAINSNOT, criterion)) {
+        for (SearchResultElementItem element : elements) {
+          if (!StringUtils.equals(filter.getFlavor(), element.getFlavor())) {
+            continue;
+          }
+          for (String criterionValue : filter.getCriteria().get(criterion)) {
+            if (!StringUtils.contains(element.getXml(), criterionValue)) {
+              return true;
+            }
+          }
+        }
+      } else if (StringUtils.equals(OaiPmhSetDefinitionFilter.CRITERION_MATCH, criterion)) {
+        for (String criterionValue : filter.getCriteria().get(criterion)) {
+          Pattern matchPattern = null; // wait with initialization until we found an element to test
+          for (SearchResultElementItem element : elements) {
+            if (!StringUtils.equals(filter.getFlavor(), element.getFlavor())) {
+              continue;
+            }
+            // initialize regex pattern once and only if we need it (for performance reasons)
+            if (matchPattern == null) {
+              matchPattern = Pattern.compile(criterionValue);
+            }
+            if (matchPattern.matcher(element.getXml()).find()) {
+              return true;
+            }
+          }
+        }
+      } else {
+        logger.warn("Unknown OAI-PMH set filter criterion '{}'. Ignore it.", criterion);
+      }
+    }
+    return false;
   }
 
   /**
@@ -375,58 +470,5 @@ public abstract class AbstractOaiPmhDatabase implements OaiPmhDatabase {
       }
     }
     return new SearchResultImpl(offset, limit, items);
-  }
-
-  public static String forSwitch(Opt<?>... opts) {
-    return $(opts).map(new Fn<Opt<?>, String>() {
-      @Override public String apply(Opt<?> o) {
-        return o.isSome() ? "some" : "none";
-      }
-    }).mkString(":");
-  }
-
-  public static String toXml(DublinCoreCatalog dc) {
-    try {
-      return dc.toXmlString();
-    } catch (IOException e) {
-      logger.error("Cannot serialize DublinCoreCatalog to XML", e);
-      return chuck(e);
-    }
-  }
-
-  public static String toXml(MediaPackage mp, AccessControlList acl) {
-    try {
-      return XACMLUtils.getXacml(mp, acl);
-    } catch (JAXBException e) {
-      logger.error(format("Cannot serialize access control list of media package %s to XML", mp.getIdentifier().toString()), e);
-      return chuck(e);
-    }
-  }
-
-  public DublinCoreCatalog getSeriesDc(String seriesId) {
-    try {
-      return getSeriesService().getSeries(seriesId);
-    } catch (SeriesException e) {
-      logger.error("An error occurred while talking to the SeriesService", e);
-      return chuck(e);
-    } catch (NotFoundException e) {
-      logger.error(format("The requested series %s does not exist", seriesId), e);
-      return chuck(e);
-    } catch (UnauthorizedException e) {
-      logger.error(format("You are not allowed to request series %s", seriesId), e);
-      return chuck(e);
-    }
-  }
-
-  public Opt<AccessControlList> getSeriesAcl(String seriesId) {
-    try {
-      return Opt.some(getSeriesService().getSeriesAccessControl(seriesId));
-    } catch (NotFoundException e) {
-      logger.info(format("Series %s does not have an ACL", seriesId), e);
-      return Opt.none();
-    } catch (SeriesException e) {
-      logger.error("An error occurred while talking to the SeriesService", e);
-      return chuck(e);
-    }
   }
 }

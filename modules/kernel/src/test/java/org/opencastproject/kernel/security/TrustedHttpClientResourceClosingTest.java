@@ -23,14 +23,13 @@ package org.opencastproject.kernel.security;
 
 import static org.junit.Assert.assertEquals;
 
-import org.opencastproject.kernel.http.api.HttpClient;
-import org.opencastproject.kernel.http.impl.HttpClientFactory;
 import org.opencastproject.security.api.SecurityService;
 import org.opencastproject.security.urlsigning.exception.UrlSigningException;
 import org.opencastproject.security.urlsigning.service.UrlSigningService;
 
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.CloseableHttpClient;
 import org.easymock.EasyMock;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -52,56 +51,53 @@ public class TrustedHttpClientResourceClosingTest {
   private static final class TestHttpClient extends TrustedHttpClientImpl {
     TestHttpClient() throws UrlSigningException {
       super("user", "pass");
-      setHttpClientFactory(new HttpClientFactory());
       setSecurityService(EasyMock.createNiceMock(SecurityService.class));
       // Setup signing service
       UrlSigningService urlSigningService = EasyMock.createMock(UrlSigningService.class);
       EasyMock.expect(urlSigningService.accepts(EasyMock.anyString())).andReturn(true).anyTimes();
       EasyMock.expect(
               urlSigningService.sign(EasyMock.anyString(), EasyMock.anyLong(), EasyMock.anyLong(), EasyMock.anyString()))
-              .andReturn("http://ok.com");
+              .andReturn("http://127.0.0.1:" + PORT);
       EasyMock.replay(urlSigningService);
 
       setUrlSigningService(urlSigningService);
     }
 
-    Map<HttpResponse, HttpClient> getResponseMap() {
+    Map<HttpResponse, CloseableHttpClient> getResponseMap() {
       return responseMap;
     }
   }
 
   @Test
   public void testResourceClosing() throws Exception {
-    startServer(PORT);
+    startServer();
     final TestHttpClient client = new TestHttpClient();
     final HttpResponse response;
-    response = client.execute(new HttpGet("http://localhost:" + PORT));
+    response = client.execute(new HttpGet("http://127.0.0.1:" + PORT));
     assertEquals("Request should be stored in response map", 1, client.getResponseMap().size());
     client.close(response);
     assertEquals("Request should be removed from response map", 0, client.getResponseMap().size());
   }
 
-  private void startServer(int port) throws Exception {
-    final ServerSocket socket = new ServerSocket(port);
+  private void startServer() throws Exception {
+    final ServerSocket socket = new ServerSocket(PORT);
     final ExecutorService es = Executors.newFixedThreadPool(1);
     final CountDownLatch barrier = new CountDownLatch(1);
-    final Callable<Void> server = new Callable<Void>() {
-      @Override public Void call() throws Exception {
-        // notify that the server is ready
-        barrier.countDown();
-        logger.info("Waiting for incoming connection");
-        final Socket s = socket.accept();
-        logger.info("Connected");
-        final PrintStream out = new PrintStream(s.getOutputStream());
-        out.println("HTTP/1.1 200 OK\n\n");
-        out.flush();
-        out.close();
-        s.getInputStream().close();
-        s.close();
-        es.shutdown();
-        logger.info("Terminate server");
-        return null;
-      }
+    final Callable<Void> server = () -> {
+      // notify that the server is ready
+      barrier.countDown();
+      logger.info("Waiting for incoming connection");
+      final Socket s = socket.accept();
+      logger.info("Connected");
+      final PrintStream out = new PrintStream(s.getOutputStream());
+      out.println("HTTP/1.1 200 OK\n\n");
+      out.flush();
+      out.close();
+      s.getInputStream().close();
+      s.close();
+      es.shutdown();
+      logger.info("Terminate server");
+      return null;
     };
     es.submit(server);
     logger.info("Waiting for server...");

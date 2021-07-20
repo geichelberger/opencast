@@ -36,8 +36,6 @@ import org.junit.Test;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
-import java.util.HashMap;
-import java.util.Map;
 
 import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.Consumes;
@@ -145,16 +143,16 @@ public class RestDocsAnnotationTest {
         assertEquals(RestParameter.Type.FILE, restQueryAnnotation.bodyParameter().type());
 
         // responses
-        assertTrue(restQueryAnnotation.reponses().length == 3);
+        assertTrue(restQueryAnnotation.responses().length == 3);
 
-        assertEquals(HttpServletResponse.SC_OK, restQueryAnnotation.reponses()[0].responseCode());
-        assertEquals("Returns augmented media package", restQueryAnnotation.reponses()[0].description());
+        assertEquals(HttpServletResponse.SC_OK, restQueryAnnotation.responses()[0].responseCode());
+        assertEquals("Returns augmented media package", restQueryAnnotation.responses()[0].description());
 
-        assertEquals(HttpServletResponse.SC_BAD_REQUEST, restQueryAnnotation.reponses()[1].responseCode());
-        assertEquals("", restQueryAnnotation.reponses()[1].description());
+        assertEquals(HttpServletResponse.SC_BAD_REQUEST, restQueryAnnotation.responses()[1].responseCode());
+        assertEquals("", restQueryAnnotation.responses()[1].description());
 
-        assertEquals(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, restQueryAnnotation.reponses()[2].responseCode());
-        assertEquals("", restQueryAnnotation.reponses()[2].description());
+        assertEquals(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, restQueryAnnotation.responses()[2].responseCode());
+        assertEquals("", restQueryAnnotation.responses()[2].description());
 
       }
     } catch (SecurityException e) {
@@ -174,8 +172,7 @@ public class RestDocsAnnotationTest {
     try {
       testMethod = TestServletSample.class.getMethod("methodA");
       if (testMethod != null) {
-        RestDocData restDocData = new RestDocData("NAME", "TITLE", "URL", null, new TestServletSample(),
-                new HashMap<String, String>());
+        RestDocData restDocData = new RestDocData("NAME", "TITLE", "URL", null);
 
         RestQuery restQueryAnnotation = (RestQuery) testMethod.getAnnotation(RestQuery.class);
         Path pathAnnotation = (Path) testMethod.getAnnotation(Path.class);
@@ -192,11 +189,11 @@ public class RestDocsAnnotationTest {
         }
 
         RestEndpointData endpoint = new RestEndpointData(testMethod.getReturnType(),
-                restDocData.processMacro(restQueryAnnotation.name()), httpMethodString, "/" + pathAnnotation.value(),
-                restDocData.processMacro(restQueryAnnotation.description()));
+                restQueryAnnotation.name(), httpMethodString, "/" + pathAnnotation.value(),
+                restQueryAnnotation.description());
         if (!restQueryAnnotation.returnDescription().isEmpty()) {
           endpoint.addNote("Return value description: "
-                  + restDocData.processMacro(restQueryAnnotation.returnDescription()));
+                  + restQueryAnnotation.returnDescription());
         }
 
         // name, description and return description
@@ -219,8 +216,8 @@ public class RestDocsAnnotationTest {
         assertEquals(MediaType.TEXT_XML, endpoint.getFormats().get(0).getName());
 
         // responses
-        for (RestResponse restResp : restQueryAnnotation.reponses()) {
-          endpoint.addStatus(restResp, restDocData);
+        for (RestResponse restResp : restQueryAnnotation.responses()) {
+          endpoint.addStatus(restResp);
         }
         assertEquals(3, endpoint.getStatuses().size());
 
@@ -235,7 +232,7 @@ public class RestDocsAnnotationTest {
 
         // body parameter
         if (restQueryAnnotation.bodyParameter().type() != RestParameter.Type.NO_PARAMETER) {
-          endpoint.addBodyParam(restQueryAnnotation.bodyParameter(), restDocData);
+          endpoint.addBodyParam(restQueryAnnotation.bodyParameter());
         }
         assertEquals("BODY", endpoint.getBodyParam().getName());
         assertEquals("The media track file", endpoint.getBodyParam().getDescription());
@@ -245,7 +242,7 @@ public class RestDocsAnnotationTest {
 
         // path parameter
         for (RestParameter restParam : restQueryAnnotation.pathParameters()) {
-          endpoint.addPathParam(new RestParamData(restParam, restDocData));
+          endpoint.addPathParam(new RestParamData(restParam));
         }
         assertEquals(1, endpoint.getPathParams().size());
         assertEquals("wdID", endpoint.getPathParams().get(0).getName());
@@ -258,9 +255,9 @@ public class RestDocsAnnotationTest {
         // query parameters
         for (RestParameter restParam : restQueryAnnotation.restParameters()) {
           if (restParam.isRequired()) {
-            endpoint.addRequiredParam(new RestParamData(restParam, restDocData));
+            endpoint.addRequiredParam(new RestParamData(restParam));
           } else {
-            endpoint.addOptionalParam(new RestParamData(restParam, restDocData));
+            endpoint.addOptionalParam(new RestParamData(restParam));
           }
         }
         // #1
@@ -280,39 +277,14 @@ public class RestDocsAnnotationTest {
         assertTrue("TEXT".equalsIgnoreCase(endpoint.getOptionalParams().get(0).getType()));
 
       }
-    } catch (SecurityException e) {
-      fail();
-    } catch (NoSuchMethodException e) {
+    } catch (SecurityException | NoSuchMethodException e) {
       fail();
     }
   }
 
   @Test
-  public void testRestQueryDocsMacros() {
-    Method testMethod = null;
-    Map<String, String> map = new HashMap<String, String>();
-    map.put("somethingElse", "the value of something else");
-    map.put("anotherthing", "the value of another thing");
-    try {
-      testMethod = TestServletSample.class.getMethod("methodB");
-      if (testMethod != null) {
-        RestQuery restQueryAnnotation = (RestQuery) testMethod.getAnnotation(RestQuery.class);
-        RestDocData restDocData = new RestDocData("NAME", "TITLE", "URL", null, new TestServletSample(), map);
-
-        assertEquals(restDocData.processMacro(restQueryAnnotation.restParameters()[1].defaultValue()),
-                "ADCD THIS IS SCHEMA XUHZSUFH the value of something else UGGUH the value of another thing AIHID");
-      }
-    } catch (SecurityException e) {
-      fail();
-    } catch (NoSuchMethodException e) {
-      e.printStackTrace();
-      fail();
-    }
-  }
-
-  @Test
-  public void testPathPatternMatching() throws Exception {
-    assertTrue("/{seriesID:.+}".matches(RestDocData.PATH_VALIDATION_REGEX));
+  public void testPathPatternMatching() {
+    assertTrue(RestDocData.isValidPath("/{seriesID:.+}"));
   }
 
   /**
@@ -329,7 +301,7 @@ public class RestDocsAnnotationTest {
     @Path("addTrack")
     @RestQuery(name = "addTrackInputStream", description = "Add a media track to a given media package using an input stream", pathParameters = { @RestParameter(defaultValue = "", description = "Workflow definition id", isRequired = true, name = "wdID", type = RestParameter.Type.STRING) }, restParameters = {
             @RestParameter(defaultValue = "Default", description = "The kind of media track", isRequired = true, name = "flavor", type = RestParameter.Type.STRING),
-            @RestParameter(defaultValue = "", description = "The media package as XML", isRequired = false, name = "mediaPackage", type = RestParameter.Type.TEXT) }, bodyParameter = @RestParameter(defaultValue = "", description = "The media track file", isRequired = true, name = "BODY", type = RestParameter.Type.FILE), reponses = {
+            @RestParameter(defaultValue = "", description = "The media package as XML", isRequired = false, name = "mediaPackage", type = RestParameter.Type.TEXT) }, bodyParameter = @RestParameter(defaultValue = "", description = "The media track file", isRequired = true, name = "BODY", type = RestParameter.Type.FILE), responses = {
             @RestResponse(description = "Returns augmented media package", responseCode = HttpServletResponse.SC_OK),
             @RestResponse(description = "", responseCode = HttpServletResponse.SC_BAD_REQUEST),
             @RestResponse(description = "", responseCode = HttpServletResponse.SC_INTERNAL_SERVER_ERROR) }, returnDescription = "augmented media package")
@@ -343,7 +315,7 @@ public class RestDocsAnnotationTest {
     @Path("addTrack")
     @RestQuery(name = "addTrackInputStream", description = "Add a media track to a given media package using an input stream", pathParameters = { @RestParameter(defaultValue = "", description = "Workflow definition id", isRequired = true, name = "wdID", type = RestParameter.Type.STRING) }, restParameters = {
             @RestParameter(defaultValue = "Default", description = "The kind of media track", isRequired = true, name = "flavor", type = RestParameter.Type.STRING),
-            @RestParameter(defaultValue = "ADCD ${this.schema} XUHZSUFH ${somethingElse} UGGUH ${anotherthing} AIHID", description = "The media package as XML", isRequired = false, name = "mediaPackage", type = RestParameter.Type.TEXT) }, bodyParameter = @RestParameter(defaultValue = "", description = "The media track file", isRequired = true, name = "BODY", type = RestParameter.Type.FILE), reponses = {
+            @RestParameter(defaultValue = "ADCD ${this.schema} XUHZSUFH ${somethingElse} UGGUH ${anotherthing} AIHID", description = "The media package as XML", isRequired = false, name = "mediaPackage", type = RestParameter.Type.TEXT) }, bodyParameter = @RestParameter(defaultValue = "", description = "The media track file", isRequired = true, name = "BODY", type = RestParameter.Type.FILE), responses = {
             @RestResponse(description = "Returns augmented media package", responseCode = HttpServletResponse.SC_OK),
             @RestResponse(description = "", responseCode = HttpServletResponse.SC_BAD_REQUEST),
             @RestResponse(description = "", responseCode = HttpServletResponse.SC_INTERNAL_SERVER_ERROR) }, returnDescription = "augmented media package")

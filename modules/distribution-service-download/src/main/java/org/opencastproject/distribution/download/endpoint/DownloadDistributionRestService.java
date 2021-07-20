@@ -31,6 +31,8 @@ import org.opencastproject.job.api.JaxbJob;
 import org.opencastproject.job.api.Job;
 import org.opencastproject.job.api.JobProducer;
 import org.opencastproject.mediapackage.MediaPackage;
+import org.opencastproject.mediapackage.MediaPackageElement;
+import org.opencastproject.mediapackage.MediaPackageElementParser;
 import org.opencastproject.mediapackage.MediaPackageParser;
 import org.opencastproject.rest.AbstractJobProducerEndpoint;
 import org.opencastproject.serviceregistry.api.ServiceRegistry;
@@ -47,6 +49,7 @@ import org.osgi.service.component.ComponentContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
 import java.util.Set;
 
 import javax.ws.rs.DefaultValue;
@@ -63,14 +66,14 @@ import javax.ws.rs.core.Response.Status;
  */
 @Path("/")
 @RestService(name = "localdistributionservice", title = "Local Distribution Service",
-  abstractText = "This service distributes media packages to the Opencast feed and engage services.",
-  notes = {
+    abstractText = "This service distributes media packages to the Opencast feed and engage services.",
+    notes = {
         "All paths above are relative to the REST endpoint base (something like http://your.server/files)",
         "If the service is down or not working it will return a status 503, this means the the underlying service is "
         + "not working and is either restarting or has failed",
         "A status code 500 means a general failure has occurred which is not recoverable and was not anticipated. In "
         + "other words, there is a bug! You should file an error report with your server logs from the time when the "
-        + "error occurred: <a href=\"https://opencast.jira.com\">Opencast Issue Tracker</a>" })
+        + "error occurred: <a href=\"https://github.com/opencast/opencast/issues\">Opencast Issue Tracker</a>" })
 public class DownloadDistributionRestService extends AbstractJobProducerEndpoint {
 
   /** The logger */
@@ -112,31 +115,41 @@ public class DownloadDistributionRestService extends AbstractJobProducerEndpoint
   @POST
   @Path("/")
   @Produces(MediaType.TEXT_XML)
-  @RestQuery(name = "distribute",
-             description = "Distribute a media package element to this distribution channel",
-             returnDescription = "The job that can be used to track the distribution",
-             restParameters = {
-                     @RestParameter(name = "mediapackage",
-                                    isRequired = true,
-                                    description = "The mediapackage",
-                                    type = Type.TEXT),
-                     @RestParameter(name = "channelId",
-                                    isRequired = true,
-                                    description = "The publication channel ID",
-                                    type = Type.TEXT),
-                     @RestParameter(name = "elementId",
-                                    isRequired = true,
-                                    description = "The element to distribute. The Id or multiple Ids as JSON Array ( ['IdOne','IdTwo'] )",
-                                    type = Type.STRING) },
-             reponses = {
-                     @RestResponse(responseCode = SC_OK,
-                                   description = "An XML representation of the distribution job") })
-  public Response distribute(@FormParam("mediapackage") String mediaPackageXml,
-                             @FormParam("elementId") String elementId,
-                             @FormParam("channelId") String channelId,
-                             @DefaultValue("true") @FormParam("checkAvailability") boolean checkAvailability,
-                             @DefaultValue("false") @FormParam("preserveReference") boolean preserveReference)
-          throws Exception {
+  @RestQuery(
+      name = "distribute",
+      description = "Distribute a media package element to this distribution channel",
+      returnDescription = "The job that can be used to track the distribution",
+      restParameters = {
+          @RestParameter(
+              name = "mediapackage",
+              isRequired = true,
+              description = "The mediapackage",
+              type = Type.TEXT
+          ),
+          @RestParameter(
+              name = "channelId",
+              isRequired = true,
+              description = "The publication channel ID",
+              type = Type.TEXT
+          ),
+          @RestParameter(
+              name = "elementId",
+              isRequired = true,
+              description = "The element to distribute. The Id or multiple Ids as JSON Array ( ['IdOne','IdTwo'] )",
+              type = Type.STRING
+          )
+      },
+      responses = {
+          @RestResponse(responseCode = SC_OK, description = "An XML representation of the distribution job")
+      }
+  )
+  public Response distribute(
+      @FormParam("mediapackage") String mediaPackageXml,
+      @FormParam("elementId") String elementId,
+      @FormParam("channelId") String channelId,
+      @FormParam("checkAvailability") @DefaultValue("true") boolean checkAvailability,
+      @FormParam("preserveReference") @DefaultValue("false") boolean preserveReference
+  ) throws Exception {
     try {
       Gson gson = new Gson();
       Set<String> setElementIds = gson.fromJson(elementId, new TypeToken<Set<String>>() { }.getType());
@@ -153,35 +166,138 @@ public class DownloadDistributionRestService extends AbstractJobProducerEndpoint
   }
 
   @POST
+  @Path("/distributesync")
+  @Produces(MediaType.TEXT_XML)
+  @RestQuery(name = "distributesync",
+      description = "Synchronously distribute a media package element to this distribution channel",
+      returnDescription = "The distribution",
+      restParameters = {
+          @RestParameter(name = "mediapackage",
+              isRequired = true,
+              description = "The mediapackage",
+              type = Type.TEXT),
+          @RestParameter(name = "channelId",
+              isRequired = true,
+              description = "The publication channel ID",
+              type = Type.TEXT),
+          @RestParameter(name = "elementId",
+              isRequired = true,
+              description = "The element to distribute. The Id or multiple Ids as JSON Array ( ['IdOne','IdTwo'] )",
+              type = Type.STRING) },
+      responses = {
+          @RestResponse(responseCode = SC_OK,
+              description = "An XML representation of the distribution") })
+  public Response distributeSync(@FormParam("mediapackage") String mediaPackageXml,
+                             @FormParam("elementId") String elementId,
+                             @FormParam("channelId") String channelId,
+                             @DefaultValue("true") @FormParam("checkAvailability") boolean checkAvailability)
+          throws Exception {
+    try {
+      Gson gson = new Gson();
+      Set<String> setElementIds = gson.fromJson(elementId, new TypeToken<Set<String>>() { }.getType());
+      final MediaPackage mediapackage = MediaPackageParser.getFromXml(mediaPackageXml);
+      final List<MediaPackageElement> result = service
+          .distributeSync(channelId, mediapackage, setElementIds, checkAvailability);
+      return ok(MediaPackageElementParser.getArrayAsXml(result));
+    } catch (IllegalArgumentException e) {
+      logger.debug("Unable to distribute element: {}", e.getMessage());
+      return status(Status.BAD_REQUEST).build();
+    } catch (Exception e) {
+      logger.warn("Error distributing element", e);
+      return serverError();
+    }
+  }
+
+  @POST
   @Path("/retract")
   @Produces(MediaType.TEXT_XML)
-  @RestQuery(name = "retract", description = "Retract a media package element from this distribution channel", returnDescription = "The job that can be used to track the retraction",
-             restParameters = {
-                     @RestParameter(name = "mediapackage",
-                                    isRequired = true,
-                                    description = "The mediapackage",
-                                    type = Type.TEXT),
-                     @RestParameter(name = "channelId",
-                                    isRequired = true,
-                                    description = "The publication channel ID",
-                                    type = Type.TEXT),
-                     @RestParameter(name = "elementId",
-                                    isRequired = true,
-                                    description = "The element to retract. The Id or multiple Ids as JSON Array ( ['IdOne','IdTwo'] )",
-                                    type = Type.STRING) },
-             reponses = {
-                     @RestResponse(responseCode = SC_OK,
-                                   description = "An XML representation of the retraction job") })
-  public Response retract(@FormParam("mediapackage") String mediaPackageXml,
-                          @FormParam("elementId") String elementId,
-                          @FormParam("channelId") String channelId)
-          throws Exception {
+  @RestQuery(
+      name = "retract",
+      description = "Retract a media package element from this distribution channel",
+      returnDescription = "The job that can be used to track the retraction",
+      restParameters = {
+          @RestParameter(
+              name = "mediapackage",
+              isRequired = true,
+              description = "The mediapackage",
+              type = Type.TEXT
+          ),
+          @RestParameter(
+              name = "channelId",
+              isRequired = true,
+              description = "The publication channel ID",
+              type = Type.TEXT
+          ),
+          @RestParameter(
+              name = "elementId",
+              isRequired = true,
+              description = "The element to retract. The Id or multiple Ids as JSON Array ( ['IdOne','IdTwo'] )",
+              type = Type.STRING
+          )
+      },
+      responses = {
+          @RestResponse(responseCode = SC_OK, description = "An XML representation of the retraction job")
+      }
+  )
+  public Response retract(
+      @FormParam("mediapackage") String mediaPackageXml,
+      @FormParam("elementId") String elementId,
+      @FormParam("channelId") String channelId
+  ) throws Exception {
     try {
       Gson gson = new Gson();
       Set<String> setElementIds = gson.fromJson(elementId, new TypeToken<Set<String>>() { }.getType());
       final MediaPackage mediapackage = MediaPackageParser.getFromXml(mediaPackageXml);
       final Job job = service.retract(channelId, mediapackage, setElementIds);
       return ok(new JaxbJob(job));
+    } catch (IllegalArgumentException e) {
+      logger.debug("Unable to retract element: {}", e.getMessage());
+      return status(Status.BAD_REQUEST).build();
+    } catch (Exception e) {
+      logger.warn("Unable to retract mediapackage '{}' from download channel: {}", mediaPackageXml, e);
+      return serverError();
+    }
+  }
+
+  @POST
+  @Path("/retractsync")
+  @Produces(MediaType.TEXT_XML)
+  @RestQuery(
+      name = "retractsync",
+      description = "Synchronously retract a media package element from this distribution channel",
+      returnDescription = "The retraction",
+      restParameters = {
+          @RestParameter(name = "mediapackage",
+              isRequired = true,
+              description = "The mediapackage",
+              type = Type.TEXT
+          ),
+          @RestParameter(name = "channelId",
+              isRequired = true,
+              description = "The publication channel ID",
+              type = Type.TEXT
+          ),
+          @RestParameter(name = "elementId",
+              isRequired = true,
+              description = "The element to retract. The Id or multiple Ids as JSON Array ( ['IdOne','IdTwo'] )",
+              type = Type.STRING
+          )
+      },
+      responses = {
+          @RestResponse(responseCode = SC_OK, description = "An XML representation of the retraction")
+      }
+  )
+  public Response retractSync(
+      @FormParam("mediapackage") String mediaPackageXml,
+      @FormParam("elementId") String elementId,
+      @FormParam("channelId") String channelId
+  ) throws Exception {
+    try {
+      Gson gson = new Gson();
+      Set<String> setElementIds = gson.fromJson(elementId, new TypeToken<Set<String>>() { }.getType());
+      final MediaPackage mediapackage = MediaPackageParser.getFromXml(mediaPackageXml);
+      final List<MediaPackageElement> result = service.retractSync(channelId, mediapackage, setElementIds);
+      return ok(MediaPackageElementParser.getArrayAsXml(result));
     } catch (IllegalArgumentException e) {
       logger.debug("Unable to retract element: {}", e.getMessage());
       return status(Status.BAD_REQUEST).build();
@@ -198,10 +314,11 @@ public class DownloadDistributionRestService extends AbstractJobProducerEndpoint
    */
   @Override
   public JobProducer getService() {
-    if (service instanceof JobProducer)
+    if (service instanceof JobProducer) {
       return (JobProducer) service;
-    else
+    } else {
       return null;
+    }
   }
 
   /**

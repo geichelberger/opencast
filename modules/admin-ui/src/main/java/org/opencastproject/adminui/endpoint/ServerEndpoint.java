@@ -21,6 +21,7 @@
 
 package org.opencastproject.adminui.endpoint;
 
+import static com.entwinemedia.fn.data.json.Jsons.BLANK;
 import static com.entwinemedia.fn.data.json.Jsons.f;
 import static com.entwinemedia.fn.data.json.Jsons.obj;
 import static com.entwinemedia.fn.data.json.Jsons.v;
@@ -30,8 +31,6 @@ import static org.opencastproject.util.doc.rest.RestParameter.Type.STRING;
 import org.opencastproject.index.service.resources.list.provider.ServersListProvider;
 import org.opencastproject.index.service.resources.list.query.ServersListQuery;
 import org.opencastproject.index.service.util.RestUtils;
-import org.opencastproject.matterhorn.search.SearchQuery;
-import org.opencastproject.matterhorn.search.SortCriterion;
 import org.opencastproject.serviceregistry.api.HostRegistration;
 import org.opencastproject.serviceregistry.api.ServiceRegistry;
 import org.opencastproject.serviceregistry.api.ServiceStatistics;
@@ -40,6 +39,8 @@ import org.opencastproject.util.doc.rest.RestParameter;
 import org.opencastproject.util.doc.rest.RestQuery;
 import org.opencastproject.util.doc.rest.RestResponse;
 import org.opencastproject.util.doc.rest.RestService;
+import org.opencastproject.util.requests.SortCriterion;
+import org.opencastproject.util.requests.SortCriterion.Order;
 
 import com.entwinemedia.fn.data.json.JValue;
 
@@ -47,6 +48,9 @@ import org.apache.commons.lang3.StringUtils;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.osgi.framework.BundleContext;
+import org.osgi.service.component.annotations.Activate;
+import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Reference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -75,16 +79,26 @@ import javax.ws.rs.core.Response;
               + "<em>This service is for exclusive use by the module admin-ui. Its API might change "
               + "anytime without prior notice. Any dependencies other than the admin UI will be strictly ignored. "
               + "DO NOT use this for integration of third-party applications.<em>"})
+@Component(
+  immediate = true,
+  service = ServerEndpoint.class,
+  property = {
+    "service.description=Admin UI - Server facade Endpoint",
+    "opencast.service.type=org.opencastproject.adminui.endpoint.ServerEndpoint",
+    "opencast.service.path=/admin-ng/server"
+  }
+)
 public class ServerEndpoint {
 
   private enum Sort {
-    COMPLETED, CORES, HOSTNAME, MAINTENANCE, MEANQUEUETIME, MEANRUNTIME, ONLINE, QUEUED, RUNNING
+    COMPLETED, CORES, HOSTNAME, MAINTENANCE, MEANQUEUETIME, MEANRUNTIME, NODENAME, ONLINE, QUEUED, RUNNING
   }
 
   // List of property keys for the JSON job object
   private static final String KEY_ONLINE = "online";
   private static final String KEY_MAINTENANCE = "maintenance";
   private static final String KEY_HOSTNAME = "hostname";
+  private static final String KEY_NODE_NAME = "nodeName";
   private static final String KEY_CORES = "cores";
   private static final String KEY_RUNNING = "running";
   private static final String KEY_COMPLETED = "completed";
@@ -138,11 +152,20 @@ public class ServerEndpoint {
         case MEANRUNTIME:
           result = ((Long) host1.get(KEY_MEAN_RUN_TIME)).compareTo((Long) host2.get(KEY_MEAN_RUN_TIME));
           break;
+        case NODENAME:
+        {
+          String name1 = (String) host1.get(KEY_NODE_NAME);
+          String name2 = (String) host2.get(KEY_NODE_NAME);
+          result = name1.compareTo(name2);
+          break;
+        }
         case HOSTNAME:
         default:
+        {
           String name1 = (String) host1.get(KEY_HOSTNAME);
           String name2 = (String) host2.get(KEY_HOSTNAME);
           result = name1.compareTo(name2);
+        }
       }
 
       return ascending ? result : -1 * result;
@@ -158,10 +181,12 @@ public class ServerEndpoint {
   private ServiceRegistry serviceRegistry;
 
   /** OSGi callback for the service registry. */
+  @Reference
   public void setServiceRegistry(ServiceRegistry serviceRegistry) {
     this.serviceRegistry = serviceRegistry;
   }
 
+  @Activate
   protected void activate(BundleContext bundleContext) {
     logger.info("Activate job endpoint");
   }
@@ -177,7 +202,7 @@ public class ServerEndpoint {
                   + "of the following: COMPLETED (jobs), CORES, HOSTNAME, MAINTENANCE, MEANQUEUETIME (mean for jobs), "
                   + "MEANRUNTIME (mean for jobs), ONLINE, QUEUED (jobs), RUNNING (jobs)."
                   + "The suffix must be :ASC for ascending or :DESC for descending sort order (e.g. HOSTNAME:DESC).", isRequired = false, type = STRING) },
-          reponses = { @RestResponse(description = "Returns the list of jobs from Opencast", responseCode = HttpServletResponse.SC_OK) },
+          responses = { @RestResponse(description = "Returns the list of jobs from Opencast", responseCode = HttpServletResponse.SC_OK) },
           returnDescription = "The list of servers")
   public Response getServers(@QueryParam("limit") final int limit, @QueryParam("offset") final int offset,
           @QueryParam("filter") String filter, @QueryParam("sort") String sort)
@@ -229,10 +254,15 @@ public class ServerEndpoint {
       boolean vOnline = server.isOnline();
       boolean vMaintenance = server.isMaintenanceMode();
       String vHostname = server.getBaseUrl();
+      String vNodeName = server.getNodeName();
       int vCores = server.getCores();
 
       if (query.getHostname().isSome()
               && !StringUtils.equalsIgnoreCase(vHostname, query.getHostname().get()))
+          continue;
+
+      if (query.getNodeName().isSome()
+              && !StringUtils.equalsIgnoreCase(vNodeName, query.getNodeName().get()))
           continue;
 
       if (query.getStatus().isSome()) {
@@ -255,6 +285,7 @@ public class ServerEndpoint {
 
       if (query.getFreeText().isSome()
                 && !StringUtils.containsIgnoreCase(vHostname, query.getFreeText().get())
+                && !StringUtils.containsIgnoreCase(vNodeName, query.getFreeText().get())
                 && !StringUtils.containsIgnoreCase(server.getIpAddress(), query.getFreeText().get()))
         continue;
 
@@ -262,6 +293,7 @@ public class ServerEndpoint {
       jsonServer.put(KEY_ONLINE, vOnline && offlineJobProducerServices <= totalJobProducerServices / 2);
       jsonServer.put(KEY_MAINTENANCE, vMaintenance);
       jsonServer.put(KEY_HOSTNAME, vHostname);
+      jsonServer.put(KEY_NODE_NAME, vNodeName);
       jsonServer.put(KEY_CORES, vCores);
       jsonServer.put(KEY_RUNNING, jobsRunning);
       jsonServer.put(KEY_QUEUED, jobsQueued);
@@ -278,8 +310,8 @@ public class ServerEndpoint {
       try {
         SortCriterion sortCriterion = RestUtils.parseSortQueryParameter(sort).iterator().next();
         sortKey = Sort.valueOf(sortCriterion.getFieldName().toUpperCase());
-        ascending = SearchQuery.Order.Ascending == sortCriterion.getOrder()
-                || SearchQuery.Order.None == sortCriterion.getOrder();
+        ascending = Order.Ascending == sortCriterion.getOrder()
+                || Order.None == sortCriterion.getOrder();
       } catch (WebApplicationException ex) {
         logger.warn("Failed to parse sort criterion \"{}\", invalid format.", sort);
       } catch (IllegalArgumentException ex) {
@@ -314,6 +346,7 @@ public class ServerEndpoint {
       Boolean vOnline = (Boolean) server.get(KEY_ONLINE);
       Boolean vMaintenance = (Boolean) server.get(KEY_MAINTENANCE);
       String vHostname = (String) server.get(KEY_HOSTNAME);
+      String vNodeName = (String) server.get(KEY_NODE_NAME);
       Integer vCores = (Integer) server.get(KEY_CORES);
       Integer vRunning = (Integer) server.get(KEY_RUNNING);
       Integer vQueued = (Integer) server.get(KEY_QUEUED);
@@ -323,7 +356,8 @@ public class ServerEndpoint {
 
       jsonServers.add(obj(f(KEY_ONLINE, v(vOnline)),
               f(KEY_MAINTENANCE, v(vMaintenance)),
-              f(KEY_HOSTNAME, v(vHostname)),
+              f(KEY_HOSTNAME, v(vHostname, BLANK)),
+              f(KEY_NODE_NAME, v(vNodeName, BLANK)),
               f(KEY_CORES, v(vCores)),
               f(KEY_RUNNING, v(vRunning)),
               f(KEY_QUEUED, v(vQueued)),

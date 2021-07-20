@@ -20,12 +20,16 @@
  */
 package org.opencastproject.assetmanager.impl.endpoint;
 
+import static javax.servlet.http.HttpServletResponse.SC_BAD_REQUEST;
+import static javax.servlet.http.HttpServletResponse.SC_CREATED;
 import static javax.servlet.http.HttpServletResponse.SC_FORBIDDEN;
 import static javax.servlet.http.HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
 import static javax.servlet.http.HttpServletResponse.SC_NOT_FOUND;
+import static javax.servlet.http.HttpServletResponse.SC_NOT_MODIFIED;
 import static javax.servlet.http.HttpServletResponse.SC_NO_CONTENT;
 import static javax.servlet.http.HttpServletResponse.SC_OK;
 import static org.opencastproject.assetmanager.api.AssetManager.DEFAULT_OWNER;
+import static org.opencastproject.systems.OpencastConstants.WORKFLOW_PROPERTIES_NAMESPACE;
 import static org.opencastproject.util.MimeTypeUtil.Fns.suffix;
 import static org.opencastproject.util.RestUtil.R.badRequest;
 import static org.opencastproject.util.RestUtil.R.forbidden;
@@ -37,11 +41,19 @@ import static org.opencastproject.util.doc.rest.RestParameter.Type.STRING;
 
 import org.opencastproject.assetmanager.api.Asset;
 import org.opencastproject.assetmanager.api.AssetManager;
+import org.opencastproject.assetmanager.api.Property;
+import org.opencastproject.assetmanager.api.PropertyId;
+import org.opencastproject.assetmanager.api.Value;
 import org.opencastproject.assetmanager.api.Version;
 import org.opencastproject.assetmanager.api.query.AQueryBuilder;
 import org.opencastproject.assetmanager.api.query.AResult;
+import org.opencastproject.assetmanager.api.query.ASelectQuery;
+import org.opencastproject.mediapackage.MediaPackage;
 import org.opencastproject.mediapackage.MediaPackageImpl;
+import org.opencastproject.rest.AbstractJobProducerEndpoint;
 import org.opencastproject.security.api.UnauthorizedException;
+import org.opencastproject.util.Checksum;
+import org.opencastproject.util.ChecksumType;
 import org.opencastproject.util.MimeTypeUtil;
 import org.opencastproject.util.data.Option;
 import org.opencastproject.util.doc.rest.RestParameter;
@@ -50,12 +62,16 @@ import org.opencastproject.util.doc.rest.RestQuery;
 import org.opencastproject.util.doc.rest.RestResponse;
 import org.opencastproject.util.doc.rest.RestService;
 
-import com.entwinemedia.fn.P1;
-import com.entwinemedia.fn.P1Lazy;
+import com.entwinemedia.fn.data.Opt;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.HashMap;
+import java.util.Map;
 
 import javax.ws.rs.DELETE;
 import javax.ws.rs.FormParam;
@@ -81,11 +97,15 @@ import javax.ws.rs.core.Response;
         "All paths are relative to the REST endpoint base (something like http://your.server/files)",
         "If you notice that this service is not working as expected, there might be a bug! "
             + "You should file an error report with your server logs from the time when the error occurred: "
-            + "<a href=\"http://opencast.jira.com\">Opencast Issue Tracker</a>"
+            + "<a href=\"http://github.com/opencast/opencast/issues\">Opencast Issue Tracker</a>"
     },
     abstractText = "This service indexes and queries available (distributed) episodes.")
-public abstract class AbstractAssetManagerRestEndpoint {
+public abstract class AbstractAssetManagerRestEndpoint extends AbstractJobProducerEndpoint {
   protected static final Logger logger = LoggerFactory.getLogger(AbstractAssetManagerRestEndpoint.class);
+
+  private final Gson gson = new Gson();
+
+  private final java.lang.reflect.Type stringMapType = new TypeToken<Map<String, String>>() { }.getType();
 
   public abstract AssetManager getAssetManager();
 
@@ -94,15 +114,17 @@ public abstract class AbstractAssetManagerRestEndpoint {
    */
   @POST
   @Path("add")
-  @RestQuery(name = "add", description = "Adds a media package to the asset manager. This method is deprecated in favor of method POST 'snapshot'.",
+  @RestQuery(
+      name = "add",
+      description = "Adds a media package to the asset manager. This method is deprecated in "
+          + "favor of method POST 'snapshot'.",
       restParameters = {
           @RestParameter(
               name = "mediapackage",
               isRequired = true,
               type = Type.TEXT,
-              defaultValue = "${this.sampleMediaPackage}",
               description = "The media package to add to the search index.")},
-      reponses = {
+      responses = {
           @RestResponse(
               description = "The media package was added, no content to return.",
               responseCode = SC_NO_CONTENT),
@@ -115,12 +137,7 @@ public abstract class AbstractAssetManagerRestEndpoint {
       returnDescription = "No content is returned.")
   @Deprecated
   public Response add(@FormParam("mediapackage") final MediaPackageImpl mediaPackage) {
-    return handleException(new P1Lazy<Response>() {
-      @Override public Response get1() {
-        getAssetManager().takeSnapshot(DEFAULT_OWNER, mediaPackage);
-        return noContent();
-      }
-    });
+    return snapshot(mediaPackage);
   }
 
   @POST
@@ -131,9 +148,8 @@ public abstract class AbstractAssetManagerRestEndpoint {
               name = "mediapackage",
               isRequired = true,
               type = Type.TEXT,
-              defaultValue = "${this.sampleMediaPackage}",
               description = "The media package to take a snapshot from.")},
-      reponses = {
+      responses = {
           @RestResponse(
               description = "A snapshot of the media package has been taken, no content to return.",
               responseCode = SC_NO_CONTENT),
@@ -145,12 +161,12 @@ public abstract class AbstractAssetManagerRestEndpoint {
               responseCode = SC_INTERNAL_SERVER_ERROR)},
       returnDescription = "No content is returned.")
   public Response snapshot(@FormParam("mediapackage") final MediaPackageImpl mediaPackage) {
-    return handleException(new P1Lazy<Response>() {
-      @Override public Response get1() {
-        getAssetManager().takeSnapshot(DEFAULT_OWNER, mediaPackage);
-        return noContent();
-      }
-    });
+    try {
+      getAssetManager().takeSnapshot(DEFAULT_OWNER, mediaPackage);
+      return noContent();
+    } catch (Exception e) {
+      return handleException(e);
+    }
   }
 
   @DELETE
@@ -164,7 +180,7 @@ public abstract class AbstractAssetManagerRestEndpoint {
               type = Type.STRING,
               description = "The media package ID of the episode whose snapshots shall be removed"
                   + " from the asset manager.")},
-      reponses = {
+      responses = {
           @RestResponse(
               description = "Snapshots have been removed, no content to return.",
               responseCode = SC_NO_CONTENT),
@@ -179,19 +195,18 @@ public abstract class AbstractAssetManagerRestEndpoint {
               responseCode = SC_INTERNAL_SERVER_ERROR)},
       returnDescription = "No content is returned.")
   public Response delete(@PathParam("id") final String mediaPackageId) {
-    return handleException(new P1Lazy<Response>() {
-      @Override public Response get1() {
-        if (mediaPackageId != null) {
-          final AQueryBuilder q = getAssetManager().createQuery();
-          if (q.delete(AssetManager.DEFAULT_OWNER, q.snapshot()).where(q.mediaPackageId(mediaPackageId)).run() > 0) {
-            return noContent();
-          } else {
-            return notFound();
-          }
-        } else
-          return notFound();
+    if (StringUtils.isEmpty(mediaPackageId)) {
+      return notFound();
+    }
+    try {
+      final AQueryBuilder q = getAssetManager().createQuery();
+      if (q.delete(AssetManager.DEFAULT_OWNER, q.snapshot()).where(q.mediaPackageId(mediaPackageId)).run() > 0) {
+        return noContent();
       }
-    });
+      return notFound();
+    } catch (Exception e) {
+      return handleException(e);
+    }
   }
 
   @GET
@@ -207,28 +222,25 @@ public abstract class AbstractAssetManagerRestEndpoint {
               isRequired = true,
               type = STRING)
       },
-      reponses = {
+      responses = {
           @RestResponse(responseCode = SC_OK, description = "Media package returned"),
           @RestResponse(responseCode = SC_NOT_FOUND, description = "Not found"),
           @RestResponse(responseCode = SC_FORBIDDEN, description = "Not allowed to read media package."),
           @RestResponse(responseCode = SC_INTERNAL_SERVER_ERROR, description = "There has been an internal error.")
       })
   public Response getMediaPackage(@PathParam("mediaPackageID") final String mediaPackageId) {
-    return handleException(new P1Lazy<Response>() {
-      @Override public Response get1() {
-        final AQueryBuilder q = getAssetManager().createQuery();
-        final AResult r = q.select(q.snapshot())
-            .where(q.mediaPackageId(mediaPackageId).and(q.version().isLatest()))
-            .run();
-        if (r.getSize() == 1) {
-          return ok(r.getRecords().head2().getSnapshot().get().getMediaPackage());
-        } else if (r.getSize() == 0) {
-          return notFound();
-        } else {
-          return serverError();
-        }
+
+    try {
+      Opt<MediaPackage> mp = getAssetManager().getMediaPackage(mediaPackageId);
+
+      if (mp.isSome()) {
+        return ok(mp.get());
+      } else {
+        return notFound();
       }
-    });
+    } catch (Exception e) {
+      return handleException(e);
+    }
   }
 
   @GET
@@ -257,13 +269,16 @@ public abstract class AbstractAssetManagerRestEndpoint {
               description = "a descriptive filename which will be ignored though",
               isRequired = false,
               type = STRING)},
-      reponses = {
+      responses = {
           @RestResponse(
               responseCode = SC_OK,
               description = "File returned"),
           @RestResponse(
               responseCode = SC_NOT_FOUND,
               description = "Not found"),
+          @RestResponse(
+              responseCode = SC_NOT_MODIFIED,
+              description = "If file not modified"),
           @RestResponse(
               description = "Not allowed to read assets of this snapshot.",
               responseCode = SC_FORBIDDEN),
@@ -273,50 +288,211 @@ public abstract class AbstractAssetManagerRestEndpoint {
   public Response getAsset(@PathParam("mediaPackageID") final String mediaPackageID,
                            @PathParam("mediaPackageElementID") final String mediaPackageElementID,
                            @PathParam("version") final String version,
-                           @HeaderParam("If-None-Match") final String ifNoneMatch) {
-    return handleException(new P1Lazy<Response>() {
-      @Override public Response get1() {
-        if (StringUtils.isNotBlank(ifNoneMatch)) {
-          return Response.notModified().build();
-        }
-        for (final Version v : getAssetManager().toVersion(version)) {
-          for (Asset asset : getAssetManager().getAsset(v, mediaPackageID, mediaPackageElementID)) {
-            final String fileName = mediaPackageElementID
-                .concat(".")
-                .concat(asset.getMimeType().bind(suffix).getOr("unknown"));
-            asset.getMimeType().map(MimeTypeUtil.Fns.toString);
-            // Write the file contents back
-            return ok(asset.getInputStream(),
-                      Option.fromOpt(asset.getMimeType().map(MimeTypeUtil.Fns.toString)),
-                      asset.getSize() > 0
-                          ? Option.some(asset.getSize())
-                          : Option.<Long>none(),
-                      Option.some(fileName));
+                           @HeaderParam("If-None-Match") String ifNoneMatch) {
+
+    try {
+      for (final Version v : getAssetManager().toVersion(version)) {
+        for (Asset asset : getAssetManager().getAsset(v, mediaPackageID, mediaPackageElementID)) {
+
+          if (StringUtils.isNotBlank(ifNoneMatch)) {
+            Checksum checksum = asset.getChecksum();
+
+            if (checksum != null && checksum.getType().equals(ChecksumType.DEFAULT_TYPE)) {
+              String md5 = checksum.getValue();
+
+              if (md5.equals(ifNoneMatch)) {
+                return Response.notModified(md5).build();
+              }
+            }
+            else {
+              logger.warn("Checksum of asset {} of media package {} is of incorrect type or missing",
+                      mediaPackageElementID, mediaPackageID);
+            }
           }
-          // none
-          return notFound();
+
+          final String fileName = mediaPackageElementID
+                  .concat(".")
+                  .concat(asset.getMimeType().bind(suffix).getOr("unknown"));
+
+          asset.getMimeType().map(MimeTypeUtil.Fns.toString);
+          // Write the file contents back
+          Option<Long> length = asset.getSize() > 0 ? Option.some(asset.getSize()) : Option.none();
+          return ok(asset.getInputStream(),
+                  Option.fromOpt(asset.getMimeType().map(MimeTypeUtil.Fns.toString)),
+                  length,
+                  Option.some(fileName));
         }
-        // cannot parse version
-        return badRequest("malformed version");
+        // none
+        return notFound();
       }
-    });
+      // cannot parse version
+      return badRequest("malformed version");
+    } catch (Exception e) {
+      return handleException(e);
+    }
+  }
+
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("{mediaPackageID}/properties.json")
+  @RestQuery(name = "getProperties",
+      description = "Get stored properties for an episode.",
+      returnDescription = "Properties as JSON",
+      pathParameters = {
+          @RestParameter(
+              name = "mediaPackageID",
+              description = "the media package ID",
+              isRequired = true,
+              type = STRING)
+      }, restParameters = {
+          @RestParameter(
+              name = "namespace",
+              description = "property namespace",
+              isRequired = false,
+              type = STRING)
+      },
+      responses = {
+          @RestResponse(responseCode = SC_OK, description = "Media package returned"),
+          @RestResponse(responseCode = SC_NOT_FOUND, description = "Not found"),
+          @RestResponse(responseCode = SC_FORBIDDEN, description = "Not allowed to read media package."),
+          @RestResponse(responseCode = SC_INTERNAL_SERVER_ERROR, description = "There has been an internal error.")
+      })
+  public Response getProperties(@PathParam("mediaPackageID") final String mediaPackageId,
+          @FormParam("namespace") final String namespace) {
+    try {
+      final AQueryBuilder queryBuilder = getAssetManager().createQuery();
+      ASelectQuery query;
+      if (StringUtils.isEmpty(namespace)) {
+        query = queryBuilder.select(queryBuilder.properties());
+      } else {
+        query = queryBuilder.select(queryBuilder.propertiesOf(namespace));
+      }
+      query = query.where(queryBuilder.mediaPackageId(mediaPackageId).and(queryBuilder.version().isLatest()));
+      final AResult result = query.run();
+
+      // we expect exactly one result when specifying a media package id
+      if (result.getSize() < 1) {
+        return notFound();
+      } else if (result.getSize() > 1) {
+        return serverError();
+      }
+
+      // build map from properties
+      HashMap<String, HashMap<String, String>> properties = new HashMap<>();
+      if (result.getRecords().head().isSome()) {
+        for (final Property property : result.getRecords().head().get().getProperties()) {
+          final String key = property.getId().getNamespace() + "." + property.getId().getName();
+          final HashMap<String, String> val = new HashMap<>();
+          val.put("type", property.getValue().getType().getClass().getSimpleName());
+          val.put("value", property.getValue().get().toString());
+          properties.put(key, val);
+        }
+      }
+      return ok(gson.toJson(properties));
+    } catch (Exception e) {
+      return handleException(e);
+    }
+  }
+
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("{mediaPackageID}/workflowProperties.json")
+  @RestQuery(name = "getWorkflowProperties",
+      description = "Get stored workflow properties for an episode.",
+      returnDescription = "Properties as JSON",
+      pathParameters = {
+          @RestParameter(
+              name = "mediaPackageID",
+              description = "the media package ID",
+              isRequired = true,
+              type = STRING)
+      },
+      responses = {
+          @RestResponse(responseCode = SC_OK, description = "Media package returned"),
+          @RestResponse(responseCode = SC_OK, description = "Invalid parameters"),
+          @RestResponse(responseCode = SC_NOT_FOUND, description = "Not found"),
+          @RestResponse(responseCode = SC_FORBIDDEN, description = "Not allowed to read media package."),
+          @RestResponse(responseCode = SC_INTERNAL_SERVER_ERROR, description = "There has been an internal error.")
+      })
+  public Response getWorkflowProperties(@PathParam("mediaPackageID") final String mediaPackageId) {
+    try {
+      final AQueryBuilder queryBuilder = getAssetManager().createQuery();
+      final AResult result = queryBuilder.select(queryBuilder.propertiesOf(WORKFLOW_PROPERTIES_NAMESPACE))
+              .where(queryBuilder.mediaPackageId(mediaPackageId).and(queryBuilder.version().isLatest())).run();
+
+      // we expect exactly one result when specifying a media package id
+      if (result.getSize() < 1) {
+        return notFound();
+      } else if (result.getSize() > 1) {
+        return serverError();
+      }
+
+      // build map from properties
+      HashMap<String, String> properties = new HashMap<>();
+      if (result.getRecords().head().isSome()) {
+        for (final Property property : result.getRecords().head().get().getProperties()) {
+          properties.put(property.getId().getName(), property.getValue().get(Value.STRING));
+        }
+      }
+      return ok(gson.toJson(properties));
+    } catch (Exception e) {
+      return handleException(e);
+    }
+  }
+
+
+  @POST
+  @Path("{mediaPackageID}/workflowProperties")
+  @RestQuery(name = "setWorkflowProperties",
+      description = "Set additional workflow properties",
+      pathParameters = {
+          @RestParameter(
+              name = "mediaPackageID",
+              description = "the media package ID",
+              isRequired = true,
+              type = STRING)
+      },
+      restParameters = {
+          @RestParameter(
+              name = "properties",
+              isRequired = true,
+              type = STRING,
+              description = "JSON object containing new properties")
+      },
+      responses = {
+          @RestResponse(description = "Properties successfully set", responseCode = SC_CREATED),
+          @RestResponse(description = "Invalid data", responseCode = SC_BAD_REQUEST),
+          @RestResponse(description = "Internal error", responseCode = SC_INTERNAL_SERVER_ERROR) },
+      returnDescription = "Returned status code indicates success")
+  public Response setWorkflowProperties(@PathParam("mediaPackageID") final String mediaPackageId,
+          @FormParam("properties") final String propertiesJSON) {
+    Map<String, String> properties;
+    try {
+      properties = gson.fromJson(propertiesJSON, stringMapType);
+    } catch (Exception e) {
+      return badRequest();
+    }
+    for (final Map.Entry<String, String> entry : properties.entrySet()) {
+      final PropertyId propertyId = PropertyId.mk(mediaPackageId, WORKFLOW_PROPERTIES_NAMESPACE, entry.getKey());
+      final Property property = Property.mk(propertyId, Value.mk(entry.getValue()));
+      if (!getAssetManager().setProperty(property)) {
+        return notFound();
+      }
+    }
+    return noContent();
   }
 
   /** Unify exception handling. */
-  public static Response handleException(final P1<Response> p) {
-    try {
-      return p.get1();
-    } catch (Exception e) {
-      logger.debug("Error calling REST method", e);
-      Throwable cause = e;
-      if (e instanceof RuntimeException && e.getCause() != null) {
-        cause = ((RuntimeException)e).getCause();
-      }
-      if (cause instanceof UnauthorizedException) {
-        return forbidden();
-      }
-
-      throw new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR);
+  public static Response handleException(Exception e) {
+    logger.debug("Error calling REST method", e);
+    Throwable cause = e;
+    if (e.getCause() != null) {
+      cause = e.getCause();
     }
+    if (cause instanceof UnauthorizedException) {
+      return forbidden();
+    }
+
+    throw new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR);
   }
 }

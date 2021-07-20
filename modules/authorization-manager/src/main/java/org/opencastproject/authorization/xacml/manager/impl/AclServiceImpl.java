@@ -21,48 +21,30 @@
 
 package org.opencastproject.authorization.xacml.manager.impl;
 
-import static com.entwinemedia.fn.Stream.$;
-import static org.opencastproject.assetmanager.api.AssetManager.DEFAULT_OWNER;
-import static org.opencastproject.assetmanager.api.fn.Enrichments.enrich;
-import static org.opencastproject.authorization.xacml.manager.impl.Util.toAcl;
-import static org.opencastproject.util.data.Collections.list;
-import static org.opencastproject.workflow.api.ConfiguredWorkflowRef.toConfiguredWorkflow;
-
-import org.opencastproject.assetmanager.api.AssetManager;
-import org.opencastproject.assetmanager.api.fn.Snapshots;
-import org.opencastproject.assetmanager.api.query.AQueryBuilder;
-import org.opencastproject.assetmanager.util.Workflows;
 import org.opencastproject.authorization.xacml.manager.api.AclService;
 import org.opencastproject.authorization.xacml.manager.api.AclServiceException;
-import org.opencastproject.authorization.xacml.manager.api.EpisodeACLTransition;
 import org.opencastproject.authorization.xacml.manager.api.ManagedAcl;
-import org.opencastproject.authorization.xacml.manager.api.SeriesACLTransition;
-import org.opencastproject.authorization.xacml.manager.api.TransitionQuery;
-import org.opencastproject.authorization.xacml.manager.api.TransitionResult;
-import org.opencastproject.mediapackage.MediaPackage;
-import org.opencastproject.mediapackage.MediaPackageSupport;
-import org.opencastproject.message.broker.api.MessageSender;
-import org.opencastproject.message.broker.api.acl.AclItem;
+import org.opencastproject.elasticsearch.api.SearchIndexException;
+import org.opencastproject.elasticsearch.api.SearchResult;
+import org.opencastproject.elasticsearch.api.SearchResultItem;
+import org.opencastproject.elasticsearch.index.AbstractSearchIndex;
+import org.opencastproject.elasticsearch.index.event.Event;
+import org.opencastproject.elasticsearch.index.event.EventSearchQuery;
+import org.opencastproject.elasticsearch.index.series.Series;
+import org.opencastproject.elasticsearch.index.series.SeriesSearchQuery;
 import org.opencastproject.security.api.AccessControlList;
-import org.opencastproject.security.api.AclScope;
-import org.opencastproject.security.api.AuthorizationService;
 import org.opencastproject.security.api.Organization;
-import org.opencastproject.series.api.SeriesService;
+import org.opencastproject.security.api.SecurityService;
+import org.opencastproject.security.api.User;
 import org.opencastproject.util.NotFoundException;
 import org.opencastproject.util.data.Option;
-import org.opencastproject.workflow.api.ConfiguredWorkflow;
-import org.opencastproject.workflow.api.ConfiguredWorkflowRef;
-import org.opencastproject.workflow.api.WorkflowService;
-import org.opencastproject.workspace.api.Workspace;
-
-import com.entwinemedia.fn.data.Opt;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
+import java.util.Optional;
+import java.util.function.Function;
 
 /** Organization bound impl. */
 public final class AclServiceImpl implements AclService {
@@ -73,255 +55,20 @@ public final class AclServiceImpl implements AclService {
   private final Organization organization;
 
   /** Service dependencies */
-  private final AclTransitionDb persistence;
   private final AclDb aclDb;
-  private final SeriesService seriesService;
-  private final AssetManager assetManager;
-  private final AuthorizationService authorizationService;
-  private final WorkflowService workflowService;
-  private final Workspace workspace;
-  private final MessageSender messageSender;
+  private final SecurityService securityService;
 
-  public AclServiceImpl(Organization organization, AclDb aclDb, AclTransitionDb transitionDb,
-          SeriesService seriesService, AssetManager assetManager, WorkflowService workflowService,
-          AuthorizationService authorizationService, MessageSender messageSender, Workspace workspace) {
+  /** The Elasticsearch indices */
+  protected AbstractSearchIndex adminUiIndex;
+  protected AbstractSearchIndex externalApiIndex;
+
+  public AclServiceImpl(Organization organization, AclDb aclDb, AbstractSearchIndex adminUiIndex,
+          AbstractSearchIndex externalApiIndex, SecurityService securityService) {
     this.organization = organization;
-    this.persistence = transitionDb;
     this.aclDb = aclDb;
-    this.seriesService = seriesService;
-    this.assetManager = assetManager;
-    this.workflowService = workflowService;
-    this.authorizationService = authorizationService;
-    this.messageSender = messageSender;
-    this.workspace = workspace;
-  }
-
-  @Override
-  public EpisodeACLTransition addEpisodeTransition(String episodeId, Option<Long> managedAclId, Date at,
-          Option<ConfiguredWorkflowRef> workflow) throws AclServiceException {
-    return persistence.storeEpisodeAclTransition(organization, episodeId, at, managedAclId, workflow);
-  }
-
-  @Override
-  public SeriesACLTransition addSeriesTransition(String seriesId, long managedAclId, Date at, boolean override,
-          Option<ConfiguredWorkflowRef> workflow) throws AclServiceException {
-    return persistence.storeSeriesAclTransition(organization, seriesId, at, managedAclId, override, workflow);
-  }
-
-  @Override
-  public EpisodeACLTransition updateEpisodeTransition(long transitionId, Option<Long> managedAclId, Date at,
-          Option<ConfiguredWorkflowRef> workflow) throws AclServiceException, NotFoundException {
-    return persistence.updateEpisodeAclTransition(organization, transitionId, at, managedAclId, workflow);
-  }
-
-  @Override
-  public SeriesACLTransition updateSeriesTransition(long transitionId, long managedAclId, Date at,
-          Option<ConfiguredWorkflowRef> workflow, boolean override) throws AclServiceException, NotFoundException {
-    return persistence.updateSeriesAclTransition(organization, transitionId, at, managedAclId, override, workflow);
-  }
-
-  @Override
-  public void deleteEpisodeTransition(long transitionId) throws NotFoundException, AclServiceException {
-    persistence.deleteEpisodeAclTransition(organization, transitionId);
-  }
-
-  @Override
-  public void deleteSeriesTransition(long transitionId) throws NotFoundException, AclServiceException {
-    persistence.deleteSeriesAclTransition(organization, transitionId);
-  }
-
-  @Override
-  public void deleteEpisodeTransitions(String episodeId) throws AclServiceException, NotFoundException {
-    List<EpisodeACLTransition> transitions = persistence.getEpisodeAclTransitions(organization, episodeId);
-    for (EpisodeACLTransition transition : transitions) {
-      persistence.deleteEpisodeAclTransition(organization, transition.getTransitionId());
-    }
-  }
-
-  @Override
-  public void deleteSeriesTransitions(String seriesId) throws AclServiceException, NotFoundException {
-    List<SeriesACLTransition> transitions = persistence.getSeriesAclTransitions(organization, seriesId);
-    for (SeriesACLTransition transition : transitions) {
-      persistence.deleteSeriesAclTransition(organization, transition.getTransitionId());
-    }
-  }
-
-  @Override
-  public TransitionResult getTransitions(TransitionQuery query) throws AclServiceException {
-    return persistence.getByQuery(organization, query);
-  }
-
-  @Override
-  public SeriesACLTransition markSeriesTransitionAsCompleted(long transitionId) throws AclServiceException,
-  NotFoundException {
-    return persistence.markSeriesTransitionAsCompleted(organization, transitionId);
-  }
-
-  @Override
-  public EpisodeACLTransition markEpisodeTransitionAsCompleted(long transitionId) throws AclServiceException,
-  NotFoundException {
-    return persistence.markEpisodeTransitionAsCompleted(organization, transitionId);
-  }
-
-  @Override
-  public boolean applyAclToEpisode(String episodeId, AccessControlList acl, Option<ConfiguredWorkflowRef> workflow)
-          throws AclServiceException {
-    try {
-      Option<MediaPackage> mediaPackage = Option.none();
-      if (assetManager != null)
-        mediaPackage = getFromAssetManagerByMpId(episodeId);
-
-      Option<AccessControlList> aclOpt = Option.option(acl);
-      // the episode service is the source of authority for the retrieval of media packages
-      for (final MediaPackage episodeSvcMp : mediaPackage) {
-        aclOpt.fold(new Option.EMatch<AccessControlList>() {
-          // set the new episode ACL
-          @Override
-          public void esome(final AccessControlList acl) {
-            // update in episode service
-            MediaPackage mp = authorizationService.setAcl(episodeSvcMp, AclScope.Episode, acl).getA();
-            if (assetManager != null)
-              assetManager.takeSnapshot(DEFAULT_OWNER, mp);
-          }
-
-          // if none EpisodeACLTransition#isDelete returns true so delete the episode ACL
-          @Override
-          public void enone() {
-            // update in episode service
-            MediaPackage mp = authorizationService.removeAcl(episodeSvcMp, AclScope.Episode);
-            if (assetManager != null)
-              assetManager.takeSnapshot(DEFAULT_OWNER, mp);
-          }
-
-        });
-        // apply optional workflow
-        for (ConfiguredWorkflowRef workflowRef : workflow)
-          applyWorkflow(list(episodeSvcMp), workflowRef);
-        return true;
-      }
-      // not found
-      return false;
-    } catch (Exception e) {
-      logger.error("Error applying episode ACL", e);
-      throw new AclServiceException(e);
-    }
-  }
-
-  @Override
-  public boolean applyAclToEpisode(String episodeId, Option<ManagedAcl> managedAcl,
-          Option<ConfiguredWorkflowRef> workflow) throws AclServiceException {
-    return applyAclToEpisode(episodeId, managedAcl.map(toAcl).getOrElseNull(), workflow);
-  }
-
-  /** Update the ACL of an episode. */
-  @Override
-  public void applyEpisodeAclTransition(final EpisodeACLTransition t) throws AclServiceException {
-    applyAclToEpisode(t.getEpisodeId(), t.getAccessControlList(), t.getWorkflow());
-    try {
-      // mark as done
-      // todo If acl application fails the transition will not be marked as done. Depending on the
-      // failure cause the application of the transition will be tried forever.
-      markEpisodeTransitionAsCompleted(t.getTransitionId());
-    } catch (NotFoundException e) {
-      throw new AclServiceException(e);
-    }
-  }
-
-  @Override
-  public boolean applyAclToSeries(String seriesId, AccessControlList acl, boolean override,
-          Option<ConfiguredWorkflowRef> workflow) throws AclServiceException {
-    try {
-      if (override) {
-        // delete acls before calling seriesService.updateAccessControl to avoid
-        // possible interference since a call to this method triggers update event handlers
-        // which run on a separate thread. This must be considered a design smell since it
-        // requires knowledge of the services implementation.
-        //
-        // delete in episode service
-        List<MediaPackage> mediaPackages = new ArrayList<>();
-        if (assetManager != null)
-          mediaPackages = getFromAssetManagerBySeriesId(seriesId);
-
-        for (MediaPackage mp : mediaPackages) {
-          // remove episode xacml and update in archive service
-          if (assetManager != null)
-            assetManager.takeSnapshot(DEFAULT_OWNER, authorizationService.removeAcl(mp, AclScope.Episode));
-        }
-      }
-      // update in series service
-      // this will in turn update the search service by the SeriesUpdatedEventHandler
-      // and the episode service by the EpisodesPermissionsUpdatedEventHandler
-      try {
-        seriesService.updateAccessControl(seriesId, acl);
-      } catch (NotFoundException e) {
-        return false;
-      }
-      return true;
-    } catch (Exception e) {
-      logger.error("Error applying series ACL", e);
-      throw new AclServiceException(e);
-    }
-  }
-
-  @Override
-  public boolean applyAclToSeries(String seriesId, ManagedAcl managedAcl, boolean override,
-          Option<ConfiguredWorkflowRef> workflow) throws AclServiceException {
-    return applyAclToSeries(seriesId, managedAcl.getAcl(), override, workflow);
-  }
-
-  /** Update the ACL of a series. */
-  @Override
-  public void applySeriesAclTransition(SeriesACLTransition t) throws AclServiceException {
-    applyAclToSeries(t.getSeriesId(), t.getAccessControlList(), t.isOverride(), t.getWorkflow());
-    try {
-      // mark as done
-      // todo If acl application fails the transition will not be marked as done. Depending on the
-      // failure cause the application of the transition will be tried forever.
-      markSeriesTransitionAsCompleted(t.getTransitionId());
-    } catch (NotFoundException e) {
-      throw new AclServiceException(e);
-    }
-  }
-
-  /**
-   * Return media package with id <code>mpId</code> from asset manager.
-   *
-   * @return single element list or empty list
-   */
-  private Option<MediaPackage> getFromAssetManagerByMpId(String mpId) {
-    final AQueryBuilder q = assetManager.createQuery();
-    final Opt<MediaPackage> mp = enrich(
-            q.select(q.snapshot()).where(q.mediaPackageId(mpId).and(q.version().isLatest())).run()).getSnapshots()
-                    .head().map(Snapshots.getMediaPackage);
-    return Option.fromOpt(mp);
-  }
-
-  /** Return all media packages of a series from the asset manager. */
-  private List<MediaPackage> getFromAssetManagerBySeriesId(String seriesId) {
-    final AQueryBuilder q = assetManager.createQuery();
-    return enrich(q.select(q.snapshot()).where(q.seriesId().eq(seriesId).and(q.version().isLatest())).run())
-            .getSnapshots().map(Snapshots.getMediaPackage).toList();
-  }
-
-  /** Apply a workflow to a list of media packages. */
-  private void applyWorkflow(final List<MediaPackage> mps, final ConfiguredWorkflowRef workflowRef) {
-    toConfiguredWorkflow(workflowService, workflowRef).fold(new Option.Match<ConfiguredWorkflow, Void>() {
-      @Override
-      public Void some(ConfiguredWorkflow workflow) {
-        logger.info("Apply optional workflow {}", workflow.getWorkflowDefinition().getId());
-        if (assetManager != null) {
-          new Workflows(assetManager, workspace, workflowService)
-                  .applyWorkflowToLatestVersion($(mps).map(MediaPackageSupport.Fn.getId.toFn()), workflow);
-        }
-        return null;
-      }
-
-      @Override
-      public Void none() {
-        logger.warn("{} does not exist", workflowRef.getWorkflowId());
-        return null;
-      }
-    });
+    this.adminUiIndex = adminUiIndex;
+    this.externalApiIndex = externalApiIndex;
+    this.securityService = securityService;
   }
 
   @Override
@@ -340,8 +87,9 @@ public final class AclServiceImpl implements AclService {
     boolean updateAcl = aclDb.updateAcl(acl);
     if (updateAcl) {
       if (oldName.isSome() && !(oldName.get().getName().equals(acl.getName()))) {
-        AclItem aclItem = AclItem.update(oldName.get().getName(), acl.getName());
-        messageSender.sendObjectMessage(AclItem.ACL_QUEUE, MessageSender.DestinationType.Queue, aclItem);
+        User user = securityService.getUser();
+        updateAclInIndex(oldName.get().getName(), acl.getName(), adminUiIndex, organization.getId(), user);
+        updateAclInIndex(oldName.get().getName(), acl.getName(), externalApiIndex, organization.getId(), user);
       }
     }
     return updateAcl;
@@ -349,28 +97,166 @@ public final class AclServiceImpl implements AclService {
 
   @Override
   public Option<ManagedAcl> createAcl(AccessControlList acl, String name) {
-    Option<ManagedAcl> createAcl = aclDb.createAcl(organization, acl, name);
-    if (createAcl.isSome()) {
-      AclItem aclItem = AclItem.create(createAcl.get().getName());
-      messageSender.sendObjectMessage(AclItem.ACL_QUEUE, MessageSender.DestinationType.Queue, aclItem);
-    }
-    return createAcl;
+    // we don't need to update the Elasticsearch indices in this case
+    return aclDb.createAcl(organization, acl, name);
   }
 
   @Override
   public boolean deleteAcl(long id) throws AclServiceException, NotFoundException {
-    final TransitionQuery query = TransitionQuery.query().withDone(false).withAclId(id);
-    final TransitionResult result = persistence.getByQuery(organization, query);
-    if (result.getEpisodeTransistions().size() > 0 || result.getSeriesTransistions().size() > 0)
-      return false;
     Option<ManagedAcl> deletedAcl = getAcl(id);
     if (aclDb.deleteAcl(organization, id)) {
       if (deletedAcl.isSome()) {
-        AclItem aclItem = AclItem.delete(deletedAcl.get().getName());
-        messageSender.sendObjectMessage(AclItem.ACL_QUEUE, MessageSender.DestinationType.Queue, aclItem);
+        User user = securityService.getUser();
+        removeAclFromIndex(deletedAcl.get().getName(), adminUiIndex, organization.getId(), user);
+        removeAclFromIndex(deletedAcl.get().getName(), externalApiIndex, organization.getId(), user);
       }
       return true;
     }
     throw new NotFoundException("Managed acl with id " + id + " not found.");
+  }
+
+  /**
+   * Update the Managed ACL in the events and series in the Elasticsearch index.
+   *
+   * @param currentAclName
+   *         the current name of the managed acl
+   * @param newAclName
+   *         the new name of the managed acl
+   * @param index
+   *         the index to update
+   * @param orgId
+   *         the organization the managed acl belongs to
+   * @param user
+   *         the current user
+   */
+  private void updateAclInIndex(String currentAclName, String newAclName, AbstractSearchIndex index, String orgId,
+          User user) {
+    logger.debug("Update the events to change the managed acl name from '{}' to '{}'.", currentAclName, newAclName);
+    updateManagedAclForEvents(currentAclName, Optional.of(newAclName), index, orgId, user);
+
+    logger.debug("Update the series to change the managed acl name from '{}' to '{}'.", currentAclName, newAclName);
+    updateManagedAclForSeries(currentAclName, Optional.of(newAclName), index, orgId, user);
+  }
+
+  /**
+   * Remove the Managed ACL from the events and series in the Elasticsearch index.
+   *
+   * @param currentAclName
+   *         the current name of the managed acl
+   * @param index
+   *         the index to update
+   * @param orgId
+   *         the organization the managed acl belongs to
+   * @param user
+   *         the current user
+   */
+  private void removeAclFromIndex(String currentAclName, AbstractSearchIndex index, String orgId,
+          User user) {
+    logger.debug("Update the events to remove the managed acl name '{}'.", currentAclName);
+    updateManagedAclForEvents(currentAclName, Optional.empty(), index, orgId, user);
+
+    logger.debug("Update the series to remove the managed acl name '{}'.", currentAclName);
+    updateManagedAclForSeries(currentAclName, Optional.empty(), index, orgId, user);
+  }
+
+  /**
+   * Update or remove the Managed Acl for the series in the Elasticsearch index.
+   *
+   * @param currentAclName
+   *         the current name of the managed acl
+   * @param newAclNameOpt
+   * @param index
+   *         the index to update
+   * @param orgId
+   *         the organization the managed acl belongs to
+   * @param user
+   *         the current user
+   */
+  private void updateManagedAclForSeries(String currentAclName, Optional<String> newAclNameOpt,
+          AbstractSearchIndex index, String orgId, User user) {
+    SearchResult<Series> result;
+    try {
+      result = index.getByQuery(new SeriesSearchQuery(orgId, user).withoutActions()
+              .withManagedAcl(currentAclName));
+    } catch (SearchIndexException e) {
+      logger.error("Unable to find the series in org '{}' with current managed acl name '{}'", orgId, currentAclName,
+              e);
+      return;
+    }
+
+    for (SearchResultItem<Series> seriesItem : result.getItems()) {
+      String seriesId = seriesItem.getSource().getIdentifier();
+
+      Function<Optional<Series>, Optional<Series>> updateFunction = (Optional<Series> seriesOpt) -> {
+        if (seriesOpt.isPresent() && seriesOpt.get().getManagedAcl().equals(currentAclName)) {
+          Series series = seriesOpt.get();
+          series.setManagedAcl(newAclNameOpt.orElse(null));
+          return Optional.of(series);
+        }
+        return Optional.empty();
+      };
+
+      try {
+        index.addOrUpdateSeries(seriesId, updateFunction, orgId, user);
+      } catch (SearchIndexException e) {
+        if (newAclNameOpt.isPresent()) {
+          logger.warn("Unable to update series'{}' from current managed acl '{}' to new managed acl name '{}'",
+                  seriesId, currentAclName, newAclNameOpt.get(), e);
+        } else {
+          logger.warn("Unable to update series '{}' to remove managed acl '{}'", seriesId, currentAclName, e);
+        }
+      }
+    }
+  }
+
+  /**
+   * Update or remove the Managed Acl for the events in the Elasticsearch index.
+   *
+   * @param currentAclName
+   *         the current name of the managed acl
+   * @param newAclNameOpt
+   * @param index
+   *         the index to update
+   * @param orgId
+   *         the organization the managed acl belongs to
+   * @param user
+   *         the current user
+   */
+  private void updateManagedAclForEvents(String currentAclName, Optional<String> newAclNameOpt,
+          AbstractSearchIndex index, String orgId, User user) {
+    SearchResult<Event> result;
+    try {
+      result = index.getByQuery(new EventSearchQuery(orgId, user).withoutActions()
+              .withManagedAcl(currentAclName));
+    } catch (SearchIndexException e) {
+      logger.error("Unable to find the events in org '{}' with current managed acl name '{}' for event",
+              orgId, currentAclName, e);
+      return;
+    }
+
+    for (SearchResultItem<Event> eventItem : result.getItems()) {
+      String eventId = eventItem.getSource().getIdentifier();
+
+      Function<Optional<Event>, Optional<Event>> updateFunction = (Optional<Event> eventOpt) -> {
+        if (eventOpt.isPresent() && eventOpt.get().getManagedAcl().equals(currentAclName)) {
+          Event event = eventOpt.get();
+          event.setManagedAcl(newAclNameOpt.orElse(null));
+          return Optional.of(event);
+        }
+        return Optional.empty();
+      };
+
+      try {
+        index.addOrUpdateEvent(eventId, updateFunction, orgId, user);
+      } catch (SearchIndexException e) {
+        if (newAclNameOpt.isPresent()) {
+          logger.warn(
+                  "Unable to update event '{}' from current managed acl '{}' to new managed acl name '{}'",
+                  eventId, currentAclName, newAclNameOpt.get(), e);
+        } else {
+          logger.warn("Unable to update event '{}' to remove managed acl '{}'", eventId, currentAclName, e);
+        }
+      }
+    }
   }
 }

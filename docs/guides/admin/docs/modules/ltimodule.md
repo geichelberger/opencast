@@ -1,104 +1,123 @@
-Integrating Opencast in an LMS using LTI
-========================================
+Integrating Opencast using LTI
+==============================
 
-What it does
-------------
 
-The Opencast LTI module provides an easy way to integrate Opencast into a Learning Management System (LMS),
-or any other system which supports the LTI standard as an LTI _tool consumer_.
+About LTI
+---------
 
-Typically, students enrolled in a course access Opencast through an LTI tool in the LMS course site, 
-and can play back videos in an Opencast series set up for the course. 
+LTI provides an easy way to integrate Opencast into any system which can act as an LTI tool consumer such as many
+learning management systems (LMS). Popular examples for LTI consumers include [Sakai](https://sakailms.org),
+[Moodle](https://moodle.org) or [ILIAS](https://ilias.de).
 
-More information about the LTI specifications is available at 
-[IMS Learning Tools Interoperability](http://www.imsglobal.org/activity/learning-tools-interoperability).
+Using the LTI integration, students can access Opencast through an LTI tool in the LMS course site, and can play back
+Opencast videos without ever leaving their course.
 
-Configure Opencast 
-------------------------
+More information about the LTI specification is available at
+[IMS Learning Tools Interoperability](https://imsglobal.org/activity/learning-tools-interoperability).
 
-To enable LTI authentication in Opencast, edit `OPENCAST/etc/security/mh_default_org.xml`
 
-* In the Authentication Filters section, uncomment the oAuthProtectedResourceFilter: 
-````
-    <!-- 2-legged OAuth is used by trusted 3rd party applications, including LTI. -->
-    <!-- Uncomment the line below to support LTI or other OAuth clients.          -->
-    <ref bean="oauthProtectedResourceFilter" />
-````
+Configuration
+-------------
 
-* Replace CONSUMER_KEY and CONSUMER_SECRET with LTI the key and secret values that you will use in your LMS:
-````
-    <!-- ####################### -->
-    <!-- # OAuth (LTI) Support # -->
-    <!-- ####################### -->
 
-    <!-- This is required for LTI. If you are using LTI and have enabled the oauthProtectedResourceFilter  -->
-    <!-- in the list of authenticationFilters above, set custom values for CONSUMERKEY and CONSUMERSECRET. -->
+### Configure OAuth
 
-    <bean name="oAuthConsumerDetailsService" class="org.opencastproject.kernel.security.OAuthSingleConsumerDetailsService">
-    <constructor-arg index="0" ref="userDetailsService" />
-    <constructor-arg index="1" value="CONSUMERKEY" />
-    <constructor-arg index="2" value="CONSUMERSECRET" />
-    <constructor-arg index="3" value="constructorName" />
-    </bean>
-````
+LTI uses OAuth to authenticate users. To enable OAuth in Opencast, edit `etc/security/mh_default_org.xml` and uncomment
+the oauthProtectedResourceFilter in the authentication filters section:
 
-* To give LMS users the same username in Opencast as the LMS username, uncomment the constructor arguments 
-below and update CONSUMERKEY to the same key used above:
+```xml
+<ref bean="oauthProtectedResourceFilter" />
+```
 
-````
-    <!-- Uncomment to trust usernames from the LTI consumer identified by CONSUMERKEY.           -->
-    <!-- Users from untrusted systems will be prefixed with "lti:" and the consumer domain name. -->
+Next, configure the OAuth consumer by setting custom credentials in
+`etc/org.opencastproject.kernel.security.OAuthConsumerDetailsService.cfg`:
 
-    <constructor-arg index="1" ref="securityService" />
-    <constructor-arg index="2">
-      <list>
-        <value>CONSUMERKEY</value>
-      </list>
-    </constructor-arg>
-````
+```properties
+oauth.consumer.name.1=CONSUMERNAME
+oauth.consumer.key.1=CONSUMERKEY
+oauth.consumer.secret.1=CONSUMERSECRET
+```
+
+
+### Configure LTI
+
+Opencast's LTI module allows additional configuration like making a OAuth consumer key a highly trusted key, preventing
+Opencast from generating a temporary username, or to block some specific usernames like the system administrator.
+
+For more details, take a look at the options in
+`etc/org.opencastproject.security.lti.LtiLaunchAuthenticationHandler.cfg`.
+
+
+The “delete” key in the series overview tool can be configured by specifying the retraction workflow in
+`etc/org.opencastproject.lti.service.impl.LtiServiceImpl.cfg`. The property is called `retract-workflow-id`, and it defaults
+to `retract`.
 
 Configure and test an LTI tool in the LMS
 -----------------------------------------
 
 Configure an LTI tool in the LMS with these values:
 
-* LTI launch URL: `OPENCAST-URL/lti`
-* LTI key: the value chosen for CONSUMERKEY in `mh_default_org.xml`
-* LTI secret: the value chosen for CONSUMERSECRET in `mh_default_org.xml`
+- LTI launch URL: `<presentation-node-url>/lti`
+- LTI key: the value of `oauth.consumer.key`
+- LTI secret: the value of `oauth.consumer.secret`
 
-In a clustered Opencast system, choose the URL of the presentation server where the media module and player are available.
+Access the LTI tool configured for Opencast in the LMS. The Opencast LTI welcome page should appear. Use the links
+provided there to verify the LTI connection.
 
-Access the LTI tool configured for Opencast in the LMS. The Opencast LTI Welcome page should appear. Click on the links 
-provided to `OPENCAST-URL/lti` and `OPENCAST-URL/info/me.json` to verify the LTI parameters provided to Opencast by the LMS,
-and the list of roles which the LTI user has in Opencast.
 
-LTI roles
-----------
+LTI Roles
+---------
 
-LTI users will only see Opencast series and videos which are public, or those to which they have access 
+LTI users will only see Opencast series and videos which are public, or those to which they have access
 because of the Opencast roles which they have. The Opencast LTI module grants an LTI user the role(s) formed
 from the LTI parameters `context_id` and `roles`.
 
 The LTI context is typically the LMS course ID, and the default LTI role for a student in a course is `Learner`.
-The Opencast role granted would therefore be `SITEID_Learner`.
+The Opencast role granted would therefore be `<context-id>_Learner`.
 
-To make a series or video visible to students who access Opencast through LTI in an LMS course, 
-add the role `SITEID_Learner` to the Series or Event Access Control List (ACL). 
+To make a series or video visible to students who access Opencast through LTI in an LMS course,
+add the role `<context-id>_Learner` to the series or event access control list (ACL).
 
-LTI users may also have additional roles if the LTI user is created as an Opencast user in the Admin UI and 
+An additional prefix for these generated roles may be defined in Opencast's LTI configuration file based on the used
+OAuth consumer. That way, you can distinguish between users from multiple different consumers.
+
+LTI users may also have additional roles if the LTI user is created as an Opencast user in the Admin UI and
 given additional roles, or if one or more Opencast User Providers or Role Providers are configured.
 
-Customize the LTI tool in the LMS
-----------------------------------
+
+Specifying LTI Tools
+--------------------
 
 Opencast will redirect an LTI user to the URL specified by the LTI custom `tool` parameter. Some LMS systems allow
 custom parameters to be defined separately in each place where an LTI tool is used, whereas other systems only allow
 custom parameters to be defined globally.
 
-* To show the Opencast Media Module, use `tool=engage/ui/`
-* To show all videos for a single series, use `tool=ltitools/series/index.html;series=SERIESID`
-* To show a single video, use `tool=engage/theodul/ui/core/index.html;id=MEDIAPACKAGEID`
-* To show a short debugging page before proceeding to the tool page, add the parameter `test=true`
+- To show the media module, use `engage/ui/` as LTI `custom_tool` launch parameter
+- To show all videos for a single series, use `ltitools/index.html` as LTI `custom_tool` launch parameter
+  and specify the following query parameters:
+    - `subtool=series`
+    - `series=SERIESID` if you have the series ID
+    - `series_name=SERIESNAME` if you just have the series name (has to be unique)
+    - `deletion=true` to show a delete button next to each episode
+    - `edit=true` if you want to display an edit button next to each episode
+    - `download=true` to show a button next to each episode that allows for downloading individual video files
+    - `lng=LANG` to force a language (the browser language is used otherwise)
+- To show an upload dialog, use `ltitools/index.html` as LTI `custom_tool` launch parameter
+  and specify the following query parameters:
+    - `subtool=upload`
+    - `series=SERIESID` if you have the series ID
+    - `series_name=SERIESNAME` if you just have the series name (has to be unique)
+    - `lng=LANG` to force a language (the browser language is used otherwise)
+- To show a single video, use `/play/<id>` as LTI `custom_tool` launch parameter
+- To show a debug page before proceeding to the tool, append the parameter `test=true`
 
 For more information about how to set custom LTI parameters, please check the documentation of your LMS.
 
+
+### Customizing LTI’s look
+
+The LTI module provides the option to provide custom style sheets for configuring the look and feel of the
+tools which may be important to match the design of the LTI consumer in which it is included. The CSS file can be found
+in the user interface configuration directory usually located at:
+
+    etc/ui-config/mh_default_org/ltitools/lti.css

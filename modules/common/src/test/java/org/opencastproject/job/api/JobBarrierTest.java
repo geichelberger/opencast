@@ -31,7 +31,6 @@ import org.opencastproject.util.data.Function;
 import org.opencastproject.util.data.Function2;
 
 import org.easymock.EasyMock;
-import org.easymock.IAnswer;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,16 +65,13 @@ public class JobBarrierTest {
     logger.info("Waiting for " + jobs.size() + " jobs");
     // create a service registry mock returning those jobs
     final ServiceRegistry sr = createNiceMock(ServiceRegistry.class);
-    EasyMock.expect(sr.getJob(EasyMock.anyLong())).andAnswer(new IAnswer<Job>() {
-      @Override
-      public Job answer() throws Throwable {
-        final long jobId = (Long) (EasyMock.getCurrentArguments()[0]);
-        return jobs.get(jobId);
-      }
+    EasyMock.expect(sr.getJob(EasyMock.anyLong())).andAnswer(() -> {
+      final long jobId = (Long) (EasyMock.getCurrentArguments()[0]);
+      return jobs.get(jobId);
     }).anyTimes();
     EasyMock.replay(sr);
     // wait for all jobs to complete
-    final JobBarrier.Result res = new JobBarrier(null, sr, 10, toArray(Job.class, jobs.values())).waitForJobs();
+    new JobBarrier(null, sr, 10, toArray(Job.class, jobs.values())).waitForJobs();
     // check if there are still running jobs
     final boolean noRunningJobs = mlist(jobs.values()).foldl(true, new Function2<Boolean, TestJob, Boolean>() {
       @Override
@@ -88,7 +84,7 @@ public class JobBarrierTest {
 
   private static boolean hasJobTerminated(Job.Status status) {
     switch (status) {
-      case CANCELED:
+      case CANCELLED:
       case DELETED:
       case FAILED:
       case FINISHED:

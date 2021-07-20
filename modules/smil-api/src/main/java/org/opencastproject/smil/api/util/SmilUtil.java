@@ -20,20 +20,22 @@
  */
 package org.opencastproject.smil.api.util;
 
-import static org.opencastproject.util.IoSupport.withResource;
-
+import org.opencastproject.mediapackage.Catalog;
+import org.opencastproject.mediapackage.MediaPackage;
 import org.opencastproject.mediapackage.MediaPackageElement;
+import org.opencastproject.mediapackage.MediaPackageElementFlavor;
+import org.opencastproject.mediapackage.selector.AbstractMediaPackageElementSelector;
+import org.opencastproject.mediapackage.selector.CatalogSelector;
+import org.opencastproject.util.NotFoundException;
 import org.opencastproject.util.XmlUtil;
 import org.opencastproject.util.data.Either;
 import org.opencastproject.util.data.functions.Misc;
+import org.opencastproject.workspace.api.Workspace;
 
 import com.android.mms.dom.smil.parser.SmilXmlParser;
-import com.entwinemedia.fn.Fn;
-import com.entwinemedia.fn.FnX;
 
 import org.apache.commons.httpclient.util.URIUtil;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.w3c.dom.Document;
@@ -43,9 +45,12 @@ import org.w3c.dom.smil.SMILDocument;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.util.Collection;
 
 /**
  * General purpose utility functions for dealing with SMIL.
@@ -64,26 +69,6 @@ public final class SmilUtil {
   private SmilUtil() {
   }
 
-  /** Parse a SMIL document from an input stream. */
-  public static final Fn<InputStream, SMILDocument> parseSmilFn = new FnX<InputStream, SMILDocument>() {
-    @Override
-    public SMILDocument applyX(InputStream in) throws SAXException, IOException {
-      return new SmilXmlParser().parse(in);
-    }
-  };
-
-  /**
-   * Read a SMIL document from a string.
-   *
-   * @throws java.io.IOException
-   *           in case of any IO error
-   * @throws org.xml.sax.SAXException
-   *           in case of a SAX related error
-   */
-  public static SMILDocument readSmil(String smil) throws IOException, SAXException {
-    return withResource(IOUtils.toInputStream(smil, "UTF-8"), parseSmilFn);
-  }
-
   /**
    * Load the SMIL document identified by <code>mpe</code>. Throws an exception if it does not exist or cannot be loaded
    * by any reason.
@@ -93,12 +78,13 @@ public final class SmilUtil {
   public static Document loadSmilDocument(InputStream in, MediaPackageElement mpe) {
     try {
       Either<Exception, org.w3c.dom.Document> eitherDocument = XmlUtil.parseNs(new InputSource(in));
-      if (eitherDocument.isRight())
+      if (eitherDocument.isRight()) {
         return eitherDocument.right().value();
+      }
 
       throw eitherDocument.left().value();
     } catch (Exception e) {
-      logger.warn("Unable to load smil document from catalog '{}': {}", mpe, ExceptionUtils.getStackTrace(e));
+      logger.warn("Unable to load smil document from catalog '{}'", mpe, e);
       return Misc.chuck(e);
     }
   }
@@ -122,28 +108,6 @@ public final class SmilUtil {
     parallel.setAttribute("dur", "0ms");
     body.appendChild(parallel);
     return smilDocument;
-  }
-
-  /**
-   * Adds a track to the SMIL document.
-   *
-   * @param smilDocument
-   *          the SMIL document
-   * @param trackType
-   *          the track type
-   * @param hasVideo
-   *          whether the track has a video stream
-   * @param startTime
-   *          the start time
-   * @param duration
-   *          the duration
-   * @param uri
-   *          the track URI
-   * @return the augmented SMIL document
-   */
-  public static Document addTrack(Document smilDocument, TrackType trackType, boolean hasVideo, long startTime,
-          long duration, URI uri) {
-    return addTrack(smilDocument, trackType, hasVideo, startTime,duration, uri, null);
   }
 
   /**
@@ -205,5 +169,33 @@ public final class SmilUtil {
     return smilDocument;
   }
 
+
+  public static SMILDocument getSmilDocumentFromMediaPackage(MediaPackage mp, MediaPackageElementFlavor smilFlavor,
+      Workspace workspace)
+          throws IOException, SAXException, NotFoundException {
+    final AbstractMediaPackageElementSelector<Catalog> smilSelector = new CatalogSelector();
+    smilSelector.addFlavor(smilFlavor);
+    final Collection<Catalog> smilCatalog = smilSelector.select(mp, false);
+    if (smilCatalog.size() == 1) {
+      return getSmilDocument(smilCatalog.iterator().next(), workspace);
+    } else {
+      logger.error("More or less than one smil catalog found: {}", smilCatalog);
+      throw new IllegalStateException("More or less than one smil catalog found!");
+    }
+  }
+
+  /** Get the SMIL document from a catalog. */
+  private static SMILDocument getSmilDocument(final Catalog smilCatalog, Workspace workspace) throws NotFoundException,
+          IOException, SAXException {
+    FileInputStream in = null;
+    try {
+      File smilXmlFile = workspace.get(smilCatalog.getURI());
+      SmilXmlParser smilParser = new SmilXmlParser();
+      in = new FileInputStream(smilXmlFile);
+      return smilParser.parse(in);
+    } finally {
+      IOUtils.closeQuietly(in);
+    }
+  }
 
 }

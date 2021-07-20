@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <artifactId>opencast-admin-ui</artifactId>
   <packaging>bundle</packaging>
@@ -7,14 +7,13 @@
   <parent>
     <groupId>org.opencastproject</groupId>
     <artifactId>base</artifactId>
-    <version>5-SNAPSHOT</version>
+    <version>11-SNAPSHOT</version>
     <relativePath>../../pom.xml</relativePath>
   </parent>
   <properties>
     <opencast.basedir>${project.basedir}/../..</opencast.basedir>
     <checkstyle.skip>false</checkstyle.skip>
     <skipTests>false</skipTests>
-    <nexus.npm>${opencast.nexus.url}/nexus/content/repositories/npmjs/</nexus.npm>
   </properties>
   <dependencies>
     <!-- osgi support -->
@@ -70,6 +69,18 @@
     </dependency>
     <dependency>
       <groupId>org.opencastproject</groupId>
+      <artifactId>opencast-statistics-service-api</artifactId>
+      <version>${project.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.opencastproject</groupId>
+      <artifactId>opencast-statistics-export-service-api</artifactId>
+      <version>${project.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.opencastproject</groupId>
       <artifactId>opencast-userdirectory</artifactId>
       <version>${project.version}</version>
       <scope>provided</scope>
@@ -94,6 +105,12 @@
     </dependency>
     <dependency>
       <groupId>org.opencastproject</groupId>
+      <artifactId>opencast-distribution-workflowoperation</artifactId>
+      <version>${project.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.opencastproject</groupId>
       <artifactId>opencast-event-comment</artifactId>
       <version>${project.version}</version>
       <scope>provided</scope>
@@ -110,7 +127,7 @@
     </dependency>
     <dependency>
       <groupId>org.opencastproject</groupId>
-      <artifactId>opencast-asset-manager-util</artifactId>
+      <artifactId>opencast-shared-filesystem-utils</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>
@@ -120,22 +137,17 @@
     </dependency>
     <dependency>
       <groupId>org.opencastproject</groupId>
-      <artifactId>opencast-search-api</artifactId>
+      <artifactId>opencast-elasticsearch-api</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>org.opencastproject</groupId>
-      <artifactId>opencast-search</artifactId>
+      <artifactId>opencast-elasticsearch-impl</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>org.opencastproject</groupId>
       <artifactId>opencast-smil-api</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.opencastproject</groupId>
-      <artifactId>opencast-messages</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>
@@ -155,16 +167,46 @@
     </dependency>
     <dependency>
       <groupId>org.opencastproject</groupId>
+      <artifactId>opencast-composer-service-api</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.opencastproject</groupId>
       <artifactId>opencast-urlsigning-service-api</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>
-      <groupId>javax.ws.rs</groupId>
-      <artifactId>jsr311-api</artifactId>
+      <groupId>org.opencastproject</groupId>
+      <artifactId>opencast-admin-ui-index</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.opencastproject</groupId>
+      <artifactId>opencast-list-providers-service</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.opencastproject</groupId>
+      <artifactId>opencast-distribution-service-api</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.opencastproject</groupId>
+      <artifactId>opencast-publication-service-api</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.opencastproject</groupId>
+      <artifactId>opencast-elasticsearch-index</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>jakarta.ws.rs</groupId>
+      <artifactId>jakarta.ws.rs-api</artifactId>
     </dependency>
     <dependency>
       <groupId>org.eclipse.persistence</groupId>
-      <artifactId>javax.persistence</artifactId>
+      <artifactId>jakarta.persistence</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.commons</groupId>
@@ -191,8 +233,17 @@
       <artifactId>httpclient-osgi</artifactId>
     </dependency>
     <dependency>
-      <groupId>javax.xml.bind</groupId>
-      <artifactId>jaxb-api</artifactId>
+      <groupId>org.apache.httpcomponents</groupId>
+      <artifactId>httpcore</artifactId>
+      <version>${httpcomponents-httpcore.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.httpcomponents</groupId>
+      <artifactId>httpcore-osgi</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>jakarta.xml.bind</groupId>
+      <artifactId>jakarta.xml.bind-api</artifactId>
     </dependency>
     <dependency>
       <groupId>com.entwinemedia.common</groupId>
@@ -206,16 +257,27 @@
       <groupId>com.googlecode.json-simple</groupId>
       <artifactId>json-simple</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.codehaus.jettison</groupId>
+      <artifactId>jettison</artifactId>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.mnode.ical4j</groupId>
+      <artifactId>ical4j</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>commons-fileupload</groupId>
+      <artifactId>commons-fileupload</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.servicemix.bundles</groupId>
+      <artifactId>org.apache.servicemix.bundles.commons-httpclient</artifactId>
+    </dependency>
     <!-- Testing -->
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.opencastproject</groupId>
-      <artifactId>opencast-series-service-impl</artifactId>
-      <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -226,19 +288,9 @@
     </dependency>
     <!-- REST test environment -->
     <dependency>
-      <groupId>com.jayway.restassured</groupId>
+      <groupId>io.rest-assured</groupId>
       <artifactId>rest-assured</artifactId>
-      <version>2.9.0</version>
-      <exclusions>
-        <exclusion>
-          <groupId>org.hamcrest</groupId>
-          <artifactId>hamcrest-core</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.hamcrest</groupId>
-          <artifactId>hamcrest-library</artifactId>
-        </exclusion>
-      </exclusions>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>uk.co.datumedge</groupId>
@@ -247,9 +299,9 @@
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>org.eclipse.persistence</groupId>
-      <artifactId>org.eclipse.persistence.core</artifactId>
-      <scope>compile</scope>
+      <groupId>org.easymock</groupId>
+      <artifactId>easymock</artifactId>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.eclipse.persistence</groupId>
@@ -277,142 +329,55 @@
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>org.easymock</groupId>
-      <artifactId>easymock</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <!-- contains javax.inject.Provider -->
-    <dependency>
-      <groupId>com.mysema.querydsl</groupId>
-      <artifactId>querydsl-apt</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
       <groupId>org.opencastproject</groupId>
       <artifactId>opencast-ingest-service-api</artifactId>
       <version>${project.version}</version>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>org.opencastproject</groupId>
+      <artifactId>opencast-rest-test-environment</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.hamcrest</groupId>
+      <artifactId>hamcrest</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-log4j12</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.opencastproject</groupId>
+      <artifactId>opencast-index-rebuild</artifactId>
+      <version>${project.version}</version>
+      <scope>compile</scope>
+    </dependency>
   </dependencies>
-  <profiles>
-    <profile>
-      <id>frontend-no-prebuilt</id>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.codehaus.mojo</groupId>
-            <artifactId>exec-maven-plugin</artifactId>
-            <executions>
-              <execution>
-                <id>npm clean</id>
-                <goals>
-                  <goal>exec</goal>
-                </goals>
-                <phase>pre-clean</phase>
-                <configuration>
-                  <executable>npm</executable>
-                  <arguments>
-                    <argument>cache</argument>
-                    <argument>verify</argument>
-                  </arguments>
-                </configuration>
-              </execution>
-              <execution>
-                <id>npm install</id>
-                <goals>
-                  <goal>exec</goal>
-                </goals>
-                <phase>initialize</phase>
-                <configuration>
-                  <executable>npm</executable>
-                  <arguments>
-                    <argument>install</argument>
-                    <argument>--registry</argument>
-                    <argument>${nexus.npm}</argument>
-                  </arguments>
-                </configuration>
-              </execution>
-              <execution>
-                <id>frontend build</id>
-                <goals>
-                  <goal>exec</goal>
-                </goals>
-                <phase>compile</phase>
-                <configuration>
-                  <!-- bring PHANTOMJS_BIN into scope -->
-                  <environmentScript>phantomjs-path.sh</environmentScript>
-                  <executable>node_modules/grunt-cli/bin/grunt</executable>
-                  <arguments>
-                    <argument>build</argument>
-                    <argument>--skipTests=${skipTests}</argument>
-                  </arguments>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-    <profile>
-      <id>frontend</id>
-      <activation>
-        <activeByDefault>true</activeByDefault>
-      </activation>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>com.github.eirslett</groupId>
-            <artifactId>frontend-maven-plugin</artifactId>
-            <executions>
-              <execution>
-                <id>install node and npm</id>
-                <goals>
-                  <goal>install-node-and-npm</goal>
-                </goals>
-                <configuration>
-                  <nodeVersion>v8.1.4</nodeVersion>
-                  <!-- npm 5.3.0 issue https://github.com/npm/npm/issues/17858 -->
-                  <npmVersion>5.2.0</npmVersion>
-                </configuration>
-              </execution>
-              <execution>
-                <id>npm clean</id>
-                <goals>
-                  <goal>npm</goal>
-                </goals>
-                <configuration>
-                  <arguments>cache verify</arguments>
-                </configuration>
-              </execution>
-              <execution>
-                <id>npm install</id>
-                <goals>
-                  <goal>npm</goal>
-                </goals>
-                <configuration>
-                  <arguments>install --registry ${nexus.npm}</arguments>
-                </configuration>
-              </execution>
-              <execution>
-                <id>grunt build</id>
-                <goals>
-                  <goal>grunt</goal>
-                </goals>
-                <configuration>
-                  <arguments>build --skipTests=${skipTests}</arguments>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-  </profiles>
   <build>
     <plugins>
       <plugin>
-        <groupId>de.empulse.eclipselink</groupId>
-        <artifactId>staticweave-maven-plugin</artifactId>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <extensions>true</extensions>
+        <configuration>
+          <ignoredUnusedDeclaredDependencies>
+            <ignoredUnusedDeclaredDependency>org.apache.httpcomponents:httpcore-osgi</ignoredUnusedDeclaredDependency>
+            <ignoredUnusedDeclaredDependency>org.mnode.ical4j:ical4j</ignoredUnusedDeclaredDependency>
+            <!-- provide a logger for tests -->
+            <ignoredUnusedDeclaredDependency>org.slf4j:slf4j-log4j12</ignoredUnusedDeclaredDependency>
+            <!-- Required for successful tests: -->
+            <ignoredUnusedDeclaredDependency>org.eclipse.persistence:org.eclipse.persistence.jpa</ignoredUnusedDeclaredDependency>
+            <ignoredUnusedDeclaredDependency>org.eclipse.persistence:org.eclipse.persistence.asm</ignoredUnusedDeclaredDependency>
+            <ignoredUnusedDeclaredDependency>org.eclipse.persistence:org.eclipse.persistence.antlr</ignoredUnusedDeclaredDependency>
+            <ignoredUnusedDeclaredDependency>com.h2database:h2</ignoredUnusedDeclaredDependency>
+            <ignoredUnusedDeclaredDependency>com.mchange:c3p0</ignoredUnusedDeclaredDependency>
+            <ignoredUnusedDeclaredDependency>org.opencastproject:opencast-ingest-service-api</ignoredUnusedDeclaredDependency>
+          </ignoredUnusedDeclaredDependencies>
+        </configuration>
       </plugin>
       <plugin>
         <groupId>org.apache.felix</groupId>
@@ -422,19 +387,16 @@
           <instructions>
             <Bundle-SymbolicName>${project.artifactId}</Bundle-SymbolicName>
             <Build-Number>${buildNumber}</Build-Number>
-            <Private-Package>webapp.*</Private-Package>
-            <Include-Resource>{maven-resources}, target/grunt</Include-Resource>
-            <Http-Alias>/admin-ng</Http-Alias>
-            <Http-Classpath>/webapp</Http-Classpath>
-            <Http-Welcome>index.html</Http-Welcome>
             <Import-Package>
               net.fortuna.ical4j.*,
               org.opencastproject.index.service.message,
+              org.opencastproject.adminui.index,
               javax.ws.rs;version=2.0.1,
               javax.ws.rs.core;version=2.0.1,
               *
             </Import-Package>
             <Private-Package>
+              webapp.*,
               org.opencastproject.adminui.util,
               org.opencastproject.adminui.exception
             </Private-Package>
@@ -443,7 +405,6 @@
               org.opencastproject.adminui.endpoint;version=${project.version},
               org.opencastproject.adminui.exception;version=${project.version},
               org.opencastproject.adminui.impl;version=${project.version},
-              org.opencastproject.adminui.impl.index;version=${project.version},
               org.opencastproject.adminui.userdirectory;version=${project.version},
               org.opencastproject.adminui.usersettings;version=${project.version},
               org.opencastproject.adminui.usersettings.persistence;version=${project.version},
@@ -451,35 +412,15 @@
             </Export-Package>
             <Service-Component>
               OSGI-INF/acl_endpoint.xml,
-              OSGI-INF/adminui_configuration.xml,
-              OSGI-INF/captureagents_endpoint.xml,
               OSGI-INF/event_endpoint.xml,
               OSGI-INF/groups_endpoint.xml,
               OSGI-INF/index_endpoint.xml,
-              OSGI-INF/job_endpoint.xml,
-              OSGI-INF/language-service.xml,
-              OSGI-INF/languages_endpoint.xml,
-              OSGI-INF/message-receiver-acl.xml,
-              OSGI-INF/message-receiver-assetmanager.xml,
-              OSGI-INF/message-receiver-comment.xml,
-              OSGI-INF/message-receiver-group.xml,
-              OSGI-INF/message-receiver-scheduler.xml,
-              OSGI-INF/message-receiver-series.xml,
-              OSGI-INF/message-receiver-theme.xml,
-              OSGI-INF/message-receiver-workflow.xml,
+              OSGI-INF/list_providers_endpoint.xml,
               OSGI-INF/presets_endpoint.xml,
-              OSGI-INF/search-index.xml,
-              OSGI-INF/server_endpoint.xml,
               OSGI-INF/series_endpoint.xml,
-              OSGI-INF/services_endpoint.xml,
-              OSGI-INF/tasks_endpoint.xml,
+              OSGI-INF/statistics_endpoint.xml,
               OSGI-INF/themes_endpoint.xml,
-              OSGI-INF/tools_endpoint.xml,
-              OSGI-INF/ui-roles-role-provider.xml,
-              OSGI-INF/user_settings_endpoint.xml,
-              OSGI-INF/user_settings_service.xml,
-              OSGI-INF/users_endpoint.xml,
-              OSGI-INF/list_providers_endpoint.xml
+              OSGI-INF/tools_endpoint.xml
             </Service-Component>
             <Meta-Persistence>
               META-INF/persistence.xml

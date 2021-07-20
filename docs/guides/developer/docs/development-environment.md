@@ -29,18 +29,22 @@ it automatically in the Opencast OSGi infrastructure. This can be done through t
 [bundle:watch](https://karaf.apache.org/manual/latest/commands/bundle-watch.html) command in Karaf. The workflow would
 be as follows:
 
- - Start Opencast and use `la -u` in the Karaf console to list all installed bundles/modules. Note down the IDs of the
-   bundles you want to watch.
- - Use `bundle:watch IDs` to watch the desired modules, e.g. `bundle:watch 190 199`
- - Make your changes and rebuild the module (e.g. execute `mvn clean install` in the module folder).
- - Watch how Karaf automatically redeploys the changed jars from your local Maven repository. You can verify that
-   everything went smoothly by checking the log with `log:tail`.
+* Start Opencast and use `la -u` in the Karaf console to list all installed bundles/modules. Note down the IDs of the
+  bundles you want to watch.
+* Use `bundle:watch IDs` to watch the desired modules, e.g. `bundle:watch 190 199`
+* Make your changes and rebuild the module (e.g. execute `mvn clean install` in the module folder).
+* Watch how Karaf automatically redeploys the changed jars from your local Maven repository. You can verify that
+  everything went smoothly by checking the log with `log:tail`.
+
+To see this technique in action, you can watch the following short video:
+
+* [Opencast development: Watch and reload modules](https://asciinema.org/a/348132)
 
 The updated bundles are only available in the currently running Karaf instance. To create a Opencast version that has
 this changes permanently, you have to run `mvn clean install` in the the assemblies directory again. Your current
 instance will be deleted by the new assembly!
 
-In several cases the bundle:watch can bring Karaf in an unstable condition, as dependencies between bundles will not
+In several cases the `bundle:watch` can bring Karaf in an unstable condition, as dependencies between bundles will not
 correctly be restored, after the new bundle has been deployed.
 
 
@@ -60,8 +64,27 @@ If you want to enable debug permanently you can export the variable in the shell
 
 You can connect the remote debugger of your IDE on port `5005`.
 
+### Enabling debugger for package installations
+
+Albeit you can use the afforemented method for package installations, you can't start debug mode via system services.
+The recommended way is to enable the debug mode in the `setenv` file, normally found in:
+
+    /usr/share/opencast/bin/
+
+And add this line:
+
+    export KARAF_DEBUG=true
+
+In case you need to change the port for debbuging, you can adding this another line:
+
+    export JAVA_DEBUG_PORT={{PORT}}
+
+Where `{{PORT}}` is the desired port.
+
+
+***
 For more information on remote debugging with Karaf you can visit [this
 site.](https://karaf.apache.org/manual/latest/#_debugging)
 
-It is not recommended to enable remote debugging on production systems!
+It is **not recommended** to enable remote debugging on production systems!
 

@@ -18,24 +18,31 @@
  * the License.
  *
  */
-new (Class (paella.VideoOverlayButtonPlugin, {
-	getName:function() {
-		return "es.upv.paella.opencast.logIn";
-	},
-	getSubclass:function() { return "logIn"; },
-	getAlignment:function() { return 'right'; },
-	getIndex:function() {return 10;},
-	getDefaultToolTip:function() { return base.dictionary.translate("Log in"); },
 
-	checkEnabled:function(onSuccess) {
-		paella.initDelegate.initParams.accessControl.userData()
-		.then((userdata)=>{		
-			onSuccess(userdata.isAnonymous);
-		});
-	},
+paella.addPlugin(function() {
+  return class logIn extends paella.VideoOverlayButtonPlugin {
+    constructor() {
+      super();
+    }
 
-	action:function(button) {
-		window.location.href = paella.initDelegate.initParams.accessControl.getAuthenticationUrl();
-	}
+    getName() {
+      return 'es.upv.paella.opencast.logIn';
+    }
+    getSubclass() { return 'logIn'; }
+    getIconClass() { return 'icon-user'; }
+    getAlignment() { return 'right'; }
+    getIndex() {return 10;}
+    getDefaultToolTip() { return base.dictionary.translate('Log in'); }
 
-}))();
+    checkEnabled(onSuccess) {
+      paella.initDelegate.initParams.accessControl.userData()
+      .then((userdata)=>{
+        onSuccess(userdata.isAnonymous);
+      });
+    }
+
+    action(button) {
+      window.location.href = paella.initDelegate.initParams.accessControl.getAuthenticationUrl();
+    }
+  };
+});

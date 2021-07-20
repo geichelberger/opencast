@@ -31,6 +31,7 @@ import org.opencastproject.distribution.api.DistributionException;
 import org.opencastproject.distribution.api.StreamingDistributionService;
 import org.opencastproject.job.api.Job;
 import org.opencastproject.mediapackage.MediaPackage;
+import org.opencastproject.mediapackage.MediaPackageElement;
 import org.opencastproject.mediapackage.MediaPackageException;
 import org.opencastproject.mediapackage.MediaPackageParser;
 import org.opencastproject.serviceregistry.api.RemoteBase;
@@ -38,12 +39,17 @@ import org.opencastproject.util.OsgiUtil;
 
 import com.google.gson.Gson;
 
+import org.apache.http.HttpResponse;
+import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.osgi.service.component.ComponentContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -79,7 +85,7 @@ public class StreamingDistributionServiceRemoteImpl extends RemoteBase implement
     return this.distributionChannel;
   }
 
- @Override
+  @Override
   public Job distribute(String channelId, MediaPackage mediaPackage, String elementId)
           throws DistributionException, MediaPackageException {
     Set<String> elementIds = new HashSet<String>();
@@ -87,11 +93,31 @@ public class StreamingDistributionServiceRemoteImpl extends RemoteBase implement
     return distribute(channelId, mediaPackage, elementIds);
   }
 
+  @Override
+  public boolean publishToStreaming() {
+    HttpGet get = new HttpGet("/publishToStreaming");
+    HttpResponse response = getResponse(get);
+
+    if (response != null) {
+      String content = null;
+      try (BufferedReader r = new BufferedReader(new InputStreamReader(response.getEntity().getContent()))) {
+        content = r.readLine();
+      } catch (Exception e) {
+        logger.error("Failed to read response from remote service: ", e);
+      } finally {
+        closeConnection(response);
+      }
+      if (content != null) {
+        return Boolean.parseBoolean(content.trim());
+      }
+    }
+    return false;
+  }
 
   @Override
   public Job distribute(String channelId, final MediaPackage mediaPackage, Set<String> elementIds)
           throws DistributionException,  MediaPackageException {
-    logger.info(format("Distributing %s elements to %s@%s", elementIds.size(), channelId, distributionChannel));
+    logger.info("Distributing {} elements to {}@{}", elementIds.size(), channelId, distributionChannel);
     final HttpPost req = post(param(PARAM_CHANNEL_ID, channelId),
                               param(PARAM_MEDIAPACKAGE, MediaPackageParser.getAsXml(mediaPackage)),
                               param(PARAM_ELEMENT_IDS, gson.toJson(elementIds)));
@@ -112,7 +138,7 @@ public class StreamingDistributionServiceRemoteImpl extends RemoteBase implement
 
   @Override
   public Job retract(String channelId, MediaPackage mediaPackage, Set<String> elementIds) throws DistributionException {
-    logger.info(format("Retracting %s elements from %s@%s", elementIds.size(), channelId, distributionChannel));
+    logger.info("Retracting {} elements from {}@{}", elementIds.size(), channelId, distributionChannel);
     final HttpPost req = post("/retract",
                               param(PARAM_MEDIAPACKAGE, MediaPackageParser.getAsXml(mediaPackage)),
                               param(PARAM_ELEMENT_IDS, gson.toJson(elementIds)),
@@ -123,5 +149,36 @@ public class StreamingDistributionServiceRemoteImpl extends RemoteBase implement
     throw new DistributionException(format("Unable to retract '%s' elements of "
                                                    + "mediapackage '%s' using a remote destribution service proxy",
                                            elementIds.size(), mediaPackage.getIdentifier().toString()));
+  }
+
+  @Override
+  public List<MediaPackageElement> distributeSync(String channelId, MediaPackage mediapackage, Set<String> elementIds)
+          throws DistributionException {
+    logger.info("Distributing {} elements to {}@{}", elementIds.size(), channelId, distributionChannel);
+    final HttpPost req = post("/distributesync", param(PARAM_CHANNEL_ID, channelId),
+        param(PARAM_MEDIAPACKAGE, MediaPackageParser.getAsXml(mediapackage)),
+        param(PARAM_ELEMENT_IDS, gson.toJson(elementIds)));
+    for (List<MediaPackageElement> elements : join(runRequest(req, elementsFromHttpResponse))) {
+      return elements;
+    }
+    throw new DistributionException(format("Unable to distribute '%s' elements of "
+            + "mediapackage '%s' using a remote destribution service proxy",
+        elementIds.size(), mediapackage.getIdentifier().toString()));
+  }
+
+  @Override
+  public List<MediaPackageElement> retractSync(String channelId, MediaPackage mediaPackage, Set<String> elementIds)
+          throws DistributionException {
+    logger.info("Retracting {} elements from {}@{}", elementIds.size(), channelId, distributionChannel);
+    final HttpPost req = post("/retract",
+        param(PARAM_MEDIAPACKAGE, MediaPackageParser.getAsXml(mediaPackage)),
+        param(PARAM_ELEMENT_IDS, gson.toJson(elementIds)),
+        param(PARAM_CHANNEL_ID, channelId));
+    for (List<MediaPackageElement> elements : join(runRequest(req, elementsFromHttpResponse))) {
+      return elements;
+    }
+    throw new DistributionException(format("Unable to retract '%s' elements of "
+            + "mediapackage '%s' using a remote destribution service proxy",
+        elementIds.size(), mediaPackage.getIdentifier().toString()));
   }
 }

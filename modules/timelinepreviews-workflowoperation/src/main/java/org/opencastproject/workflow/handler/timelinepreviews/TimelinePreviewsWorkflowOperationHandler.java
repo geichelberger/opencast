@@ -34,12 +34,14 @@ import org.opencastproject.timelinepreviews.api.TimelinePreviewsService;
 import org.opencastproject.util.IoSupport;
 import org.opencastproject.util.NotFoundException;
 import org.opencastproject.workflow.api.AbstractWorkflowOperationHandler;
+import org.opencastproject.workflow.api.ConfiguredTagsAndFlavors;
 import org.opencastproject.workflow.api.WorkflowInstance;
 import org.opencastproject.workflow.api.WorkflowOperationException;
 import org.opencastproject.workflow.api.WorkflowOperationResult;
 import org.opencastproject.workspace.api.Workspace;
 
 import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.osgi.service.component.ComponentContext;
 import org.slf4j.Logger;
@@ -53,8 +55,6 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.SortedMap;
-import java.util.TreeMap;
 
 /**
  * Workflow operation for the timeline previews service.
@@ -76,26 +76,14 @@ public class TimelinePreviewsWorkflowOperationHandler extends AbstractWorkflowOp
   /** Target tags configuration property name. */
   private static final String TARGET_TAGS_PROPERTY = "target-tags";
 
+  /** Process first match only */
+  private static final String PROCCESS_FIRST_MATCH = "process-first-match-only";
+
   /** Image size configuration property name. */
   private static final String IMAGE_SIZE_PROPERTY = "image-count";
 
   /** Default value for image size. */
   private static final int DEFAULT_IMAGE_SIZE = 10;
-
-
-  /** The configuration options for this handler */
-  private static final SortedMap<String, String> CONFIG_OPTIONS;
-
-  static {
-    CONFIG_OPTIONS = new TreeMap<String, String>();
-    CONFIG_OPTIONS.put(SOURCE_FLAVOR_PROPERTY, "The source media file flavor.");
-    CONFIG_OPTIONS.put(SOURCE_TAGS_PROPERTY, "Comma-separated tags of the source media files. "
-            + "Any media that match " + SOURCE_FLAVOR_PROPERTY + " or " + SOURCE_TAGS_PROPERTY
-            + " will be processed.");
-    CONFIG_OPTIONS.put(TARGET_FLAVOR_PROPERTY, "The target timeline previews image flavor.");
-    CONFIG_OPTIONS.put(TARGET_TAGS_PROPERTY, "The timeline previews image (comma separated) target tags.");
-    CONFIG_OPTIONS.put(IMAGE_SIZE_PROPERTY, "The number of timeline previews in the image.");
-  }
 
   /** The timeline previews service. */
   private TimelinePreviewsService timelinePreviewsService = null;
@@ -109,46 +97,23 @@ public class TimelinePreviewsWorkflowOperationHandler extends AbstractWorkflowOp
     logger.info("Registering timeline previews workflow operation handler");
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * @see
-   * org.opencastproject.workflow.api.WorkflowOperationHandler#getConfigurationOptions()
-   */
   @Override
-  public SortedMap<String, String> getConfigurationOptions() {
-    return CONFIG_OPTIONS;
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * @see
-   * org.opencastproject.workflow.api.WorkflowOperationHandler#start(org.opencastproject.workflow.api.WorkflowInstance,
-   * org.opencastproject.job.api.JobContext)
-   */
-  @Override
-  public WorkflowOperationResult start(WorkflowInstance workflowInstance, JobContext context) throws WorkflowOperationException {
+  public WorkflowOperationResult start(WorkflowInstance workflowInstance, JobContext context)
+          throws WorkflowOperationException {
     MediaPackage mediaPackage = workflowInstance.getMediaPackage();
-    logger.info("Start timeline previews workflow operation for mediapackage {}", mediaPackage.getIdentifier().compact());
+    logger.info("Start timeline previews workflow operation for mediapackage {}",
+        mediaPackage.getIdentifier().toString());
 
-    String sourceFlavorProperty = StringUtils.trimToNull(
-            workflowInstance.getCurrentOperation().getConfiguration(SOURCE_FLAVOR_PROPERTY));
-    String sourceTagsProperty = StringUtils.trimToNull(
-            workflowInstance.getCurrentOperation().getConfiguration(SOURCE_TAGS_PROPERTY));
-    if (StringUtils.isEmpty(sourceFlavorProperty) && StringUtils.isEmpty(sourceTagsProperty)) {
+    ConfiguredTagsAndFlavors tagsAndFlavors = getTagsAndFlavors(workflowInstance,
+        Configuration.many, Configuration.many, Configuration.many, Configuration.one);
+    List<MediaPackageElementFlavor> sourceFlavorProperty = tagsAndFlavors.getSrcFlavors();
+    List<String> sourceTagsProperty = tagsAndFlavors.getSrcTags();
+    if (sourceFlavorProperty.isEmpty() && sourceTagsProperty.isEmpty()) {
       throw new WorkflowOperationException(String.format("Required property %s or %s not set",
               SOURCE_FLAVOR_PROPERTY, SOURCE_TAGS_PROPERTY));
     }
-
-    String targetFlavorProperty = StringUtils.trimToNull(
-            workflowInstance.getCurrentOperation().getConfiguration(TARGET_FLAVOR_PROPERTY));
-    if (targetFlavorProperty == null) {
-      throw new WorkflowOperationException(String.format("Required property %s not set", TARGET_FLAVOR_PROPERTY));
-    }
-
-    String targetTagsProperty = StringUtils.trimToNull(
-            workflowInstance.getCurrentOperation().getConfiguration(TARGET_TAGS_PROPERTY));
+    MediaPackageElementFlavor targetFlavor = tagsAndFlavors.getSingleTargetFlavor();
+    List<String> targetTagsProperty = tagsAndFlavors.getTargetTags();
 
     String imageSizeArg = StringUtils.trimToNull(
             workflowInstance.getCurrentOperation().getConfiguration(IMAGE_SIZE_PROPERTY));
@@ -166,16 +131,19 @@ public class TimelinePreviewsWorkflowOperationHandler extends AbstractWorkflowOp
       logger.info("Property {} not set, using default value: {}", IMAGE_SIZE_PROPERTY, DEFAULT_IMAGE_SIZE);
     }
 
+    boolean processOnlyOne = BooleanUtils.toBoolean(StringUtils.trimToNull(
+            workflowInstance.getCurrentOperation().getConfiguration(PROCCESS_FIRST_MATCH)));
+
     TrackSelector trackSelector = new TrackSelector();
-    for (String flavor : asList(sourceFlavorProperty)) {
+    for (MediaPackageElementFlavor flavor : sourceFlavorProperty) {
       trackSelector.addFlavor(flavor);
     }
-    for (String tag : asList(sourceTagsProperty)) {
+    for (String tag : sourceTagsProperty) {
       trackSelector.addTag(tag);
     }
-    Collection<Track> sourceTracks = trackSelector.select(mediaPackage, false);
+    Collection<Track> sourceTracks = trackSelector.select(mediaPackage, true);
     if (sourceTracks.isEmpty()) {
-      logger.info("No tracks found in mediapackage {} with specified {} {}", mediaPackage.getIdentifier().compact(),
+      logger.info("No tracks found in mediapackage {} with specified {} {}", mediaPackage.getIdentifier().toString(),
               SOURCE_FLAVOR_PROPERTY,
               sourceFlavorProperty);
       createResult(mediaPackage, WorkflowOperationResult.Action.SKIP);
@@ -186,22 +154,27 @@ public class TimelinePreviewsWorkflowOperationHandler extends AbstractWorkflowOp
       try {
         // generate timeline preview images
         logger.info("Create timeline previews job for track '{}' in mediapackage '{}'",
-                sourceTrack.getIdentifier(), mediaPackage.getIdentifier().compact());
+                sourceTrack.getIdentifier(), mediaPackage.getIdentifier().toString());
 
         Job timelinepreviewsJob = timelinePreviewsService.createTimelinePreviewImages(sourceTrack, imageSize);
         timelinepreviewsJobs.add(timelinepreviewsJob);
+
+        if (processOnlyOne) {
+          break;
+        }
+
       } catch (MediaPackageException | TimelinePreviewsException ex) {
         logger.error("Creating timeline previews job for track '{}' in media package '{}' failed with error {}",
-                sourceTrack.getIdentifier(), mediaPackage.getIdentifier().compact(), ex.getMessage());
+                sourceTrack.getIdentifier(), mediaPackage.getIdentifier().toString(), ex.getMessage());
       }
     }
 
-    logger.info("Wait for timeline previews jobs for media package {}", mediaPackage.getIdentifier().compact());
+    logger.info("Wait for timeline previews jobs for media package {}", mediaPackage.getIdentifier().toString());
     if (!waitForStatus(timelinepreviewsJobs.toArray(new Job[timelinepreviewsJobs.size()])).isSuccess()) {
       cleanupWorkspace(timelinepreviewsJobs);
       throw new WorkflowOperationException(
               String.format("Timeline previews jobs for media package '%s' have not completed successfully",
-                      mediaPackage.getIdentifier().compact()));
+                      mediaPackage.getIdentifier().toString()));
     }
 
 
@@ -228,12 +201,12 @@ public class TimelinePreviewsWorkflowOperationHandler extends AbstractWorkflowOp
 
           FileInputStream timelinePreviewsInputStream = null;
           logger.info("Put timeline preview images file {} from media package {} to the media package work space",
-                  timelinePreviewsMpe.getURI(), mediaPackage.getIdentifier().compact());
+                  timelinePreviewsMpe.getURI(), mediaPackage.getIdentifier().toString());
 
           try {
             timelinePreviewsInputStream = new FileInputStream(timelinePreviewsFile);
             String fileName = FilenameUtils.getName(timelinePreviewsMpe.getURI().getPath());
-            URI timelinePreviewsWfrUri = workspace.put(mediaPackage.getIdentifier().compact(),
+            URI timelinePreviewsWfrUri = workspace.put(mediaPackage.getIdentifier().toString(),
                     timelinePreviewsMpe.getIdentifier(), fileName, timelinePreviewsInputStream);
             timelinePreviewsMpe.setURI(timelinePreviewsWfrUri);
           } catch (FileNotFoundException ex) {
@@ -249,16 +222,17 @@ public class TimelinePreviewsWorkflowOperationHandler extends AbstractWorkflowOp
           }
 
           // set the timeline previews attachment flavor and add it to the mediapackage
-          MediaPackageElementFlavor targetFlavor = MediaPackageElementFlavor.parseFlavor(targetFlavorProperty);
           if ("*".equals(targetFlavor.getType())) {
-            targetFlavor = new MediaPackageElementFlavor(timelinePreviewsMpe.getFlavor().getType(), targetFlavor.getSubtype());
+            targetFlavor = new MediaPackageElementFlavor(
+                timelinePreviewsMpe.getFlavor().getType(), targetFlavor.getSubtype());
           }
           if ("*".equals(targetFlavor.getSubtype())) {
-            targetFlavor = new MediaPackageElementFlavor(targetFlavor.getType(), timelinePreviewsMpe.getFlavor().getSubtype());
+            targetFlavor = new MediaPackageElementFlavor(
+                targetFlavor.getType(), timelinePreviewsMpe.getFlavor().getSubtype());
           }
           timelinePreviewsMpe.setFlavor(targetFlavor);
-          if (!StringUtils.isEmpty(targetTagsProperty)) {
-            for (String tag : asList(targetTagsProperty)) {
+          if (!targetTagsProperty.isEmpty()) {
+            for (String tag : targetTagsProperty) {
               timelinePreviewsMpe.addTag(tag);
             }
           }
@@ -271,7 +245,8 @@ public class TimelinePreviewsWorkflowOperationHandler extends AbstractWorkflowOp
     }
 
 
-    logger.info("Timeline previews workflow operation for mediapackage {} completed", mediaPackage.getIdentifier().compact());
+    logger.info("Timeline previews workflow operation for mediapackage {} completed",
+        mediaPackage.getIdentifier().toString());
     return createResult(mediaPackage, WorkflowOperationResult.Action.CONTINUE);
   }
 
@@ -281,23 +256,23 @@ public class TimelinePreviewsWorkflowOperationHandler extends AbstractWorkflowOp
    */
   private void cleanupWorkspace(List<Job> jobs) {
     for (Job job : jobs) {
-        String jobPayload = job.getPayload();
-        if (StringUtils.isNotEmpty(jobPayload)) {
-          try {
-            MediaPackageElement timelinepreviewsMpe = MediaPackageElementParser.getFromXml(jobPayload);
-            URI timelinepreviewsUri = timelinepreviewsMpe.getURI();
-            workspace.delete(timelinepreviewsUri);
-          } catch (MediaPackageException ex) {
+      String jobPayload = job.getPayload();
+      if (StringUtils.isNotEmpty(jobPayload)) {
+        try {
+          MediaPackageElement timelinepreviewsMpe = MediaPackageElementParser.getFromXml(jobPayload);
+          URI timelinepreviewsUri = timelinepreviewsMpe.getURI();
+          workspace.delete(timelinepreviewsUri);
+        } catch (MediaPackageException ex) {
             // unexpected job payload
-            logger.error("Can't parse timeline previews attachment from job {}", job.getId());
-          } catch (NotFoundException ex) {
+          logger.error("Can't parse timeline previews attachment from job {}", job.getId());
+        } catch (NotFoundException ex) {
             // this is ok, because we want delete the file
-          } catch (IOException ex) {
-            logger.warn("Deleting timeline previews image file from workspace failed: {}", ex.getMessage());
+        } catch (IOException ex) {
+          logger.warn("Deleting timeline previews image file from workspace failed: {}", ex.getMessage());
             // this is ok, because workspace cleaner will remove old files if they exist
-          }
         }
       }
+    }
   }
 
   public void setTimelinePreviewsService(TimelinePreviewsService timelinePreviewsService) {

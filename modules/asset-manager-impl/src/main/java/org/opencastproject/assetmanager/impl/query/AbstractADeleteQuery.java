@@ -25,19 +25,17 @@ import static java.lang.String.format;
 
 import org.opencastproject.assetmanager.api.query.ADeleteQuery;
 import org.opencastproject.assetmanager.api.query.Predicate;
-import org.opencastproject.assetmanager.impl.AbstractAssetManager;
+import org.opencastproject.assetmanager.api.storage.AssetStore;
+import org.opencastproject.assetmanager.api.storage.DeletionSelector;
+import org.opencastproject.assetmanager.impl.AssetManagerImpl;
 import org.opencastproject.assetmanager.impl.RuntimeTypes;
 import org.opencastproject.assetmanager.impl.VersionImpl;
 import org.opencastproject.assetmanager.impl.persistence.Conversions;
-import org.opencastproject.assetmanager.impl.persistence.Database;
 import org.opencastproject.assetmanager.impl.persistence.EntityPaths;
 import org.opencastproject.assetmanager.impl.persistence.QPropertyDto;
 import org.opencastproject.assetmanager.impl.persistence.QSnapshotDto;
-import org.opencastproject.assetmanager.impl.storage.DeletionSelector;
-import org.opencastproject.util.persistencefn.Queries;
 
 import com.entwinemedia.fn.Fn;
-import com.entwinemedia.fn.Unit;
 import com.entwinemedia.fn.data.SetB;
 import com.mysema.query.Tuple;
 import com.mysema.query.jpa.JPASubQuery;
@@ -54,15 +52,13 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
-import javax.persistence.EntityManager;
-
 public abstract class AbstractADeleteQuery implements ADeleteQuery, DeleteQueryContributor, EntityPaths {
   private static final Logger logger = LoggerFactory.getLogger(AbstractADeleteQuery.class);
 
-  private AbstractAssetManager am;
+  private AssetManagerImpl am;
   private String owner;
 
-  public AbstractADeleteQuery(AbstractAssetManager am, String owner) {
+  public AbstractADeleteQuery(AssetManagerImpl am, String owner) {
     this.am = am;
     this.owner = owner;
   }
@@ -99,7 +95,7 @@ public abstract class AbstractADeleteQuery implements ADeleteQuery, DeleteQueryC
     // resolve AST
     final DeleteQueryContribution c = contributeDelete(owner);
     // run all queries in a single transaction
-    final DeletionResult deletion = am.getDb().run(new Fn<JPAQueryFactory, DeletionResult>() {
+    final DeletionResult deletion = am.getDatabase().run(new Fn<JPAQueryFactory, DeletionResult>() {
       @Override public DeletionResult apply(final JPAQueryFactory jpa) {
         return runQueries(jpa, c);
       }
@@ -111,11 +107,15 @@ public abstract class AbstractADeleteQuery implements ADeleteQuery, DeleteQueryC
       final String orgId = t.get(Q_SNAPSHOT.organizationId);
       final String mpId = t.get(Q_SNAPSHOT.mediaPackageId);
       final VersionImpl version = Conversions.toVersion(t.get(Q_SNAPSHOT.version));
-      am.getAssetStore().delete(DeletionSelector.delete(orgId, mpId, version));
-      deleteSnapshotHandler.notifyDeleteSnapshot(mpId, version);
+      final DeletionSelector deletionSelector = DeletionSelector.delete(orgId, mpId, version);
+      am.getLocalAssetStore().delete(deletionSelector);
+      for (AssetStore as : am.getRemoteAssetStores()) {
+        as.delete(deletionSelector);
+      }
+      deleteSnapshotHandler.handleDeletedSnapshot(mpId, version);
     }
     for (String mpId : deletion.deletedEpisodes) {
-      deleteSnapshotHandler.notifyDeleteEpisode(mpId);
+      deleteSnapshotHandler.handleDeletedEpisode(mpId);
     }
     final long searchTime = (System.nanoTime() - startTime) / 1000000;
     logger.debug("Complete query ms " + searchTime);
@@ -158,10 +158,10 @@ public abstract class AbstractADeleteQuery implements ADeleteQuery, DeleteQueryC
 SELECT
   e.mediapackage_id,
   count(*) AS v
-FROM mh_assets_snapshot e
+FROM oc_assets_snapshot e
 GROUP BY e.mediapackage_id
 HAVING v = (SELECT count(*)
-            FROM mh_assets_snapshot e2
+            FROM oc_assets_snapshot e2
             WHERE e.mediapackage_id = e2.mediapackage_id
                   AND
                   -- delete where clause
@@ -180,19 +180,10 @@ HAVING v = (SELECT count(*)
 //                              .count()))
 //              .list(e2.mediaPackageId);
 // </BLOCK>
-      // delete assets from database
-      final JPADeleteClause qAssets = jpa
-              .delete(Q_ASSET)
-              .where(Q_ASSET.snapshotId.in(
-                      new JPASubQuery().from(Q_SNAPSHOT).where(where).list(Q_SNAPSHOT.id)));
-      am.getDb().logDelete(formatQueryName(c.name, "delete assets"), qAssets);
-      qAssets.execute();
       // main delete query
       final JPADeleteClause qMain = jpa.delete(Q_SNAPSHOT).where(where);
-      am.getDb().logDelete(formatQueryName(c.name, "main"), qMain);
+      am.getDatabase().logDelete(formatQueryName(c.name, "main"), qMain);
       final long deletedItems = qMain.execute();
-      // delete orphaned properties
-      deleteOrphanedProperties();
       // <BLOCK>
       // TODO Bad solution. Yields all media package IDs which can easily be thousands
       // TODO The above SQL solution does not work with H2 so I suspect the query is not 100% clean
@@ -237,22 +228,24 @@ HAVING v = (SELECT count(*)
                 .list(Q_PROPERTY.mediaPackageId)
 
              [2]
-             SELECT DISTINCT t1.mediapackage_id FROM mh_assets_snapshot t2, mh_assets_properties t1 WHERE (t2.organization_id = ?)
+             SELECT DISTINCT t1.mediapackage_id FROM oc_assets_snapshot t2, oc_assets_properties t1
+                 WHERE (t2.organization_id = ?)
            */
           where = Q_PROPERTY.mediaPackageId.in(
-                  new JPASubQuery()
-                          .from(Q_PROPERTY)
-                          .join(Q_SNAPSHOT)
-                          // move the join condition from the "ON" clause (mediapackage_id) to the where clause. Find an explanation above. */
-                          .where(Q_PROPERTY.mediaPackageId.eq(Q_SNAPSHOT.mediaPackageId).and(w))
-                          .distinct()
-                          .list(Q_PROPERTY.mediaPackageId));
+              new JPASubQuery()
+                  .from(Q_PROPERTY)
+                  .join(Q_SNAPSHOT)
+                  // move the join condition from the "ON" clause (mediapackage_id) to the
+                  // where clause. Find an explanation above.
+                  .where(Q_PROPERTY.mediaPackageId.eq(Q_SNAPSHOT.mediaPackageId).and(w))
+                  .distinct()
+                  .list(Q_PROPERTY.mediaPackageId));
         } else {
           where = null;
         }
       }
       final JPADeleteClause qProperties = jpa.delete(from).where(Expressions.allOf(c.targetPredicate.orNull(), where));
-      am.getDb().logDelete(formatQueryName(c.name, "main"), qProperties);
+      am.getDatabase().logDelete(formatQueryName(c.name, "main"), qProperties);
       final long deletedItems = qProperties.execute();
       return new DeletionResult(deletedItems, Collections.<Tuple>emptyList(), Collections.<String>emptySet());
     } else {
@@ -265,37 +258,6 @@ HAVING v = (SELECT count(*)
     return run(NOP_DELETE_SNAPSHOT_HANDLER);
   }
 
-  /**
-   * Delete all orphaned properties. Orphaned properties refer to a non-existing media package.
-   */
-  private void deleteOrphanedProperties() {
-    logger.debug("\n---\nDELETE [orphaned properties]\n---");
-    am.getDb().runSql(new Database.Sql<Unit>() {
-      @Override public Unit h2(EntityManager em) {
-        Queries.sql.update(em, "DELETE FROM mh_assets_properties\n"
-                + "WHERE id in (\n"
-                + "  SELECT p.id\n"
-                + "  FROM mh_assets_properties p LEFT JOIN mh_assets_snapshot e ON p.mediapackage_id = e.mediapackage_id\n"
-                + "  WHERE e.id IS NULL);");
-        return Unit.unit;
-      }
-
-      @Override public Unit mysql(EntityManager em) {
-        Queries.sql.update(em, "DELETE p FROM\n"
-                + "mh_assets_properties p LEFT JOIN mh_assets_snapshot e ON p.mediapackage_id = e.mediapackage_id\n"
-                + "WHERE e.id IS NULL;");
-        return Unit.unit;
-      }
-
-      @Override public Unit postgres(EntityManager em) {
-        Queries.sql.update(em, "DELETE p FROM\n"
-                + "mh_assets_properties p LEFT JOIN mh_assets_snapshot e ON p.mediapackage_id = e.mediapackage_id\n"
-                + "WHERE e.id IS NULL;");
-        return Unit.unit;
-      }
-    });
-  }
-
   private static String formatQueryName(String name, String subQueryName) {
     return format("[%s] [%s]", name, subQueryName);
   }
@@ -304,16 +266,16 @@ HAVING v = (SELECT count(*)
    * Call {@link #run(DeleteSnapshotHandler)} with a deletion handler to get notified about deletions.
    */
   public interface DeleteSnapshotHandler {
-    void notifyDeleteSnapshot(String mpId, VersionImpl version);
+    void handleDeletedSnapshot(String mpId, VersionImpl version);
 
-    void notifyDeleteEpisode(String mpId);
+    void handleDeletedEpisode(String mpId);
   }
 
   public static final DeleteSnapshotHandler NOP_DELETE_SNAPSHOT_HANDLER = new DeleteSnapshotHandler() {
-    @Override public void notifyDeleteSnapshot(String mpId, VersionImpl version) {
+    @Override public void handleDeletedSnapshot(String mpId, VersionImpl version) {
     }
 
-    @Override public void notifyDeleteEpisode(String mpId) {
+    @Override public void handleDeletedEpisode(String mpId) {
     }
   };
 

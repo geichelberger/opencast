@@ -21,6 +21,8 @@
 
 package org.opencastproject.external.userdirectory;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 import org.opencastproject.security.api.JaxbOrganization;
 import org.opencastproject.security.api.JaxbRole;
 import org.opencastproject.security.api.Organization;
@@ -35,8 +37,10 @@ import com.entwinemedia.fn.Stream;
 import com.entwinemedia.fn.StreamOp;
 
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.osgi.service.component.ComponentContext;
+import org.osgi.service.component.annotations.Activate;
+import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Reference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,6 +57,13 @@ import java.util.regex.Pattern;
 /**
  * The External API role provider.
  */
+@Component(
+  property = {
+    "service.description=Provides the External API roles"
+  },
+  immediate = true,
+  service = { RoleProvider.class }
+)
 public class ExternalApiRoleProvider implements RoleProvider {
 
   /** The logger */
@@ -67,31 +78,20 @@ public class ExternalApiRoleProvider implements RoleProvider {
    * @param securityService
    *          the securityService to set
    */
+  @Reference(name = "security-service")
   public void setSecurityService(SecurityService securityService) {
     this.securityService = securityService;
   }
 
+  @Activate
   protected void activate(ComponentContext cc) {
     String rolesFile = ExternalGroupLoader.ROLES_PATH_PREFIX + File.separator + ExternalGroupLoader.EXTERNAL_APPLICATIONS_ROLES_FILE;
-    InputStream in = null;
-    try {
-      in = getClass().getResourceAsStream(rolesFile);
-      roles = new TreeSet<>(IOUtils.readLines(in, "UTF-8"));
+    try (InputStream in = getClass().getResourceAsStream(rolesFile)) {
+      roles = new TreeSet<>(IOUtils.readLines(in, UTF_8));
     } catch (IOException e) {
-      logger.error("Unable to read available roles: {}", ExceptionUtils.getStackTrace(e));
-    } finally {
-      IOUtils.closeQuietly(in);
+      logger.error("Unable to read available roles", e);
     }
     logger.info("Activated External API role provider");
-  }
-
-  /**
-   * @see org.opencastproject.security.api.RoleProvider#getRoles()
-   */
-  @Override
-  public Iterator<Role> getRoles() {
-    Organization organization = securityService.getOrganization();
-    return Stream.$(roles).map(toRole._2(organization)).iterator();
   }
 
   /**

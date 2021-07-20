@@ -21,12 +21,13 @@
 
 package org.opencastproject.workflow.impl;
 
-import static com.entwinemedia.fn.Stream.$;
-
 import static org.apache.solr.client.solrj.util.ClientUtils.escapeQueryChars;
 import static org.opencastproject.security.api.SecurityConstants.GLOBAL_ADMIN_ROLE;
 import static org.opencastproject.util.data.Option.option;
 
+import org.opencastproject.assetmanager.api.AssetManager;
+import org.opencastproject.assetmanager.api.query.AQueryBuilder;
+import org.opencastproject.assetmanager.api.query.AResult;
 import org.opencastproject.job.api.Job;
 import org.opencastproject.mediapackage.MediaPackage;
 import org.opencastproject.security.api.AccessControlEntry;
@@ -42,19 +43,17 @@ import org.opencastproject.security.util.SecurityUtil;
 import org.opencastproject.serviceregistry.api.ServiceRegistry;
 import org.opencastproject.serviceregistry.api.ServiceRegistryException;
 import org.opencastproject.solr.SolrServerFactory;
-import org.opencastproject.util.JobUtil;
 import org.opencastproject.util.NotFoundException;
 import org.opencastproject.util.SolrUtils;
 import org.opencastproject.workflow.api.WorkflowDatabaseException;
-import org.opencastproject.workflow.api.WorkflowException;
 import org.opencastproject.workflow.api.WorkflowInstance;
 import org.opencastproject.workflow.api.WorkflowInstance.WorkflowState;
 import org.opencastproject.workflow.api.WorkflowOperationInstance;
 import org.opencastproject.workflow.api.WorkflowParser;
+import org.opencastproject.workflow.api.WorkflowParsingException;
 import org.opencastproject.workflow.api.WorkflowQuery;
 import org.opencastproject.workflow.api.WorkflowQuery.QueryTerm;
 import org.opencastproject.workflow.api.WorkflowQuery.Sort;
-import org.opencastproject.workflow.api.WorkflowService;
 import org.opencastproject.workflow.api.WorkflowSet;
 import org.opencastproject.workflow.api.WorkflowSetImpl;
 import org.opencastproject.workflow.api.WorkflowStatistics;
@@ -79,6 +78,10 @@ import org.apache.solr.common.SolrDocumentList;
 import org.apache.solr.common.SolrInputDocument;
 import org.osgi.framework.ServiceException;
 import org.osgi.service.component.ComponentContext;
+import org.osgi.service.component.annotations.Activate;
+import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Deactivate;
+import org.osgi.service.component.annotations.Reference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -100,6 +103,14 @@ import java.util.concurrent.Executors;
 /**
  * Provides data access to the workflow service through file storage in the workspace, indexed via solr.
  */
+@Component(
+  property = {
+    "service.description=Workflow Service Index",
+    "synchronousIndexing=false"
+  },
+  immediate = true,
+  service = { WorkflowServiceIndex.class }
+)
 public class WorkflowServiceSolrIndex implements WorkflowServiceIndex {
 
   /** The logger */
@@ -195,6 +206,9 @@ public class WorkflowServiceSolrIndex implements WorkflowServiceIndex {
   /** The security service */
   private SecurityService securityService = null;
 
+  /** The asset manager */
+  private AssetManager assetManager = null;
+
   /** Whether to index workflows synchronously as they are stored */
   protected boolean synchronousIndexing = true;
 
@@ -216,6 +230,7 @@ public class WorkflowServiceSolrIndex implements WorkflowServiceIndex {
    * @param cc
    *          the component context
    */
+  @Activate
   public void activate(ComponentContext cc) {
     String solrServerUrlConfig = StringUtils.trimToNull(cc.getBundleContext().getProperty(CONFIG_SOLR_URL));
     if (solrServerUrlConfig != null) {
@@ -278,57 +293,43 @@ public class WorkflowServiceSolrIndex implements WorkflowServiceIndex {
     if (instancesInSolr == 0) {
       logger.info("The workflow index is empty, looking for workflows to index");
       // this may be a new index, so get all of the existing workflows and index them
-      List<Job> jobs = null;
+      List<String> workflowPayloads;
 
       try {
-        jobs = $(serviceRegistry.getJobs(WorkflowService.JOB_TYPE, null)).filter(operationIsStartWorkflow).toList();
+        workflowPayloads =  serviceRegistry.getJobPayloads(WorkflowServiceImpl.Operation.START_WORKFLOW.toString());
       } catch (ServiceRegistryException e) {
         logger.error("Unable to load the workflows jobs: {}", e.getMessage());
         throw new ServiceException(e.getMessage());
       }
 
-      if (jobs.size() > 0) {
-        logger.info("Populating the workflow index with {} workflows", jobs.size());
-        int errors = 0;
-        for (Job job : jobs) {
-          if (job.getPayload() == null) {
-            logger.warn("Skipping restoring of workflow {}: Payload is empty", job.getId());
-            continue;
-          }
-          WorkflowInstance instance = null;
-          boolean erroneousWorkflowJob = false;
-          try {
-            instance = WorkflowParser.parseWorkflowInstance(job.getPayload());
-            Organization organization = orgDirectory.getOrganization(job.getOrganization());
-            securityService.setOrganization(organization);
-            securityService.setUser(SecurityUtil.createSystemUser(systemUserName, organization));
-            index(instance);
-          } catch (WorkflowDatabaseException e) {
-            logger.warn("Skipping restoring of workflow {}: {}", instance.getId(), e.getMessage());
-            erroneousWorkflowJob = true;
-            errors++;
-          } catch (Throwable e) {
-            logger.warn("Skipping restoring of workflow {}: {}", instance.getId(), e.getMessage());
-            erroneousWorkflowJob = true;
-            errors++;
-          }
-
-          // Make sure this job is not being dispatched anymore
-          if (erroneousWorkflowJob && JobUtil.isReadyToDispatch(job)) {
-            job.setStatus(Job.Status.CANCELED);
-            try {
-              serviceRegistry.updateJob(job);
-              logger.info("Canceled job {} because unable to restore", job);
-            } catch (Exception e) {
-              logger.error("Error updating erroneous job {}: {}", job.getId(), e.getMessage());
-            }
-          }
-        }
-
-        if (errors > 0)
-          logger.warn("Skipped {} erroneous workflows while populating the index", errors);
-        logger.info("Finished populating the workflow search index");
+      final int total = workflowPayloads.size();
+      if (total == 0) {
+        logger.info("No workflows found. Repopulating index finished.");
+        return;
       }
+
+      logger.info("Populating the workflow index with {} workflows", total);
+
+      int current = 0;
+      for (String payload : workflowPayloads) {
+        current++;
+        WorkflowInstance instance = null;
+        try {
+          instance = WorkflowParser.parseWorkflowInstance(payload);
+          Organization organization = orgDirectory.getOrganization(instance.getOrganizationId());
+          securityService.setOrganization(organization);
+          securityService.setUser(SecurityUtil.createSystemUser(systemUserName, organization));
+          index(instance);
+        } catch (WorkflowParsingException | WorkflowDatabaseException | NotFoundException e) {
+          logger.warn("Skipping restoring of workflow {}", payload, e);
+        }
+        if (current % 100 == 0) {
+          logger.info("Indexing workflow {}/{} ({} percent done)", current, total, current * 100 / total);
+        }
+      }
+
+
+      logger.info("Finished populating the workflow search index");
     }
   }
 
@@ -377,6 +378,7 @@ public class WorkflowServiceSolrIndex implements WorkflowServiceIndex {
   /**
    * Shuts down the solr index.
    */
+  @Deactivate
   public void deactivate() {
     SolrServerFactory.shutdown(solrServer);
   }
@@ -504,18 +506,30 @@ public class WorkflowServiceSolrIndex implements WorkflowServiceIndex {
       doc.addField(SUBJECT_KEY, buf.toString());
     }
 
-    User workflowCreator = instance.getCreator();
-    doc.addField(WORKFLOW_CREATOR_KEY, workflowCreator.getUsername());
-    doc.addField(ORG_KEY, instance.getOrganization().getId());
+    doc.addField(WORKFLOW_CREATOR_KEY, instance.getCreatorName());
+    doc.addField(ORG_KEY, instance.getOrganizationId());
 
-    AccessControlList acl;
-    try {
-      acl = authorizationService.getActiveAcl(mp).getA();
-    } catch (Error e) {
-      logger.error("No security xacml found on media package {}", mp);
-      throw new WorkflowException(e);
+    // Media package used to get the active acl
+    MediaPackage aclMp = mp;
+
+    // If workflow has ended, get the latest acl from the asset manager because there may be no security
+    // attachments in the workspace anymore
+    if (instance.getState().isTerminated()) {
+      AQueryBuilder query = assetManager.createQuery();
+      AResult result = query.select(query.snapshot())
+              .where(query.mediaPackageId(mp.getIdentifier().toString()).and(query.version().isLatest())).run();
+      if (result.getRecords().head().isSome()) {
+        aclMp = result.getRecords().head().get().getSnapshot().get().getMediaPackage();
+      }
     }
-    addAuthorization(doc, acl);
+
+    try {
+      AccessControlList acl = authorizationService.getActiveAcl(aclMp).getA();
+      addAuthorization(doc, acl);
+    } catch (Exception e) {
+      logger.warn("Could not find active acl for media package {}", mp, e);
+      // Solr document will not have acl info
+    }
 
     return doc;
   }
@@ -563,7 +577,6 @@ public class WorkflowServiceSolrIndex implements WorkflowServiceIndex {
       String fieldName = ACL_KEY_PREFIX + entry.getKey();
       doc.setField(fieldName, entry.getValue());
     }
-
   }
 
   /**
@@ -852,6 +865,7 @@ public class WorkflowServiceSolrIndex implements WorkflowServiceIndex {
    * @param query
    *          the workflow query
    * @param action
+   *          ACL action (e.g. read or write) to check for
    * @param applyPermissions
    *          whether to apply the permissions to the query. Set to false for administrative queries.
    * @return the solr query string
@@ -1093,6 +1107,7 @@ public class WorkflowServiceSolrIndex implements WorkflowServiceIndex {
    * @param registry
    *          the service registry
    */
+  @Reference(name = "serviceregistry")
   protected void setServiceRegistry(ServiceRegistry registry) {
     this.serviceRegistry = registry;
   }
@@ -1103,6 +1118,7 @@ public class WorkflowServiceSolrIndex implements WorkflowServiceIndex {
    * @param orgDirectory
    *          the organization directory service
    */
+  @Reference(name = "orgDirectory")
   protected void setOrgDirectory(OrganizationDirectoryService orgDirectory) {
     this.orgDirectory = orgDirectory;
   }
@@ -1113,6 +1129,7 @@ public class WorkflowServiceSolrIndex implements WorkflowServiceIndex {
    * @param authorizationService
    *          the authorizationService to set
    */
+  @Reference(name = "authorization")
   protected void setAuthorizationService(AuthorizationService authorizationService) {
     this.authorizationService = authorizationService;
   }
@@ -1123,8 +1140,20 @@ public class WorkflowServiceSolrIndex implements WorkflowServiceIndex {
    * @param securityService
    *          the securityService to set
    */
+  @Reference(name = "security")
   protected void setSecurityService(SecurityService securityService) {
     this.securityService = securityService;
+  }
+
+  /**
+   * Callback for setting the asset manager.
+   *
+   * @param assetManager
+   *          the asset manager
+   */
+  @Reference(name = "assetManager")
+  protected void setAssetManager(AssetManager assetManager) {
+    this.assetManager = assetManager;
   }
 
 }

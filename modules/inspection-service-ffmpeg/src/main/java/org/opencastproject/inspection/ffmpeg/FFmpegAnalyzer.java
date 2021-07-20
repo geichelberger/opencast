@@ -31,7 +31,6 @@ import org.opencastproject.util.ProcessRunner.ProcessInfo;
 import com.entwinemedia.fn.Pred;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
@@ -121,7 +120,7 @@ public class FFmpegAnalyzer implements MediaAnalyzer {
       if (exitCode != -1 && exitCode != 0 && exitCode != 255)
         throw new MediaAnalyzerException("Frame analyzer " + binary + " exited with code " + exitCode);
     } catch (IOException e) {
-      logger.error("Error executing ffprobe: {}", ExceptionUtils.getStackTrace(e));
+      logger.error("Error executing ffprobe", e);
       throw new MediaAnalyzerException("Error while running ffprobe " + binary, e);
     }
 
@@ -311,6 +310,11 @@ public class FFmpegAnalyzer implements MediaAnalyzer {
             obj = stream.get("nb_frames");
             if (obj != null) {
               vMetadata.setFrames(Long.parseLong((String) obj));
+            } else if (vMetadata.getDuration() != null && vMetadata.getFrameRate() != null) {
+              long framesEstimation = Double.valueOf(vMetadata.getDuration() / 1000.0 * vMetadata.getFrameRate()).longValue();
+              if (framesEstimation >= 1) {
+                vMetadata.setFrames(framesEstimation);
+              }
             }
           }
 
@@ -345,10 +349,18 @@ public class FFmpegAnalyzer implements MediaAnalyzer {
   private float parseFloat(String val) {
     if (val.contains("/")) {
       String[] v = val.split("/");
-      return Float.parseFloat(v[0]) / Float.parseFloat(v[1]);
+      if (Float.parseFloat(v[1]) == 0) {
+        return 0;
+      } else {
+        return Float.parseFloat(v[0]) / Float.parseFloat(v[1]);
+      }
     } else if (val.contains(":")) {
       String[] v = val.split(":");
-      return Float.parseFloat(v[0]) / Float.parseFloat(v[1]);
+      if (Float.parseFloat(v[1]) == 0) {
+        return 0;
+      } else {
+        return Float.parseFloat(v[0]) / Float.parseFloat(v[1]);
+      }
     } else {
       return Float.parseFloat(val);
     }

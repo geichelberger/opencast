@@ -26,8 +26,8 @@ import static org.junit.Assert.assertEquals;
 import org.opencastproject.security.api.DefaultOrganization;
 import org.opencastproject.security.api.JaxbGroup;
 import org.opencastproject.security.api.JaxbRole;
+import org.opencastproject.util.XmlSafeParser;
 
-import org.apache.commons.io.IOUtils;
 import org.custommonkey.xmlunit.Diff;
 import org.custommonkey.xmlunit.ElementNameAndTextQualifier;
 import org.custommonkey.xmlunit.XMLAssert;
@@ -39,7 +39,6 @@ import java.util.HashSet;
 import java.util.Set;
 
 import javax.xml.bind.JAXBContext;
-import javax.xml.transform.stream.StreamSource;
 
 /**
  * Tests JAXB un/marshalling of the group's
@@ -62,20 +61,19 @@ public class GroupParsingTest {
     StringWriter writer  = new StringWriter();
     StringWriter writer2 = new StringWriter();
 
-    Set<JaxbRole> roles = new HashSet<JaxbRole>();
+    Set<JaxbRole> roles = new HashSet<>();
     roles.add(new JaxbRole("ROLE_COURSE_ADMIN", ORGANIZATION));
     roles.add(new JaxbRole("ROLE_USER", ORGANIZATION));
 
-    Set<String> members = new HashSet<String>();
+    Set<String> members = new HashSet<>();
     members.add("admin1");
     members.add("admin2");
 
     JaxbGroup group = new JaxbGroup("admin", ORGANIZATION, "Admin", "Admin group", roles, members);
     jaxbContext.createMarshaller().marshal(group, writer);
 
-    String expectedOutput = IOUtils.toString(getClass().getResourceAsStream(GROUP_XML_FILE), "UTF-8");
-    StreamSource streamSource = new StreamSource(getClass().getResourceAsStream(GROUP_XML_FILE));
-    JaxbGroup groupFromFile = jaxbContext.createUnmarshaller().unmarshal(streamSource, JaxbGroup.class).getValue();
+    JaxbGroup groupFromFile = jaxbContext.createUnmarshaller()
+            .unmarshal(XmlSafeParser.parse(getClass().getResourceAsStream(GROUP_XML_FILE)), JaxbGroup.class).getValue();
     jaxbContext.createMarshaller().marshal(groupFromFile, writer2);
 
     Diff diff = new Diff(writer2.toString(), writer.toString());
@@ -96,8 +94,8 @@ public class GroupParsingTest {
 
     JaxbGroup expectedGroup = new JaxbGroup("admin", ORGANIZATION, "Admin", "Admin group", roles, members);
 
-    StreamSource streamSource = new StreamSource(getClass().getResourceAsStream(GROUP_XML_FILE));
-    JaxbGroup group = jaxbContext.createUnmarshaller().unmarshal(streamSource, JaxbGroup.class).getValue();
+    JaxbGroup group = jaxbContext.createUnmarshaller()
+            .unmarshal(XmlSafeParser.parse(getClass().getResourceAsStream(GROUP_XML_FILE)), JaxbGroup.class).getValue();
 
     assertEquals(expectedGroup.getGroupId(), group.getGroupId());
     assertEquals(expectedGroup.getName(), group.getName());

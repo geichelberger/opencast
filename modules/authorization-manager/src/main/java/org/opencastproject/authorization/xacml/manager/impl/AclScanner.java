@@ -21,6 +21,7 @@
 
 package org.opencastproject.authorization.xacml.manager.impl;
 
+import org.opencastproject.authorization.xacml.XACMLParsingException;
 import org.opencastproject.authorization.xacml.XACMLUtils;
 import org.opencastproject.authorization.xacml.manager.api.AclService;
 import org.opencastproject.authorization.xacml.manager.api.AclServiceException;
@@ -35,7 +36,6 @@ import org.opencastproject.util.data.Option;
 
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.felix.fileinstall.ArtifactInstaller;
 import org.osgi.framework.BundleContext;
 import org.slf4j.Logger;
@@ -120,7 +120,7 @@ public class AclScanner implements ArtifactInstaller {
    * @throws IOException
    * @throws JAXBException
    */
-  private void addAcl(File artifact) throws IOException, JAXBException {
+  private void addAcl(File artifact) throws IOException, XACMLParsingException {
     List<Organization> organizations = organizationDirectoryService.getOrganizations();
 
     logger.debug("Adding Acl {}", artifact.getAbsolutePath());
@@ -163,7 +163,7 @@ public class AclScanner implements ArtifactInstaller {
    * @throws IOException
    * @throws JAXBException
    */
-  private void updateAcl(File artifact) throws IOException, JAXBException {
+  private void updateAcl(File artifact) throws IOException, XACMLParsingException {
     List<Organization> organizations = organizationDirectoryService.getOrganizations();
 
     logger.debug("Updating Acl {}", artifact.getAbsolutePath());
@@ -214,7 +214,7 @@ public class AclScanner implements ArtifactInstaller {
         } catch (NotFoundException e) {
           logger.warn("Unable to delete managec acl {}: Managed acl already deleted!", id);
         } catch (AclServiceException e) {
-          logger.error("Unable to delete managed acl {}: {}", id, ExceptionUtils.getStackTrace(e));
+          logger.error("Unable to delete managed acl {}", id, e);
         }
       } else {
         logger.debug("No Acl found with the id {}.", id);
@@ -243,7 +243,7 @@ public class AclScanner implements ArtifactInstaller {
    * @throws FileNotFoundException
    * @throws JAXBException
    */
-  private AccessControlList parseToAcl(File artifact) throws FileNotFoundException, JAXBException {
+  private AccessControlList parseToAcl(File artifact) throws FileNotFoundException, XACMLParsingException {
     FileInputStream in = null;
     AccessControlList acl = null;
 

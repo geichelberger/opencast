@@ -28,7 +28,6 @@ import org.opencastproject.security.api.Organization;
 import org.opencastproject.security.api.UnauthorizedException;
 import org.opencastproject.serviceregistry.api.ServiceRegistryException;
 import org.opencastproject.util.NeedleEye;
-import org.opencastproject.util.data.Effect0;
 import org.opencastproject.workflow.api.WorkflowDatabaseException;
 import org.opencastproject.workflow.api.WorkflowInstance;
 
@@ -165,7 +164,7 @@ public class WorkflowCleanupScanner extends AbstractWorkflowBufferScanner implem
       try {
         getWorkflowService().cleanupWorkflowInstances(bufferForFailedJobs, WorkflowInstance.WorkflowState.FAILED);
       } catch (WorkflowDatabaseException e) {
-        logger.error("Unable to cleanup failed jobs: {}", e);
+        logger.error("Unable to cleanup failed jobs:", e);
       } catch (UnauthorizedException e) {
         logger.error("Workflow cleanup job doesn't have right to delete jobs!");
         throw new IllegalStateException(e);
@@ -176,7 +175,7 @@ public class WorkflowCleanupScanner extends AbstractWorkflowBufferScanner implem
       try {
         getWorkflowService().cleanupWorkflowInstances(bufferForSuccessfulJobs, WorkflowInstance.WorkflowState.SUCCEEDED);
       } catch (WorkflowDatabaseException e) {
-        logger.error("Unable to cleanup successful jobs: {}", e);
+        logger.error("Unable to cleanup successful jobs:", e);
       } catch (UnauthorizedException e) {
         logger.error("Workflow cleanup job doesn't have right to delete jobs!");
         throw new IllegalStateException(e);
@@ -187,7 +186,7 @@ public class WorkflowCleanupScanner extends AbstractWorkflowBufferScanner implem
       try {
         getWorkflowService().cleanupWorkflowInstances(bufferForStoppedJobs, WorkflowInstance.WorkflowState.STOPPED);
       } catch (WorkflowDatabaseException e) {
-        logger.error("Unable to cleanup stopped jobs: {}", e);
+        logger.error("Unable to cleanup stopped jobs:", e);
       } catch (UnauthorizedException e) {
         logger.error("Workflow cleanup job doesn't have right to delete jobs!");
         throw new IllegalStateException(e);
@@ -223,12 +222,7 @@ public class WorkflowCleanupScanner extends AbstractWorkflowBufferScanner implem
       // iterate all organizations
       for (final Organization org : parameters.getOrganizationDirectoryService().getOrganizations()) {
         // set the organization on the current thread
-        parameters.getAdminContextFor(org.getId()).runInContext(new Effect0() {
-          @Override
-          protected void run() {
-            parameters.scan();
-          }
-        });
+        parameters.getAdminContextFor(org.getId()).runInContext(parameters::scan);
       }
 
       logger.info("Finished " + parameters.getScannerName() + " job.");

@@ -23,6 +23,7 @@ package org.opencastproject.event.handler;
 
 import static org.opencastproject.job.api.Job.Status.FINISHED;
 import static org.opencastproject.mediapackage.MediaPackageElementParser.getFromXml;
+import static org.opencastproject.mediapackage.MediaPackageElements.XACML_POLICY_EPISODE;
 import static org.opencastproject.workflow.handler.distribution.EngagePublicationChannel.CHANNEL_ID;
 
 import org.opencastproject.distribution.api.DistributionException;
@@ -33,6 +34,7 @@ import org.opencastproject.job.api.JobBarrier.Result;
 import org.opencastproject.mediapackage.Attachment;
 import org.opencastproject.mediapackage.Catalog;
 import org.opencastproject.mediapackage.MediaPackage;
+import org.opencastproject.mediapackage.MediaPackageElement;
 import org.opencastproject.mediapackage.MediaPackageElements;
 import org.opencastproject.mediapackage.MediaPackageException;
 import org.opencastproject.message.broker.api.series.SeriesItem;
@@ -195,7 +197,21 @@ public class SeriesUpdatedEventHandler {
         // If the security policy has been updated, make sure to distribute that change
         // to the distribution channels as well
         if (SeriesItem.Type.UpdateAcl.equals(seriesItem.getType())) {
-          // Build a new XACML file for this mediapackage
+          if (seriesItem.getOverrideEpisodeAcl()) {
+
+            MediaPackageElement[] distributedEpisodeAcls = mp.getElementsByFlavor(XACML_POLICY_EPISODE);
+            authorizationService.removeAcl(mp, AclScope.Episode);
+
+            for (MediaPackageElement distributedEpisodeAcl : distributedEpisodeAcls) {
+              Job retractJob = distributionService.retract(CHANNEL_ID, mp, distributedEpisodeAcl.getIdentifier());
+              JobBarrier barrier = new JobBarrier(null, serviceRegistry, retractJob);
+              Result jobResult = barrier.waitForJobs();
+              if (!jobResult.getStatus().get(retractJob).equals(FINISHED)) {
+                logger.error("Unable to retract episode XACML {}", distributedEpisodeAcl.getIdentifier());
+              }
+            }
+          }
+
           Attachment fileRepoCopy = authorizationService.setAcl(mp, AclScope.Series, seriesItem.getAcl()).getB();
 
           // Distribute the updated XACML file
@@ -206,7 +222,7 @@ public class SeriesUpdatedEventHandler {
             mp.remove(fileRepoCopy);
             mp.add(getFromXml(serviceRegistry.getJob(distributionJob.getId()).getPayload()));
           } else {
-            logger.error("Unable to distribute XACML {}", fileRepoCopy.getIdentifier());
+            logger.error("Unable to distribute series XACML {}", fileRepoCopy.getIdentifier());
             continue;
           }
         }
@@ -249,8 +265,9 @@ public class SeriesUpdatedEventHandler {
           boolean retractSeriesCatalog = retractSeriesCatalog(mp);
           boolean updateEpisodeCatalog = updateEpisodeCatalog(mp);
 
-          if (!retractSeriesCatalog || !updateEpisodeCatalog)
+          if (!retractSeriesCatalog || !updateEpisodeCatalog) {
             continue;
+          }
         }
 
         // Update the search index with the modified mediapackage
@@ -259,19 +276,11 @@ public class SeriesUpdatedEventHandler {
         barrier.waitForJobs();
       }
     } catch (SearchException e) {
-      logger.warn("Unable to find mediapackages in search: ", e.getMessage());
-    } catch (UnauthorizedException e) {
-      logger.warn(e.getMessage());
-    } catch (MediaPackageException e) {
-      logger.warn(e.getMessage());
-    } catch (ServiceRegistryException e) {
-      logger.warn(e.getMessage());
-    } catch (NotFoundException e) {
-      logger.warn(e.getMessage());
-    } catch (IOException e) {
-      logger.warn(e.getMessage());
-    } catch (DistributionException e) {
-      logger.warn(e.getMessage());
+      logger.warn("Unable to find mediapackages for series {} in search: {}", seriesItem, e.getMessage());
+    } catch (UnauthorizedException | MediaPackageException | ServiceRegistryException
+             | NotFoundException | IOException | DistributionException e) {
+      logger.warn("Unable to update mediapackages for series {} for user {}: {} {}",
+                  seriesId, prevUser.getUsername(), e.getClass().getSimpleName(), e.getMessage());
     } finally {
       securityService.setOrganization(prevOrg);
       securityService.setUser(prevUser);

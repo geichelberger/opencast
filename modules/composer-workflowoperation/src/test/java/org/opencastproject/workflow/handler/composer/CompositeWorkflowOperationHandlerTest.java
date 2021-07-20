@@ -37,7 +37,6 @@ import org.opencastproject.mediapackage.MediaPackageException;
 import org.opencastproject.mediapackage.Track;
 import org.opencastproject.serviceregistry.api.ServiceRegistry;
 import org.opencastproject.serviceregistry.api.ServiceRegistryException;
-import org.opencastproject.util.MimeTypes;
 import org.opencastproject.util.NotFoundException;
 import org.opencastproject.util.data.Option;
 import org.opencastproject.workflow.api.WorkflowInstance.WorkflowState;
@@ -159,6 +158,69 @@ public class CompositeWorkflowOperationHandlerTest {
     Assert.assertEquals("composite/work", trackEncoded.getFlavor().toString());
     Assert.assertTrue(Arrays.asList(targetTags.split("\\W")).containsAll(Arrays.asList(trackEncoded.getTags())));
   }
+
+  @Test
+  public void testDesignatedAudioSource() throws Exception {
+    setMockups();
+
+    // operation configuration
+    String targetTags = "engage,compound";
+    Map<String, String> configurations = new HashMap<String, String>();
+    configurations.put("source-audio-name", ComposerService.UPPER);
+    configurations.put("source-flavor-upper", "presenter/source");
+    configurations.put("source-flavor-lower", "presentation/source");
+    configurations.put("source-flavor-watermark", "watermark/source");
+    configurations.put("source-url-watermark", getClass().getResource("/watermark.jpg").toExternalForm());
+    configurations.put("target-tags", targetTags);
+    configurations.put("target-flavor", "composite/work");
+    configurations.put("encoding-profile", "composite");
+    configurations.put("layout", "test");
+    configurations.put("layout-test", TEST_LAYOUT);
+    configurations.put("layout-single", TEST_SINGLE_LAYOUT);
+    configurations.put("output-resolution", "1900x1080");
+    configurations.put("output-background", "black");
+
+    // run the operation handler
+    WorkflowOperationResult result = getWorkflowOperationResult(mp, configurations);
+
+    // check track metadata
+    MediaPackage mpNew = result.getMediaPackage();
+    Assert.assertEquals(Action.CONTINUE, result.getAction());
+    Track trackEncoded = mpNew.getTrack(COMPOUND_TRACK_ID);
+    Assert.assertEquals("composite/work", trackEncoded.getFlavor().toString());
+    Assert.assertTrue(Arrays.asList(targetTags.split("\\W")).containsAll(Arrays.asList(trackEncoded.getTags())));
+  }
+
+    @Test
+    public void testBothAudioSourceNoWatermark() throws Exception {
+      setMockups();
+
+      // operation configuration
+      String targetTags = "engage,compound";
+      Map<String, String> configurations = new HashMap<String, String>();
+      configurations.put("source-audio-name", ComposerService.BOTH); // equivalent to null
+      configurations.put("source-flavor-upper", "presenter/source");
+      configurations.put("source-flavor-lower", "presentation/source");
+      configurations.put("target-tags", targetTags);
+      configurations.put("target-flavor", "composite/work");
+      configurations.put("encoding-profile", "composite");
+      configurations.put("layout", "test");
+      configurations.put("layout-test", TEST_LAYOUT);
+      configurations.put("layout-single", TEST_SINGLE_LAYOUT);
+      configurations.put("output-resolution", "1900x1080");
+      configurations.put("output-background", "black");
+
+      // run the operation handler
+      WorkflowOperationResult result = getWorkflowOperationResult(mp, configurations);
+
+      // check track metadata
+      MediaPackage mpNew = result.getMediaPackage();
+      Assert.assertEquals(Action.CONTINUE, result.getAction());
+      Track trackEncoded = mpNew.getTrack(COMPOUND_TRACK_ID);
+      Assert.assertEquals("composite/work", trackEncoded.getFlavor().toString());
+      Assert.assertTrue(Arrays.asList(targetTags.split("\\W")).containsAll(Arrays.asList(trackEncoded.getTags())));
+  }
+
 
   @Test
   public void testWithoutWatermark() throws Exception {
@@ -290,7 +352,6 @@ public class CompositeWorkflowOperationHandlerTest {
     EasyMock.expect(profile.getIdentifier()).andReturn(PROFILE_ID);
     EasyMock.expect(profile.getApplicableMediaType()).andReturn(MediaType.Stream);
     EasyMock.expect(profile.getOutputType()).andReturn(MediaType.AudioVisual);
-    EasyMock.expect(profile.getMimeType()).andReturn(MimeTypes.MPEG4.toString()).times(2);
     EasyMock.replay(profile);
 
     // set up mock composer service
@@ -300,6 +361,7 @@ public class CompositeWorkflowOperationHandlerTest {
             composerService.composite((Dimension) EasyMock.anyObject(), Option.option((LaidOutElement<Track>) EasyMock.anyObject()),
                     (LaidOutElement<Track>) EasyMock.anyObject(),
                     (Option<LaidOutElement<Attachment>>) EasyMock.anyObject(), (String) EasyMock.anyObject(),
+                    (String) EasyMock.anyObject(),
                     (String) EasyMock.anyObject())).andReturn(job);
     EasyMock.replay(composerService);
     operationHandler.setComposerService(composerService);

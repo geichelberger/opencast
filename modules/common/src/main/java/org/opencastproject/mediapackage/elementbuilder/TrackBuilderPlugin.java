@@ -221,6 +221,25 @@ public class TrackBuilderPlugin extends AbstractElementBuilderPlugin {
         throw new UnsupportedElementException("Duration of track " + url + " is malformatted");
       }
 
+      // is live
+      String strLive = (String) xpath.evaluate("live/text()", elementNode, XPathConstants.STRING);
+      if (StringUtils.isNotEmpty(strLive)) {
+        boolean live = Boolean.parseBoolean(strLive.trim());
+        track.setLive(live);
+      }
+
+      // is an adaptive playlist
+      String strMaster = (String) xpath.evaluate("master/text()", elementNode, XPathConstants.STRING);
+      if (StringUtils.isNotEmpty(strMaster)) {
+        track.setMaster(Boolean.parseBoolean(strMaster.trim()));
+      }
+
+      // has logical name - adaptive playlist reference
+      String strLogicalname = (String) xpath.evaluate("logicalname/text()", elementNode, XPathConstants.STRING);
+      if (StringUtils.isNotEmpty(strLogicalname)) {
+        track.setLogicalName(strLogicalname.trim());
+      }
+
       // audio settings
       Node audioSettingsNode = (Node) xpath.evaluate("audio", elementNode, XPathConstants.NODE);
       if (audioSettingsNode != null && audioSettingsNode.hasChildNodes()) {

@@ -22,16 +22,20 @@
 package org.opencastproject.adminui.endpoint;
 
 import org.opencastproject.adminui.util.TestServiceRegistryFactory;
-import org.opencastproject.index.service.resources.list.api.ResourceListProvider;
-import org.opencastproject.index.service.resources.list.api.ResourceListQuery;
-import org.opencastproject.index.service.resources.list.impl.ListProvidersServiceImpl;
 import org.opencastproject.index.service.resources.list.provider.ServersListProvider;
-import org.opencastproject.index.service.util.ListProviderUtil;
+import org.opencastproject.index.service.util.JSONUtils;
+import org.opencastproject.list.api.ResourceListProvider;
+import org.opencastproject.list.api.ResourceListQuery;
+import org.opencastproject.list.impl.ListProvidersServiceImpl;
+import org.opencastproject.list.util.ListProviderUtil;
 import org.opencastproject.security.api.Organization;
 import org.opencastproject.security.api.SecurityService;
 
 import org.easymock.EasyMock;
 import org.junit.Ignore;
+import org.osgi.framework.BundleContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -42,16 +46,28 @@ import javax.ws.rs.Path;
 @Ignore
 public class TestListProvidersEndpoint extends ListProvidersEndpoint {
 
+  private static final Logger logger = LoggerFactory.getLogger(ListProvidersEndpoint.class);
+
   public static final String PROVIDER_NAME = "test";
   public static final String[] PROVIDER_VALUES = { "x", "a", "c", "z", "t", "h" };
   private final Map<String, String> baseMap = new HashMap<String, String>();
 
   private ListProvidersServiceImpl listProvidersService = new ListProvidersServiceImpl();
   private SecurityService securityService;
+  private Organization organization;
+
+  protected void activate(BundleContext bundleContext) {
+    logger.info("Activate list provider service");
+    JSONUtils.setUserRegex(".*");
+  }
 
   public TestListProvidersEndpoint() {
     this.securityService = EasyMock.createNiceMock(SecurityService.class);
-    EasyMock.expect(securityService.getOrganization()).andReturn(null);
+    organization = EasyMock.createNiceMock(Organization.class);
+    EasyMock.expect(securityService.getOrganization()).andReturn(organization).anyTimes();
+    EasyMock.expect(organization.getId()).andReturn("mh_default_org").anyTimes();
+    EasyMock.replay(organization, securityService);
+    listProvidersService.setSecurityService(securityService);
 
     for (int i = 0; i < PROVIDER_VALUES.length; i++) {
       baseMap.put(Integer.toString(i), PROVIDER_VALUES[i]);
@@ -64,7 +80,7 @@ public class TestListProvidersEndpoint extends ListProvidersEndpoint {
       }
 
       @Override
-      public Map<String, String> getList(String listName, ResourceListQuery query, Organization organization) {
+      public Map<String, String> getList(String listName, ResourceListQuery query) {
         return ListProviderUtil.filterMap(baseMap, query);
       }
 

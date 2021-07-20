@@ -33,12 +33,12 @@ public interface Job {
 
   /** The status of the job that this receipt represents */
   enum Status {
-    QUEUED, PAUSED, RUNNING, FINISHED, FAILED, DELETED, INSTANTIATED, DISPATCHING, RESTART, CANCELED, WAITING;
+    QUEUED, PAUSED, RUNNING, FINISHED, FAILED, DELETED, INSTANTIATED, DISPATCHING, RESTART, CANCELLED, WAITING;
 
     /** Return if the job is terminated. */
     public boolean isTerminated() {
       switch (this) {
-        case CANCELED:
+        case CANCELLED:
         case DELETED:
         case FAILED:
         case FINISHED:
@@ -271,31 +271,4 @@ public interface Job {
 
   void setJobLoad(Float load);
 
-  /**
-   * Gets the list of job IDs that are blocking this job from continuing
-   * 
-   * @return the list of Job IDs that are blocking this job
-   */
-  List<Long> getBlockedJobIds();
-
-  void setBlockedJobIds(List<Long> list);
-
-  /**
-   * Clears the list of jobs blocking this job from continuing
-   */
-  void removeBlockedJobsIds();
-
-  /**
-   * Gets which job, if any, this job is blocking
-   * 
-   * @return the Job ID this job is blocking, or null
-   */
-  Long getBlockingJobId();
-
-  void setBlockingJobId(Long jobId);
-
-  /**
-   * Clears the reference to the job which this job is blocking, if any
-   */
-  void removeBlockingJobId();
 }

@@ -31,27 +31,33 @@ import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
+import javax.persistence.Index;
+import javax.persistence.JoinColumn;
+import javax.persistence.ManyToOne;
 import javax.persistence.Table;
 import javax.persistence.TableGenerator;
 
 /** JPA DTO modeling the asset database table. */
 @Entity(name = "Asset")
-@Table(name = "mh_assets_asset")
+@Table(name = "oc_assets_asset", indexes = {
+    @Index(name = "IX_oc_assets_asset_checksum", columnList = ("checksum")),
+    @Index(name = "IX_oc_assets_asset_mediapackage_element_id", columnList = ("mediapackage_element_id")) })
 // Maintain own generator to support database migrations from Archive to AssetManager
 // The generator's initial value has to be set after the data migration.
 // Otherwise duplicate key errors will most likely happen.
-@TableGenerator(name = "seq_mh_assets_asset", initialValue = 0, allocationSize = 50)
+@TableGenerator(name = "seq_oc_assets_asset", initialValue = 0, allocationSize = 50)
 public class AssetDto {
   private static final ProductBuilder p = Products.E;
 
   @Id
-  @GeneratedValue(strategy = GenerationType.TABLE, generator = "seq_mh_assets_asset")
+  @GeneratedValue(strategy = GenerationType.TABLE, generator = "seq_oc_assets_asset")
   @Column(name = "id")
   private Long id;
 
   // foreign key referencing SnapshotDto.id
-  @Column(name = "snapshot_id", nullable = false)
-  private Long snapshotId;
+  @ManyToOne(targetEntity = SnapshotDto.class)
+  @JoinColumn(name = "snapshot_id", referencedColumnName = "id", nullable = false)
+  private SnapshotDto snapshot;
 
   @Column(name = "mediapackage_element_id", nullable = false, length = 128)
   private String mediaPackageElementId;
@@ -65,13 +71,26 @@ public class AssetDto {
   @Column(name = "size", nullable = false)
   private Long size;
 
-  /** Create a new DTO. */
-  public static AssetDto mk(String mediaPackageElementId, long snapshotId, String checksum, Opt<MimeType> mimeType, long size) {
+  @Column(name = "storage_id", nullable = false, length = 256)
+  private String storageId;
+
+  /**
+   * Create a new DTO.
+   */
+  public static AssetDto mk(
+      String mediaPackageElementId,
+      SnapshotDto snapshot,
+      String checksum,
+      Opt<MimeType> mimeType,
+      String storeageId,
+      long size
+  ) {
     final AssetDto dto = new AssetDto();
-    dto.snapshotId = snapshotId;
+    dto.snapshot = snapshot;
     dto.mediaPackageElementId = mediaPackageElementId;
     dto.checksum = checksum;
     dto.mimeType = mimeType.isSome() ? mimeType.get().toString() : null;
+    dto.storageId = storeageId;
     dto.size = size;
     return dto;
   }
@@ -84,6 +103,10 @@ public class AssetDto {
     return mediaPackageElementId;
   }
 
+  public String getChecksum() {
+    return checksum;
+  }
+
   public Opt<MimeType> getMimeType() {
     return Conversions.toMimeType(mimeType);
   }
@@ -91,5 +114,20 @@ public class AssetDto {
   public Long getSize() {
     return size;
   }
-}
 
+  public String getStorageId() {
+    return storageId;
+  }
+
+  void setStorageId(String storage) {
+    this.storageId = storage;
+  }
+
+  public SnapshotDto getSnapshot() {
+    return snapshot;
+  }
+
+  public void setSnapshot(SnapshotDto snapshot) {
+    this.snapshot = snapshot;
+  }
+}

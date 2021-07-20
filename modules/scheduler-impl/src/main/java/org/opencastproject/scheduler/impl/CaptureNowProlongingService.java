@@ -42,7 +42,6 @@ import org.opencastproject.security.util.SecurityUtil;
 import org.opencastproject.serviceregistry.api.ServiceRegistry;
 import org.opencastproject.serviceregistry.api.ServiceRegistryException;
 import org.opencastproject.util.NotFoundException;
-import org.opencastproject.util.data.Effect0;
 import org.opencastproject.workspace.api.Workspace;
 
 import com.entwinemedia.fn.data.Opt;
@@ -50,7 +49,6 @@ import com.entwinemedia.fn.data.Opt;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.joda.time.DateTime;
 import org.osgi.service.cm.ConfigurationException;
 import org.osgi.service.cm.ManagedService;
@@ -289,26 +287,22 @@ public class CaptureNowProlongingService implements ManagedService {
     private void execute(final CaptureNowProlongingService prolongingService, final String agentId) {
       for (Organization organization : prolongingService.getOrgDirectoryService().getOrganizations()) {
         User user = SecurityUtil.createSystemUser(prolongingService.getComponentContext(), organization);
-        SecurityUtil.runAs(prolongingService.getSecurityService(), organization, user, new Effect0() {
-          @Override
-          protected void run() {
-            try {
-              MediaPackage mp = prolongingService.getCurrentRecording(agentId);
-              Opt<DublinCoreCatalog> dublinCore = DublinCoreUtil.loadEpisodeDublinCore(prolongingService.getWorkspace(),
-                      mp);
-              if (dublinCore.isSome()
-                      && EncodingSchemeUtils.decodeMandatoryPeriod(dublinCore.get().getFirst(PROPERTY_TEMPORAL))
-                              .getEnd().before(DateTime.now().plusSeconds(90).toDate())) {
-                prolong(prolongingService, mp, dublinCore.get(), agentId);
-              } else {
-                logger.debug("Wait another minute before extending the ad-hoc recording for agent '{}'", agentId);
-              }
-            } catch (NotFoundException e) {
-              logger.info("Unable to extend the ad-hoc recording for agent '{}': No ad-hoc recording found", agentId);
-            } catch (Exception e) {
-              logger.error("Error extending the ad-hoc recording for agent '{}': {}", agentId,
-                      ExceptionUtils.getStackTrace(e));
+        SecurityUtil.runAs(prolongingService.getSecurityService(), organization, user, () -> {
+          try {
+            MediaPackage mp = prolongingService.getCurrentRecording(agentId);
+            Opt<DublinCoreCatalog> dublinCore = DublinCoreUtil.loadEpisodeDublinCore(prolongingService.getWorkspace(),
+                    mp);
+            if (dublinCore.isSome()
+                    && EncodingSchemeUtils.decodeMandatoryPeriod(dublinCore.get().getFirst(PROPERTY_TEMPORAL))
+                            .getEnd().before(DateTime.now().plusSeconds(90).toDate())) {
+              prolong(prolongingService, mp, dublinCore.get(), agentId);
+            } else {
+              logger.debug("Wait another minute before extending the ad-hoc recording for agent '{}'", agentId);
             }
+          } catch (NotFoundException e) {
+            logger.info("Unable to extend the ad-hoc recording for agent '{}': No ad-hoc recording found", agentId);
+          } catch (Exception e) {
+            logger.error("Error extending the ad-hoc recording for agent '{}': {}", agentId, e);
           }
         });
       }
@@ -346,13 +340,12 @@ public class CaptureNowProlongingService implements ManagedService {
    */
   public MediaPackage getCurrentRecording(String agentId)
           throws NotFoundException, UnauthorizedException, SchedulerException {
-    List<MediaPackage> search = schedulerService.search(Opt.some(agentId), Opt.<Date> none(), Opt.some(new Date()),
-            Opt.some(new Date()), Opt.<Date> none());
-    if (search.isEmpty()) {
+    Opt<MediaPackage> current = schedulerService.getCurrentRecording(agentId);
+    if (current.isNone()) {
       logger.warn("Unable to load the current recording for agent '{}': no recording found", agentId);
       throw new NotFoundException("No current recording found for agent '" + agentId + "'");
     }
-    return search.get(0);
+    return current.get();
   }
 
   /**
@@ -377,7 +370,7 @@ public class CaptureNowProlongingService implements ManagedService {
    */
   public void prolongEvent(MediaPackage event, DublinCoreCatalog dublinCore, String agentId)
           throws UnauthorizedException, NotFoundException, SchedulerException, IllegalArgumentException, IOException {
-    String eventId = event.getIdentifier().compact();
+    String eventId = event.getIdentifier().toString();
 
     DCMIPeriod period = EncodingSchemeUtils.decodeMandatoryPeriod(dublinCore.getFirst(DublinCore.PROPERTY_TEMPORAL));
 
@@ -388,7 +381,7 @@ public class CaptureNowProlongingService implements ManagedService {
 
     List<MediaPackage> events = schedulerService.findConflictingEvents(agentId, period.getStart(), prolongedEndDate);
     for (MediaPackage conflictMediaPackage : events) {
-      if (eventId.equals(conflictMediaPackage.getIdentifier().compact()))
+      if (eventId.equals(conflictMediaPackage.getIdentifier().toString()))
         continue;
 
       Opt<DublinCoreCatalog> conflictingDc = DublinCoreUtil.loadEpisodeDublinCore(workspace, conflictMediaPackage);
@@ -424,7 +417,7 @@ public class CaptureNowProlongingService implements ManagedService {
 
     schedulerService.updateEvent(eventId, Opt.<Date> none(), Opt.some(prolongedEndDate), Opt.<String> none(),
             Opt.<Set<String>> none(), Opt.some(event), Opt.<Map<String, String>> none(),
-            Opt.<Map<String, String>> none(), Opt.<Opt<Boolean>> none(), SchedulerService.ORIGIN);
+            Opt.<Map<String, String>> none());
   }
 
 }

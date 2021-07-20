@@ -22,7 +22,6 @@
 package org.opencastproject.staticfiles.impl;
 
 import static java.lang.String.format;
-import static org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace;
 import static org.opencastproject.util.RequireUtil.notNull;
 
 import org.opencastproject.security.api.Organization;
@@ -42,7 +41,6 @@ import com.google.common.util.concurrent.Service.State;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.osgi.service.component.ComponentContext;
 import org.osgi.service.component.ComponentException;
 import org.slf4j.Logger;
@@ -109,16 +107,17 @@ public class StaticFileServiceImpl implements StaticFileService {
                 String.format("%s does not exists and could not be created", rootFile.getAbsolutePath()));
       }
     }
-    if (!rootFile.canRead())
+    if (!rootFile.canRead()) {
       throw new ComponentException(String.format("Cannot read from %s", rootFile.getAbsolutePath()));
+    }
 
     purgeService = new PurgeTemporaryStorageService();
     purgeService.addListener(new Listener() {
       @Override
       public void failed(State from, Throwable failure) {
-        logger.warn("Temporary storage purging service failed: {}", getStackTrace(failure));
+        logger.warn("Temporary storage purging service failed:", failure);
       }
-    }, MoreExecutors.sameThreadExecutor());
+    }, MoreExecutors.directExecutor());
     purgeService.startAsync();
     logger.info("Purging of temporary storage section scheduled");
   }
@@ -164,7 +163,7 @@ public class StaticFileServiceImpl implements StaticFileService {
       Files.createDirectories(file.getParent());
       Files.copy(progressInputStream, file);
     } catch (IOException e) {
-      logger.error("Unable to save file '{}' to {} because: {}", filename, file, ExceptionUtils.getStackTrace(e));
+      logger.error("Unable to save file '{}' to {}", filename, file, e);
       throw e;
     }
 
@@ -173,8 +172,9 @@ public class StaticFileServiceImpl implements StaticFileService {
 
   @Override
   public InputStream getFile(final String uuid) throws NotFoundException, IOException {
-    if (StringUtils.isBlank(uuid))
+    if (StringUtils.isBlank(uuid)) {
       throw new IllegalArgumentException("The uuid must not be blank");
+    }
 
     final String org = securityService.getOrganization().getId();
 
@@ -206,7 +206,7 @@ public class StaticFileServiceImpl implements StaticFileService {
       Path file = getFile(org, uuid);
       return file.getFileName().toString();
     } catch (IOException e) {
-      logger.warn("Error while reading file: {}", getStackTrace(e));
+      logger.warn("Error while reading file:", e);
       throw new NotFoundException(e);
     }
   }
@@ -218,7 +218,7 @@ public class StaticFileServiceImpl implements StaticFileService {
       Path file = getFile(org, uuid);
       return Files.size(file);
     } catch (IOException e) {
-      logger.warn("Error while reading file: {}", getStackTrace(e));
+      logger.warn("Error while reading file:", e);
       throw new NotFoundException(e);
     }
   }
@@ -292,16 +292,16 @@ public class StaticFileServiceImpl implements StaticFileService {
    *           if there was an error while deleting the files.
    */
   void purgeTemporaryStorageSection(final String org, final long lifetime) throws IOException {
-    logger.info("Purge temporary storage section of organization '{}'", org);
+    logger.debug("Purge temporary storage section of organization '{}'", org);
     final Path temporaryStorageDir = getTemporaryStorageDir(org);
     if (Files.exists(temporaryStorageDir)) {
       try (DirectoryStream<Path> tempFilesStream = Files.newDirectoryStream(temporaryStorageDir,
-              new DirectoryStream.Filter<Path>() {
-                @Override
-                public boolean accept(Path path) throws IOException {
-                  return (Files.getLastModifiedTime(path).toMillis() < (new Date()).getTime() - lifetime);
-                }
-              })) {
+          new DirectoryStream.Filter<Path>() {
+            @Override
+            public boolean accept(Path path) throws IOException {
+              return (Files.getLastModifiedTime(path).toMillis() < (new Date()).getTime() - lifetime);
+            }
+          })) {
         for (Path file : tempFilesStream) {
           FileUtils.deleteQuietly(file.toFile());
         }

@@ -59,8 +59,8 @@ This example would add a mirror for the primary Opencast Maven repository, causi
 preferred repository to use. You can find some example configurations in `docs/maven/`.
 
 
-Pushing artifacts to Maven
---------------------------
+Pushing artifacts to a Maven repository
+---------------------------------------
 
 #### Pushing to your local Maven repository
 
@@ -86,77 +86,110 @@ packaging   | The file type (effectively), this should match the filename's exte
 version     | The artifact's version                                                    | 1.1
 generatePom | Whether or not to generate a pom file automatically                       | true
 
-#### Pushing to the remote Nexus repository
+#### Pushing to Maven Central
 
-The following command will push a file to the remote Nexus repository.  Normally builds are pushed to to the remote
-automatically as part of the CI server build, however if there is a need to push to the repo this is the command you
-need. To deploy to the remote repository you will first need a username and password. This can be obtained from the QA
-coordinator. Once you have that, put them in your `.m2/settings.xml` file. It should look like this
+Opencast previously hosted our own Maven repository at nexus.opencast.org, however starting with Opencast 6.6 we are
+transitioning to using Maven Central.  There are a few steps prior to being able to push to Sonatype's repo:
 
+- Create a GPG key, and push the public key to a key server
+- Sign up for an account on [Sonatype's JIRA instance](https://issues.sonatype.org)
+- Let the QA Coordinator know about your user, they will comment on
+  [our repo creation ticket](https://issues.sonatype.org/browse/OSSRH-36510) or create a new issue to give your user permissions
+- Put the following in your `.m2/settings.xml` file
+
+```xml
     <settings>
       <servers>
         <server>
-          <id>opencast</id>
+          <id>ossrh</id>
           <username>$username</username>
           <password>$password</password>
         </server>
         ...
       </servers>
-      ....
+      <profiles>
+        <profile>
+          <id>ossrh</id>
+          <activation>
+            <activeByDefault>true</activeByDefault>
+          </activation>
+          <properties>
+            <gpg.keyname>$gpgKeyId</gpg.keyname>
+          </properties>
+        </profile>
+        ...
+      </profiles>
     </settings>
+```
 
-The command to push the file looks like this. Not that pushing files from your local Maven repository directly is not
-possible, instead you must copy them *outside* the repository and push from there. See below for help on that.
+##### Pushing Snapshots
 
-    mvn deploy:deploy-file \
-      -DrepositoryId=$repo_id \
-      -Durl=$url \
-      -Dfile=$filename \
-      -DgroupId=$groupId \
-      -DartifactId=$artifactId \
-      -Dpackaging=$packaging \
-      -Dversion=$version \
-      -DgeneratePom=$generatePom
+Snapshots are pushed automatically by the CI servers.  For historical purposes, this is accomplished by:
 
-Variable Map
+```bash
+mvn deploy
+```
 
-Variable    | What it does                                                               | Example
-------------|----------------------------------------------------------------------------|--------------------
-repo\_id    | Identifies which set of credentials from your .m2/settings.xml file to use | opencast
-url         | Where to push the file                                                     | http://nexus.virtuos.uos.de:8081/nexus/content/repositories/snapshots
-filename    | The path to the local file you want in your repository                     | audio\_out.mp2
-groupId     | The Opencast group ID                                                      | org.opencastproject
-artifactId  | The artifact ID. This is the name of the artifact according to Maven       | audio
-packaging   | The file type (effectively), this should match the filename's extension    | mp2
-version     | The artifact's version                                                     | 1.1
-generatePom | Whether or not to generate a pom file automatically                        | true
+To verify, your artifacts can be found [here](https://oss.sonatype.org/content/repositories/snapshots/org/opencastproject/)
+and [here](https://oss.sonatype.org/content/groups/staging/org/opencastproject/).  Note that you cannot (easily) drop
+bad snapshots.  Instead, fix it and redeploy!
 
-#### Help with push to the remote Nexus repository
+##### Pushing Releases
 
-Uploading to Nexus is more difficult than it should be: You can't just run deploy:deploy-file. This script is handy
-when you need to manually upload something like a previous release.  Make a copy of
-`~/.m2/repository/org/opencastproject/*` to `$SOURCE_FILES` inside of your git clone, check out the version you're
-uploading, then run this script.  There will be numerous errors as it processes things that either don't have
-artifacts, or don't have artifacts in the version you're uploading, but those can be ignored.
+Note: Please read this section entirely before running any commands.  Maven Central does not allow you to change a
+release once it has been closed!
 
-    #!/bin/bash
+Pushing releases is similar to snapshots, with the added requirements that you also push:
 
-    CORE_NEXUS="nexus.virtuos.uos.de:8081"
-    SOURCE_FILES="nexus_copy"
+- Javadocs
+- Sources
+- GPG signatures for the binaries, docs, and sources
 
-    uploadVersion() {
-      ls $1 | while read line
-      do
-        mvn deploy:deploy-file \
-          -DrepositoryId=opencast \
-          -Durl=http://$CORE_NEXUS/nexus/content/repositories/releases \
-          -Dfile=$SOURCE_FILES/$line/$2/$line-$2.jar \
-          -DgroupId=org.opencastproject -DartifactId=$line \
-          -Dversion=$2 \
-          -DgeneratePom=true \
-          -Dpackaging=jar
-      done
-    }
+This is automated with the `release` profile.  To push a release run
 
-    git checkout <VERSION>
-    uploadVersion ~/.m2/repository/org/opencastproject <VERSION>
+```bash
+mvn nexus-staging:deploy -P release
+```
+
+This creates a staging repository (https://oss.sonatype.org/content/groups/staging/org/opencastproject/) for your
+artifacts.  This is always safe to do - you can still rollback all changes with
+
+```bash
+mvn nexus-staging:drop
+```
+
+If things do not look ok, fix the issue and redeploy.  Once you are confident that everything is ok, you can run
+
+```bash
+mvn nexus-staging:close
+```
+
+This closes the staging repository, and runs the Sonatype-side tests for things like GPG signatures.  If this fails,
+correct the issue locally, and redeploy.  Once this succeeds, you have two options: drop (to destroy the release) or:
+
+```bash
+mvn nexus-staging:release
+```
+
+to permanently release the binaries in their current states.
+
+##### Troubleshooting
+
+Sometimes the deploy or close will fail, timing out after 5 minutes waiting for Sonatype.  It will complain about
+violations of deploy rules - this may or may not actually be true.  If you're confident that this is caused by a simple
+timeout and not something you have done use one of the following.
+
+To reattempt a deploy use
+
+```bash
+mvn nexus-staging:deploy-staged
+```
+
+This will avoid recompiling, retesting, and resigning all of the binaries.
+
+
+To reattempt a close use
+
+```bash
+mvn nexus-staging:close
+```

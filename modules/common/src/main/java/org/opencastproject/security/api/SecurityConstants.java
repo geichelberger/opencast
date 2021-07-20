@@ -26,9 +26,6 @@ package org.opencastproject.security.api;
  */
 public interface SecurityConstants {
 
-  /** Header name for the digest authorization */
-  String AUTHORIZATION_HEADER = "X-Opencast-Matterhorn-Authorization";
-
   /** Header name for the desired organization */
   String ORGANIZATION_HEADER = "X-Opencast-Matterhorn-Organization";
 
@@ -47,6 +44,9 @@ public interface SecurityConstants {
   /** Name of the Opencast admin role */
   String GLOBAL_ADMIN_ROLE = "ROLE_ADMIN";
 
+  /** Name of the Opencast capture agent role */
+  String GLOBAL_CAPTURE_AGENT_ROLE = "ROLE_CAPTURE_AGENT";
+
   /** Name of the Opencast global sudo role */
   String GLOBAL_SUDO_ROLE = "ROLE_SUDO";
 
@@ -55,5 +55,11 @@ public interface SecurityConstants {
 
   /** The roles associated with the Opencast system account */
   String[] GLOBAL_SYSTEM_ROLES = new String[] { GLOBAL_ADMIN_ROLE, GLOBAL_SUDO_ROLE };
+
+  /** The roles associated with the Opencast capture agent account */
+  String[] GLOBAL_CAPTURE_AGENT_ROLES = new String[] { GLOBAL_CAPTURE_AGENT_ROLE };
+
+  /** The administrator user configuration option */
+  String GLOBAL_ADMIN_USER_PROPERTY = "org.opencastproject.security.admin.user";
 
 }

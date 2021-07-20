@@ -41,6 +41,7 @@ import javax.persistence.MapKeyColumn;
 import javax.persistence.NamedQueries;
 import javax.persistence.NamedQuery;
 import javax.persistence.Table;
+import javax.persistence.UniqueConstraint;
 
 /**
  * Enitity object for storing series in persistence storage. Series ID is stored as primary key, DUBLIN_CORE field is
@@ -50,12 +51,16 @@ import javax.persistence.Table;
  */
 @Entity(name = "SeriesEntity") @IdClass(SeriesEntityId.class)
 @Access(AccessType.FIELD)
-@Table(name = "mh_series")
+@Table(name = "oc_series")
 @NamedQueries({
-        @NamedQuery(name = "Series.findAll", query = "select s from SeriesEntity s"),
-        @NamedQuery(name = "Series.getCount", query = "select COUNT(s) from SeriesEntity s"),
-        @NamedQuery(name = "seriesById", query = "select s from SeriesEntity as s where s.seriesId=:seriesId and s.organization=:organization"),
-        @NamedQuery(name = "allSeriesInOrg", query = "select s from SeriesEntity as s where s.organization=:organization") })
+    @NamedQuery(name = "Series.findAll", query = "select s from SeriesEntity s"),
+    @NamedQuery(name = "Series.getCount", query = "select COUNT(s) from SeriesEntity s"),
+    @NamedQuery(
+        name = "seriesById",
+        query = "select s from SeriesEntity as s where s.seriesId=:seriesId and s.organization=:organization"
+    ),
+    @NamedQuery(name = "allSeriesInOrg", query = "select s from SeriesEntity as s where s.organization=:organization")
+})
 public class SeriesEntity {
 
   /** Series ID, primary key */
@@ -79,24 +84,25 @@ public class SeriesEntity {
   @Column(name = "access_control", length = 65535)
   protected String accessControl;
 
-  /** Opt-out status */
-  @Column(name = "opt_out")
-  protected boolean optOut = false;
-
+  @Lob
   @ElementCollection(targetClass = String.class)
-  @MapKeyColumn(name = "name")
-  @Column(name = "value")
-  @CollectionTable(name = "mh_series_property", joinColumns = {
-          @JoinColumn(name = "series", referencedColumnName = "id"),
-          @JoinColumn(name = "organization", referencedColumnName = "organization") })
+  @MapKeyColumn(name = "name", nullable = false)
+  @Column(name = "value", length = 65535)
+  @CollectionTable(name = "oc_series_property", uniqueConstraints = {
+      @UniqueConstraint(name = "UNQ_series_properties", columnNames = {"series", "organization", "name"})
+      }, joinColumns = {
+          @JoinColumn(name = "series", referencedColumnName = "id", nullable = false),
+          @JoinColumn(name = "organization", referencedColumnName = "organization", nullable = false) })
   protected Map<String, String> properties;
 
   @ElementCollection
-  @MapKeyColumn(name = "type")
+  @MapKeyColumn(name = "type", length = 128, nullable = false)
   @Column(name = "data")
-  @CollectionTable(name = "mh_series_elements", joinColumns = {
-          @JoinColumn(name = "series", referencedColumnName = "id"),
-          @JoinColumn(name = "organization", referencedColumnName = "organization") })
+  @CollectionTable(name = "oc_series_elements", uniqueConstraints = {
+      @UniqueConstraint(name = "UNQ_series_elements", columnNames = {"series", "organization", "type"})
+      }, joinColumns = {
+      @JoinColumn(name = "series", referencedColumnName = "id", nullable = false),
+      @JoinColumn(name = "organization", referencedColumnName = "organization", nullable = false) })
   protected Map<String, byte[]> elements;
 
   /**
@@ -120,10 +126,12 @@ public class SeriesEntity {
    * @param seriesId
    */
   public void setSeriesId(String seriesId) {
-    if (seriesId == null)
+    if (seriesId == null) {
       throw new IllegalArgumentException("Series id can't be null");
-    if (seriesId.length() > 128)
+    }
+    if (seriesId.length() > 128) {
       throw new IllegalArgumentException("Series id can't be longer than 128 characters");
+    }
     this.seriesId = seriesId;
   }
 
@@ -178,21 +186,6 @@ public class SeriesEntity {
    */
   public void setOrganization(String organization) {
     this.organization = organization;
-  }
-
-  /**
-   * @return the opt out status
-   */
-  public boolean isOptOut() {
-    return optOut;
-  }
-
-  /**
-   * @param optOut
-   *          the opt out status to set
-   */
-  public void setOptOut(boolean optOut) {
-    this.optOut = optOut;
   }
 
   public Map<String, String> getProperties() {

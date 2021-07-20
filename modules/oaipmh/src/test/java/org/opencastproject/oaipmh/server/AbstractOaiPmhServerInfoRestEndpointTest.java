@@ -20,12 +20,12 @@
  */
 package org.opencastproject.oaipmh.server;
 
-import static com.jayway.restassured.RestAssured.given;
+import static io.restassured.RestAssured.given;
 import static org.hamcrest.CoreMatchers.equalTo;
-import static org.opencastproject.rest.RestServiceTestEnv.localhostRandomPort;
-import static org.opencastproject.rest.RestServiceTestEnv.testEnvForClasses;
+import static org.opencastproject.test.rest.RestServiceTestEnv.localhostRandomPort;
+import static org.opencastproject.test.rest.RestServiceTestEnv.testEnvForClasses;
 
-import org.opencastproject.rest.RestServiceTestEnv;
+import org.opencastproject.test.rest.RestServiceTestEnv;
 
 import org.apache.http.HttpStatus;
 import org.junit.AfterClass;
@@ -37,15 +37,13 @@ public class AbstractOaiPmhServerInfoRestEndpointTest {
 
   @Test
   public void testHasRepo() throws Exception {
-    given().log().all()
-            .pathParam("repoId", "UNKNOWN")
-            .expect().log().all()
+    given().pathParam("repoId", "UNKNOWN")
+            .expect()
             .statusCode(HttpStatus.SC_OK)
             .body(equalTo("false"))
             .when().get(env.host("/hasrepo/{repoId}"));
-    given().log().all()
-            .pathParam("repoId", "default")
-            .expect().log().all()
+    given().pathParam("repoId", "default")
+            .expect()
             .statusCode(HttpStatus.SC_OK)
             .body(equalTo("true"))
             .when().get(env.host("/hasrepo/{repoId}"));
@@ -53,8 +51,7 @@ public class AbstractOaiPmhServerInfoRestEndpointTest {
 
   @Test
   public void testGetMountPoint() throws Exception {
-    given().log().all()
-            .expect().log().all()
+    given().expect()
             .body(equalTo("/oaipmh"))
             .when().get(env.host("/mountpoint"));
   }

@@ -25,15 +25,11 @@ import static org.opencastproject.adminui.endpoint.EndpointUtil.addRequestFilter
 import static org.opencastproject.adminui.endpoint.EndpointUtil.generateJSONObject;
 
 import org.opencastproject.adminui.exception.JsonCreationException;
-import org.opencastproject.index.service.exception.ListProviderException;
-import org.opencastproject.index.service.resources.list.api.ListProvidersService;
-import org.opencastproject.index.service.resources.list.api.ResourceListQuery;
 import org.opencastproject.index.service.resources.list.query.AclsListQuery;
 import org.opencastproject.index.service.resources.list.query.AgentsListQuery;
 import org.opencastproject.index.service.resources.list.query.EventListQuery;
 import org.opencastproject.index.service.resources.list.query.GroupsListQuery;
 import org.opencastproject.index.service.resources.list.query.JobsListQuery;
-import org.opencastproject.index.service.resources.list.query.ResourceListQueryImpl;
 import org.opencastproject.index.service.resources.list.query.SeriesListQuery;
 import org.opencastproject.index.service.resources.list.query.ServersListQuery;
 import org.opencastproject.index.service.resources.list.query.ServicesListQuery;
@@ -41,6 +37,11 @@ import org.opencastproject.index.service.resources.list.query.ThemesListQuery;
 import org.opencastproject.index.service.resources.list.query.UsersListQuery;
 import org.opencastproject.index.service.util.JSONUtils;
 import org.opencastproject.index.service.util.RestUtils;
+import org.opencastproject.list.api.ListProviderException;
+import org.opencastproject.list.api.ListProvidersService;
+import org.opencastproject.list.api.ResourceListQuery;
+import org.opencastproject.list.impl.ListProviderNotFoundException;
+import org.opencastproject.list.impl.ResourceListQueryImpl;
 import org.opencastproject.security.api.SecurityService;
 import org.opencastproject.util.doc.rest.RestParameter;
 import org.opencastproject.util.doc.rest.RestQuery;
@@ -85,9 +86,15 @@ public class ListProvidersEndpoint {
 
   private SecurityService securityService;
   private ListProvidersService listProvidersService;
+  private SeriesEndpoint seriesEndpoint;
+
+  /** This regex is used to reduce the users in the filter selectbox.
+   * The filter is located in the top right corner in the admin ui. */
+  private static final String PROP_KEY_USER_FILTER_REGEX = "org.opencastproject.adminui.filter.user.regex";
 
   protected void activate(BundleContext bundleContext) {
     logger.info("Activate list provider service");
+    JSONUtils.setUserRegex(bundleContext.getProperty(PROP_KEY_USER_FILTER_REGEX));
   }
 
   /** OSGi callback for series services. */
@@ -100,48 +107,53 @@ public class ListProvidersEndpoint {
     this.securityService = securitySerivce;
   }
 
+  /** OSGi callback for series end point. */
+  public void setSeriesEndpoint(SeriesEndpoint seriesEndpoint) {
+    this.seriesEndpoint = seriesEndpoint;
+  }
+
   @GET
   @Path("{source}.json")
   @Produces(MediaType.APPLICATION_JSON)
   @RestQuery(name = "list", description = "Provides key-value list from the given source", pathParameters = { @RestParameter(name = "source", description = "The source for the key-value list", isRequired = true, type = RestParameter.Type.STRING) }, restParameters = {
           @RestParameter(description = "The maximum number of items to return per page", isRequired = false, name = "limit", type = RestParameter.Type.INTEGER),
           @RestParameter(description = "The offset", isRequired = false, name = "offset", type = RestParameter.Type.INTEGER),
-          @RestParameter(description = "Filters", isRequired = false, name = "filter", type = RestParameter.Type.STRING) }, reponses = { @RestResponse(description = "Returns the key-value list for the given source.", responseCode = HttpServletResponse.SC_OK) }, returnDescription = "")
+          @RestParameter(description = "Filters", isRequired = false, name = "filter", type = RestParameter.Type.STRING) }, responses = { @RestResponse(description = "Returns the key-value list for the given source.", responseCode = HttpServletResponse.SC_OK) }, returnDescription = "")
   public Response getList(@PathParam("source") final String source, @QueryParam("limit") final int limit,
           @QueryParam("filter") final String filter, @QueryParam("offset") final int offset,
           @Context HttpHeaders headers) {
-    if (listProvidersService.hasProvider(source)) {
-      ResourceListQueryImpl query = new ResourceListQueryImpl();
-      query.setLimit(limit);
-      query.setOffset(offset);
-      addRequestFiltersToQuery(filter, query);
-      Map<String, String> autocompleteList;
-      try {
-        autocompleteList = listProvidersService.getList(source, query, securityService.getOrganization(), false);
-      } catch (ListProviderException e) {
-        logger.error("Not able to get list from provider {}: {}", source, e);
-        return SERVER_ERROR;
-      }
 
-      JSONObject jsonList;
-      try {
-        jsonList = generateJSONObject(autocompleteList);
-      } catch (JsonCreationException e) {
-        logger.error("Not able to generate resources list JSON from source {}: {}", source, e);
-        return SERVER_ERROR;
-      }
-
-      return Response.ok(jsonList.toString()).build();
+    ResourceListQueryImpl query = new ResourceListQueryImpl();
+    query.setLimit(limit);
+    query.setOffset(offset);
+    addRequestFiltersToQuery(filter, query);
+    Map<String, String> autocompleteList;
+    try {
+      autocompleteList = listProvidersService.getList(source, query, false);
+    } catch (ListProviderNotFoundException e) {
+      logger.debug("No list found for {}", source, e);
+      return NOT_FOUND;
+    } catch (ListProviderException e) {
+      logger.error("Server error when getting list from provider {}", source, e);
+      return SERVER_ERROR;
     }
 
-    return NOT_FOUND;
+    JSONObject jsonList;
+    try {
+      jsonList = generateJSONObject(autocompleteList);
+    } catch (JsonCreationException e) {
+      logger.error("Not able to generate resources list JSON from source {}", source, e);
+      return SERVER_ERROR;
+    }
+
+    return Response.ok(jsonList.toString()).build();
   }
 
   @GET
   @Path("components.json")
   @Produces(MediaType.APPLICATION_JSON)
   @RestQuery(name = "components", description = "Provides a set of constants lists (right now only eventCommentReasons) for use in the admin UI",
-    reponses = { @RestResponse(description = "Returns a set of constants lists (right now only eventCommentReasons) for use in the admin UI",
+    responses = { @RestResponse(description = "Returns a set of constants lists (right now only eventCommentReasons) for use in the admin UI",
     responseCode = HttpServletResponse.SC_OK) }, returnDescription = "")
   public Response getComponents(@Context HttpHeaders headers) {
     String[] sources = { "eventCommentReasons" };
@@ -153,8 +165,7 @@ public class ListProvidersEndpoint {
       if (listProvidersService.hasProvider(source)) {
         JSONObject subList;
         try {
-          subList = generateJSONObject(listProvidersService.getList(source, query, securityService.getOrganization(),
-                  true));
+          subList = generateJSONObject(listProvidersService.getList(source, query, true));
           list.put(source, subList);
         } catch (JsonCreationException e) {
           logger.error("Not able to generate resources list JSON from source {}: {}", source, e);
@@ -174,7 +185,7 @@ public class ListProvidersEndpoint {
   @GET
   @Path("providers.json")
   @Produces(MediaType.APPLICATION_JSON)
-  @RestQuery(name = "availableProviders", description = "Provides the list of the available list providers", reponses = { @RestResponse(description = "Returns the availables list providers.", responseCode = HttpServletResponse.SC_OK) }, returnDescription = "")
+  @RestQuery(name = "availableProviders", description = "Provides the list of the available list providers", responses = { @RestResponse(description = "Returns the availables list providers.", responseCode = HttpServletResponse.SC_OK) }, returnDescription = "")
   public Response getAvailablesProviders(@Context HttpHeaders headers) {
     JSONArray list = new JSONArray();
 
@@ -186,7 +197,7 @@ public class ListProvidersEndpoint {
   @GET
   @Path("{page}/filters.json")
   @Produces(MediaType.APPLICATION_JSON)
-  @RestQuery(name = "filters", description = "Provides filters for the given page", pathParameters = { @RestParameter(name = "page", description = "The page for which the filters are required", isRequired = true, type = RestParameter.Type.STRING) }, reponses = { @RestResponse(description = "Returns the filters for the given page.", responseCode = HttpServletResponse.SC_OK) }, returnDescription = "")
+  @RestQuery(name = "filters", description = "Provides filters for the given page", pathParameters = { @RestParameter(name = "page", description = "The page for which the filters are required", isRequired = true, type = RestParameter.Type.STRING) }, responses = { @RestResponse(description = "Returns the filters for the given page.", responseCode = HttpServletResponse.SC_OK) }, returnDescription = "")
   public Response getFilters(@PathParam("page") final String page, @Context HttpHeaders headers)
           throws ListProviderException {
 
@@ -218,7 +229,13 @@ public class ListProvidersEndpoint {
     }
 
     try {
-      return RestUtils.okJson(JSONUtils.filtersToJSON(query, listProvidersService, securityService.getOrganization()));
+      if ("events".equals(page) && seriesEndpoint.getOnlySeriesWithWriteAccessEventsFilter()) {
+        Map<String, String> seriesWriteAccess = seriesEndpoint.getUserSeriesByAccess(true);
+        return RestUtils.okJson(JSONUtils.filtersToJSONSeriesWriteAccess(query, listProvidersService,
+                securityService.getOrganization(), seriesWriteAccess));
+      } else {
+        return RestUtils.okJson(JSONUtils.filtersToJSON(query, listProvidersService, securityService.getOrganization()));
+      }
     } catch (ListProviderException e) {
       logger.error("Not able to get list of options for the filters for the page {}: {}", page, e);
       return SERVER_ERROR;

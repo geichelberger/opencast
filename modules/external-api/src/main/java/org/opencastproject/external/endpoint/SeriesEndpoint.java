@@ -29,39 +29,42 @@ import static com.entwinemedia.fn.data.json.Jsons.v;
 import static javax.servlet.http.HttpServletResponse.SC_BAD_REQUEST;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.trimToNull;
-import static org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace;
-import static org.opencastproject.external.common.ApiVersion.VERSION_1_0_0;
-import static org.opencastproject.index.service.util.RestUtils.okJson;
+import static org.opencastproject.external.common.ApiVersion.VERSION_1_1_0;
+import static org.opencastproject.external.common.ApiVersion.VERSION_1_2_0;
+import static org.opencastproject.external.common.ApiVersion.VERSION_1_5_0;
 import static org.opencastproject.util.DateTimeSupport.toUTC;
+import static org.opencastproject.util.RestUtil.getEndpointUrl;
 import static org.opencastproject.util.doc.rest.RestParameter.Type.STRING;
 
+import org.opencastproject.elasticsearch.api.SearchIndexException;
+import org.opencastproject.elasticsearch.api.SearchResult;
+import org.opencastproject.elasticsearch.api.SearchResultItem;
+import org.opencastproject.elasticsearch.index.event.EventIndexSchema;
+import org.opencastproject.elasticsearch.index.series.Series;
+import org.opencastproject.elasticsearch.index.series.SeriesIndexSchema;
+import org.opencastproject.elasticsearch.index.series.SeriesSearchQuery;
+import org.opencastproject.external.common.ApiMediaType;
 import org.opencastproject.external.common.ApiResponses;
 import org.opencastproject.external.common.ApiVersion;
-import org.opencastproject.external.impl.index.ExternalIndex;
+import org.opencastproject.external.index.ExternalIndex;
 import org.opencastproject.external.util.AclUtils;
 import org.opencastproject.external.util.ExternalMetadataUtils;
 import org.opencastproject.index.service.api.IndexService;
-import org.opencastproject.index.service.catalog.adapter.MetadataList;
-import org.opencastproject.index.service.catalog.adapter.MetadataUtils;
 import org.opencastproject.index.service.exception.IndexServiceException;
-import org.opencastproject.index.service.impl.index.event.EventIndexSchema;
-import org.opencastproject.index.service.impl.index.series.Series;
-import org.opencastproject.index.service.impl.index.series.SeriesIndexSchema;
-import org.opencastproject.index.service.impl.index.series.SeriesSearchQuery;
 import org.opencastproject.index.service.util.RequestUtils;
 import org.opencastproject.index.service.util.RestUtils;
-import org.opencastproject.matterhorn.search.SearchIndexException;
-import org.opencastproject.matterhorn.search.SearchResult;
-import org.opencastproject.matterhorn.search.SearchResultItem;
-import org.opencastproject.matterhorn.search.SortCriterion;
 import org.opencastproject.mediapackage.MediaPackageElementFlavor;
 import org.opencastproject.metadata.dublincore.DublinCore;
-import org.opencastproject.metadata.dublincore.MetadataCollection;
+import org.opencastproject.metadata.dublincore.DublinCoreMetadataCollection;
 import org.opencastproject.metadata.dublincore.MetadataField;
+import org.opencastproject.metadata.dublincore.MetadataJson;
+import org.opencastproject.metadata.dublincore.MetadataList;
 import org.opencastproject.metadata.dublincore.SeriesCatalogUIAdapter;
 import org.opencastproject.rest.RestConstants;
 import org.opencastproject.security.api.AccessControlEntry;
 import org.opencastproject.security.api.AccessControlList;
+import org.opencastproject.security.api.AccessControlParser;
+import org.opencastproject.security.api.Permissions;
 import org.opencastproject.security.api.SecurityService;
 import org.opencastproject.security.api.UnauthorizedException;
 import org.opencastproject.series.api.SeriesException;
@@ -78,15 +81,16 @@ import org.opencastproject.util.doc.rest.RestParameter;
 import org.opencastproject.util.doc.rest.RestQuery;
 import org.opencastproject.util.doc.rest.RestResponse;
 import org.opencastproject.util.doc.rest.RestService;
+import org.opencastproject.util.requests.SortCriterion;
 
 import com.entwinemedia.fn.Fn;
 import com.entwinemedia.fn.data.Opt;
 import com.entwinemedia.fn.data.json.Field;
+import com.entwinemedia.fn.data.json.JObject;
 import com.entwinemedia.fn.data.json.JValue;
 import com.entwinemedia.fn.data.json.Jsons.Functions;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
@@ -105,6 +109,7 @@ import java.util.TreeMap;
 
 import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.DELETE;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.FormParam;
 import javax.ws.rs.GET;
 import javax.ws.rs.HeaderParam;
@@ -119,7 +124,11 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
 @Path("/")
-@RestService(name = "externalapiseries", title = "External API Series Service", notes = "", abstractText = "Provides resources and operations related to the series")
+@Produces({ ApiMediaType.JSON, ApiMediaType.VERSION_1_0_0, ApiMediaType.VERSION_1_1_0, ApiMediaType.VERSION_1_2_0,
+            ApiMediaType.VERSION_1_3_0, ApiMediaType.VERSION_1_4_0, ApiMediaType.VERSION_1_5_0,
+            ApiMediaType.VERSION_1_6_0 })
+@RestService(name = "externalapiseries", title = "External API Series Service", notes = {},
+             abstractText = "Provides resources and operations related to the series")
 public class SeriesEndpoint {
 
   private static final int CREATED_BY_UI_ORDER = 9;
@@ -127,11 +136,8 @@ public class SeriesEndpoint {
 
   private static final Logger logger = LoggerFactory.getLogger(SeriesEndpoint.class);
 
-  /** Default server URL */
-  protected String serverUrl = "http://localhost:8080";
-
-  /** Service url */
-  protected String serviceUrl = null;
+  /** Base URL of this endpoint */
+  protected String endpointBaseUrl;
 
   /* OSGi service references */
   private ExternalIndex externalIndex;
@@ -161,33 +167,34 @@ public class SeriesEndpoint {
 
   /** OSGi activation method */
   void activate(ComponentContext cc) {
-    if (cc == null) {
-      this.serverUrl = "http://localhost:8080";
-    } else {
-      String ccServerUrl = cc.getBundleContext().getProperty(OpencastConstants.EXTERNAL_API_URL_ORG_PROPERTY);
-      logger.debug("Configured server url is {}", ccServerUrl);
-      if (ccServerUrl == null)
-        this.serverUrl = "http://localhost:8080";
-      else {
-        this.serverUrl = ccServerUrl;
-      }
-    }
-    serviceUrl = (String) cc.getProperties().get(RestConstants.SERVICE_PATH_PROPERTY);
-    logger.info("Activated External API - Series Endpoint");
+    logger.info("Activating External API - Series Endpoint");
+
+    final Tuple<String, String> endpointUrl = getEndpointUrl(cc, OpencastConstants.EXTERNAL_API_URL_ORG_PROPERTY,
+            RestConstants.SERVICE_PATH_PROPERTY);
+    endpointBaseUrl = UrlSupport.concat(endpointUrl.getA(), endpointUrl.getB());
+    logger.debug("Configured service endpoint is {}", endpointBaseUrl);
   }
 
   @GET
   @Path("")
-  @Produces({ "application/json", "application/v1.0.0+json" })
   @RestQuery(name = "getseries", description = "Returns a list of series.", returnDescription = "", restParameters = {
+          @RestParameter(name = "onlyWithWriteAccess", isRequired = false, description = "Whether only to get the series to which we have write access.", type = RestParameter.Type.BOOLEAN),
           @RestParameter(name = "filter", isRequired = false, description = "A comma seperated list of filters to limit the results with. A filter is the filter's name followed by a colon \":\" and then the value to filter with so it is the form <Filter Name>:<Value to Filter With>.", type = STRING),
           @RestParameter(name = "sort", description = "Sort the results based upon a list of comma seperated sorting criteria. In the comma seperated list each type of sorting is specified as a pair such as: <Sort Name>:ASC or <Sort Name>:DESC. Adding the suffix ASC or DESC sets the order as ascending or descending order and is mandatory.", isRequired = false, type = STRING),
           @RestParameter(name = "limit", description = "The maximum number of results to return for a single request.", isRequired = false, type = RestParameter.Type.INTEGER),
-          @RestParameter(name = "offset", description = "Number of results to skip based on the limit. 0 is the first set of results up to the limit, 1 is the second set of results after the first limit, 2 is third set of results after skipping the first two sets of results etc.", isRequired = false, type = RestParameter.Type.INTEGER) }, reponses = {
-                  @RestResponse(description = "A (potentially empty) list of series is returned.", responseCode = HttpServletResponse.SC_OK) })
+          @RestParameter(name = "offset", description = "The index of the first result to return.", isRequired = false, type = RestParameter.Type.INTEGER),
+          @RestParameter(name = "withacl", isRequired = false, description = "Whether the acl should be included in the response.", type = RestParameter.Type.BOOLEAN)
+        }, responses = {
+          @RestResponse(description = "A (potentially empty) list of series is returned.", responseCode = HttpServletResponse.SC_OK) })
   public Response getSeriesList(@HeaderParam("Accept") String acceptHeader, @QueryParam("filter") String filter,
           @QueryParam("sort") String sort, @QueryParam("order") String order, @QueryParam("offset") int offset,
-          @QueryParam("limit") int limit) throws UnauthorizedException {
+          @QueryParam("limit") int limit, @QueryParam("onlyWithWriteAccess") Boolean onlyWithWriteAccess,
+          @QueryParam("withacl") Boolean withAcl) throws UnauthorizedException {
+    final ApiVersion requestedVersion = ApiMediaType.parse(acceptHeader).getVersion();
+    if (requestedVersion.isSmallerThan(VERSION_1_5_0)) {
+      // withAcl was added for version 1.5.0 and should be ignored for smaller versions.
+      withAcl = false;
+    }
     try {
       SeriesSearchQuery query = new SeriesSearchQuery(securityService.getOrganization().getId(),
               securityService.getUser());
@@ -209,10 +216,17 @@ public class SeriesEndpoint {
             continue;
           }
           String name = filterTuple[0];
-          String value = filterTuple[1];
+
+          String value;
+          if (!requestedVersion.isSmallerThan(VERSION_1_1_0)) {
+            // MH-13038 - 1.1.0 and higher support semi-colons in values
+            value = f.substring(name.length() + 1);
+          } else {
+            value = filterTuple[1];
+          }
 
           if ("managedAcl".equals(name)) {
-            query.withAccessPolicy(value);
+            query.withManagedAcl(value);
           } else if ("contributors".equals(name)) {
             query.withContributor(value);
           } else if ("CreationDate".equals(name)) {
@@ -242,6 +256,22 @@ public class SeriesEndpoint {
             query.withSubject(value);
           } else if ("title".equals(name)) {
             query.withTitle(value);
+          } else if (!requestedVersion.isSmallerThan(VERSION_1_1_0)) {
+            // additional filters only available with Version 1.1.0 or higher
+            if ("identifier".equals(name)) {
+              query.withIdentifier(value);
+            } else if ("description".equals(name)) {
+              query.withDescription(value);
+            } else if ("creator".equals(name)) {
+              query.withCreator(value);
+            } else if ("publishers".equals(name)) {
+              query.withPublisher(value);
+            } else if ("rightsholder".equals(name)) {
+              query.withRightsHolder(value);
+            } else {
+              logger.warn("Unknown filter criteria {}", name);
+              return Response.status(SC_BAD_REQUEST).build();
+            }
           }
         }
       }
@@ -264,17 +294,22 @@ public class SeriesEndpoint {
               query.sortByCreatedDateTime(criterion.getOrder());
               break;
             default:
-              logger.info("Unknown filter criteria {}", criterion.getFieldName());
+              logger.info("Unknown sort criteria {}", criterion.getFieldName());
               return Response.status(SC_BAD_REQUEST).build();
           }
         }
       }
 
+      if (onlyWithWriteAccess != null && onlyWithWriteAccess) {
+        query.withoutActions();
+        query.withAction(Permissions.Action.WRITE);
+      }
+
       logger.trace("Using Query: " + query.toString());
 
       SearchResult<Series> result = externalIndex.getByQuery(query);
-
-      return ApiResponses.Json.ok(VERSION_1_0_0, arr($(result.getItems()).map(new Fn<SearchResultItem<Series>, JValue>() {
+      final boolean includeAcl = (withAcl != null && withAcl);
+      return ApiResponses.Json.ok(requestedVersion, arr($(result.getItems()).map(new Fn<SearchResultItem<Series>, JValue>() {
         @Override
         public JValue apply(SearchResultItem<Series> a) {
           final Series s = a.getSource();
@@ -285,28 +320,89 @@ public class SeriesEndpoint {
             subjects = arr(splitSubjectIntoArray(s.getSubject()));
           }
           Date createdDate = s.getCreatedDateTime();
-          return obj(f("identifier", v(s.getIdentifier())), f("title", v(s.getTitle())), f("creator", v(s.getCreator(), BLANK)),
-                  f("created", v(createdDate != null ? toUTC(createdDate.getTime()) : null, BLANK)), f("subjects", subjects),
-                  f("contributors", arr($(s.getContributors()).map(Functions.stringToJValue))),
-                  f("organizers", arr($(s.getOrganizers()).map(Functions.stringToJValue))),
-                  f("publishers", arr($(s.getPublishers()).map(Functions.stringToJValue))));
+          JObject result;
+          if (requestedVersion.isSmallerThan(VERSION_1_1_0)) {
+            result = obj(
+                    f("identifier", v(s.getIdentifier())),
+                    f("title", v(s.getTitle())),
+                    f("creator", v(s.getCreator(), BLANK)),
+                    f("created", v(createdDate != null ? toUTC(createdDate.getTime()) : null, BLANK)),
+                    f("subjects", subjects),
+                    f("contributors", arr($(s.getContributors()).map(Functions.stringToJValue))),
+                    f("organizers", arr($(s.getOrganizers()).map(Functions.stringToJValue))),
+                    f("publishers", arr($(s.getPublishers()).map(Functions.stringToJValue))));
+          }
+          else {
+            result = obj(
+                    f("identifier", v(s.getIdentifier())),
+                    f("title", v(s.getTitle())),
+                    f("description", v(s.getDescription(), BLANK)),
+                    f("creator", v(s.getCreator(), BLANK)),
+                    f("created", v(createdDate != null ? toUTC(createdDate.getTime()) : null, BLANK)),
+                    f("subjects", subjects),
+                    f("contributors", arr($(s.getContributors()).map(Functions.stringToJValue))),
+                    f("organizers", arr($(s.getOrganizers()).map(Functions.stringToJValue))),
+                    f("language", v(s.getLanguage(), BLANK)),
+                    f("license", v(s.getLicense(), BLANK)),
+                    f("rightsholder", v(s.getRightsHolder(), BLANK)),
+                    f("publishers", arr($(s.getPublishers()).map(Functions.stringToJValue))));
+
+            if (includeAcl) {
+              AccessControlList acl = getAclFromSeries(s);
+              result = result.merge(f("acl", arr(AclUtils.serializeAclToJson(acl))));
+            }
+          }
+
+          return result;
+
         }
       }).toList()));
     } catch (Exception e) {
-      logger.warn("Could not perform search query: {}", ExceptionUtils.getStackTrace(e));
+      logger.warn("Could not perform search query", e);
       throw new WebApplicationException(Response.Status.INTERNAL_SERVER_ERROR);
     }
   }
 
+  /**
+   * Get an {@link AccessControlList} from a {@link Series}.
+   *
+   * @param series
+   *          The {@link Series} to get the ACL from.
+   * @return The {@link AccessControlList} stored in the {@link Series}
+   */
+  private static AccessControlList getAclFromSeries(Series series) {
+    AccessControlList activeAcl = new AccessControlList();
+    try {
+      if (series.getAccessPolicy() != null) {
+        activeAcl = AccessControlParser.parseAcl(series.getAccessPolicy());
+      }
+    } catch (Exception e) {
+      logger.error("Unable to parse access policy", e);
+    }
+    return activeAcl;
+  }
+
   @GET
   @Path("{seriesId}")
-  @Produces({ "application/json", "application/v1.0.0+json" })
-  @RestQuery(name = "getseries", description = "Returns a single series.", returnDescription = "", pathParameters = {
-          @RestParameter(name = "seriesId", description = "The series id", isRequired = true, type = STRING) }, reponses = {
-                  @RestResponse(description = "The series is returned.", responseCode = HttpServletResponse.SC_OK),
-                  @RestResponse(description = "The specified series does not exist.", responseCode = HttpServletResponse.SC_NOT_FOUND) })
-  public Response getSeries(@HeaderParam("Accept") String acceptHeader, @PathParam("seriesId") String id)
+  @RestQuery(name = "getseries", description = "Returns a single series.", returnDescription = "",
+  pathParameters = {
+          @RestParameter(name = "seriesId", description = "The series id", isRequired = true, type = STRING)
+  }, restParameters = {
+          @RestParameter(name = "withacl", isRequired = false, type = RestParameter.Type.BOOLEAN,
+                         description = "Whether the acl should be included in the response.")
+  }, responses = {
+          @RestResponse(description = "The series is returned.", responseCode = HttpServletResponse.SC_OK),
+          @RestResponse(description = "The specified series does not exist.", responseCode = HttpServletResponse.SC_NOT_FOUND),
+  })
+  public Response getSeries(@HeaderParam("Accept") String acceptHeader, @PathParam("seriesId") String id,
+                            @QueryParam("withacl") Boolean withAcl)
           throws Exception {
+    final ApiVersion requestedVersion = ApiMediaType.parse(acceptHeader).getVersion();
+    if (requestedVersion.isSmallerThan(VERSION_1_5_0)) {
+      // withAcl was added for version 1.5.0 and should be ignored for smaller versions.
+      withAcl = false;
+    }
+
     for (final Series s : indexService.getSeries(id, externalIndex)) {
       JValue subjects;
       if (s.getSubject() == null) {
@@ -315,14 +411,47 @@ public class SeriesEndpoint {
         subjects = arr(splitSubjectIntoArray(s.getSubject()));
       }
       Date createdDate = s.getCreatedDateTime();
-      return ApiResponses.Json.ok(VERSION_1_0_0, obj(
-          f("identifier", v(s.getIdentifier())), f("title", v(s.getTitle())),
-          f("description", v(s.getDescription(), BLANK)), f("creator", v(s.getCreator(), BLANK)), f("subjects", subjects),
-          f("organization", v(s.getOrganization())), f("created", v(createdDate != null ? toUTC(createdDate.getTime()) : null, BLANK)),
-          f("contributors", arr($(s.getContributors()).map(Functions.stringToJValue))),
-          f("organizers", arr($(s.getOrganizers()).map(Functions.stringToJValue))),
-          f("publishers", arr($(s.getPublishers()).map(Functions.stringToJValue))),
-          f("opt_out", v(s.isOptedOut()))));
+      JObject responseContent;
+      if (requestedVersion.isSmallerThan(VERSION_1_1_0)) {
+        responseContent = obj(
+                f("identifier", v(s.getIdentifier())),
+                f("title", v(s.getTitle())),
+                f("description", v(s.getDescription(), BLANK)),
+                f("creator", v(s.getCreator(), BLANK)),
+                f("subjects", subjects),
+                f("organization", v(s.getOrganization())),
+                f("created", v(createdDate != null ? toUTC(createdDate.getTime()) : null, BLANK)),
+                f("contributors", arr($(s.getContributors()).map(Functions.stringToJValue))),
+                f("organizers", arr($(s.getOrganizers()).map(Functions.stringToJValue))),
+                // For compatibility (MH-13405)
+                f("opt_out", false),
+                f("publishers", arr($(s.getPublishers()).map(Functions.stringToJValue))));
+      }
+      else {
+        responseContent = obj(
+                f("identifier", v(s.getIdentifier())),
+                f("title", v(s.getTitle())),
+                f("description", v(s.getDescription(), BLANK)),
+                f("creator", v(s.getCreator(), BLANK)),
+                f("subjects", subjects),
+                f("organization", v(s.getOrganization())),
+                f("created", v(createdDate != null ? toUTC(createdDate.getTime()) : null, BLANK)),
+                f("contributors", arr($(s.getContributors()).map(Functions.stringToJValue))),
+                f("organizers", arr($(s.getOrganizers()).map(Functions.stringToJValue))),
+                // For compatibility (MH-13405)
+                f("opt_out", false),
+                f("publishers", arr($(s.getPublishers()).map(Functions.stringToJValue))),
+                f("language", v(s.getLanguage(), BLANK)),
+                f("license", v(s.getLicense(), BLANK)),
+                f("rightsholder", v(s.getRightsHolder(), BLANK)));
+
+        if (withAcl != null && withAcl) {
+          AccessControlList acl = getAclFromSeries(s);
+          responseContent = responseContent.merge(f("acl", arr(AclUtils.serializeAclToJson(acl))));
+        }
+      }
+
+      return ApiResponses.Json.ok(requestedVersion, responseContent);
     }
     return ApiResponses.notFound("Cannot find an series with id '%s'.", id);
   }
@@ -338,22 +467,22 @@ public class SeriesEndpoint {
 
   @GET
   @Path("{seriesId}/metadata")
-  @Produces({ "application/json", "application/v1.0.0+json" })
   @RestQuery(name = "getseriesmetadata", description = "Returns a series' metadata of all types or returns a series' metadata collection of the given type when the query string parameter type is specified. For each metadata catalog there is a unique property called the flavor such as dublincore/series so the type in this example would be 'dublincore/series'", returnDescription = "", pathParameters = {
           @RestParameter(name = "seriesId", description = "The series id", isRequired = true, type = STRING) }, restParameters = {
-                  @RestParameter(name = "type", isRequired = false, description = "The type of metadata to return", type = STRING) }, reponses = {
+                  @RestParameter(name = "type", isRequired = false, description = "The type of metadata to return", type = STRING) }, responses = {
                           @RestResponse(description = "The series' metadata are returned.", responseCode = HttpServletResponse.SC_OK),
                           @RestResponse(description = "The specified series does not exist.", responseCode = HttpServletResponse.SC_NOT_FOUND) })
   public Response getSeriesMetadata(@HeaderParam("Accept") String acceptHeader, @PathParam("seriesId") String id,
           @QueryParam("type") String type) throws Exception {
+    final ApiVersion requestedVersion = ApiMediaType.parse(acceptHeader).getVersion();
     if (StringUtils.trimToNull(type) == null) {
-      return getAllMetadata(id);
+      return getAllMetadata(id, requestedVersion);
     } else {
-      return getMetadataByType(id, type);
+      return getMetadataByType(id, type, requestedVersion);
     }
   }
 
-  private Response getAllMetadata(String id) throws SearchIndexException {
+  private Response getAllMetadata(String id, ApiVersion requestedVersion) throws SearchIndexException {
     Opt<Series> optSeries = indexService.getSeries(id, externalIndex);
     if (optSeries.isNone())
       return ApiResponses.notFound("Cannot find a series with id '%s'.", id);
@@ -362,27 +491,27 @@ public class SeriesEndpoint {
     List<SeriesCatalogUIAdapter> catalogUIAdapters = indexService.getSeriesCatalogUIAdapters();
     catalogUIAdapters.remove(indexService.getCommonSeriesCatalogUIAdapter());
     for (SeriesCatalogUIAdapter adapter : catalogUIAdapters) {
-      final Opt<MetadataCollection> optSeriesMetadata = adapter.getFields(id);
+      final Opt<DublinCoreMetadataCollection> optSeriesMetadata = adapter.getFields(id);
       if (optSeriesMetadata.isSome()) {
-        metadataList.add(adapter.getFlavor(), adapter.getUITitle(), optSeriesMetadata.get());
+        metadataList.add(adapter.getFlavor().toString(), adapter.getUITitle(), optSeriesMetadata.get());
       }
     }
-    MetadataCollection collection = getSeriesMetadata(optSeries.get());
+    DublinCoreMetadataCollection collection = getSeriesMetadata(optSeries.get());
     ExternalMetadataUtils.changeSubjectToSubjects(collection);
     metadataList.add(indexService.getCommonSeriesCatalogUIAdapter(), collection);
-    return okJson(metadataList.toJSON());
+    return ApiResponses.Json.ok(requestedVersion, MetadataJson.listToJson(metadataList, false));
   }
 
-  private Response getMetadataByType(String id, String type) throws SearchIndexException {
+  private Response getMetadataByType(String id, String type, ApiVersion requestedVersion) throws SearchIndexException {
     Opt<Series> optSeries = indexService.getSeries(id, externalIndex);
     if (optSeries.isNone())
       return ApiResponses.notFound("Cannot find a series with id '%s'.", id);
 
     // Try the main catalog first as we load it from the index.
     if (typeMatchesSeriesCatalogUIAdapter(type, indexService.getCommonSeriesCatalogUIAdapter())) {
-      MetadataCollection collection = getSeriesMetadata(optSeries.get());
+      DublinCoreMetadataCollection collection = getSeriesMetadata(optSeries.get());
       ExternalMetadataUtils.changeSubjectToSubjects(collection);
-      return ApiResponses.Json.ok(ApiVersion.VERSION_1_0_0, collection.toJSON());
+      return ApiResponses.Json.ok(requestedVersion, MetadataJson.collectionToJson(collection, false));
     }
 
     // Try the other catalogs
@@ -391,9 +520,9 @@ public class SeriesEndpoint {
 
     for (SeriesCatalogUIAdapter adapter : catalogUIAdapters) {
       if (typeMatchesSeriesCatalogUIAdapter(type, adapter)) {
-        final Opt<MetadataCollection> optSeriesMetadata = adapter.getFields(id);
+        final Opt<DublinCoreMetadataCollection> optSeriesMetadata = adapter.getFields(id);
         if (optSeriesMetadata.isSome()) {
-          return ApiResponses.Json.ok(ApiVersion.VERSION_1_0_0, optSeriesMetadata.get().toJSON());
+          return ApiResponses.Json.ok(requestedVersion, MetadataJson.collectionToJson(optSeriesMetadata.get(), true));
         }
       }
     }
@@ -405,76 +534,88 @@ public class SeriesEndpoint {
    *
    * @param series
    *          the source {@link Series}
-   * @return a {@link MetadataCollection} instance with all the series metadata
+   * @return a {@link DublinCoreMetadataCollection} instance with all the series metadata
    */
-  @SuppressWarnings("unchecked")
-  private MetadataCollection getSeriesMetadata(Series series) {
-    MetadataCollection metadata = indexService.getCommonSeriesCatalogUIAdapter().getRawFields();
+  private DublinCoreMetadataCollection getSeriesMetadata(Series series) {
+    DublinCoreMetadataCollection metadata = indexService.getCommonSeriesCatalogUIAdapter().getRawFields();
 
-    MetadataField<?> title = metadata.getOutputFields().get(DublinCore.PROPERTY_TITLE.getLocalName());
+    MetadataField title = metadata.getOutputFields().get(DublinCore.PROPERTY_TITLE.getLocalName());
     metadata.removeField(title);
-    MetadataField<String> newTitle = MetadataUtils.copyMetadataField(title);
+    MetadataField newTitle = new MetadataField(title);
     newTitle.setValue(series.getTitle());
     metadata.addField(newTitle);
 
-    MetadataField<?> subject = metadata.getOutputFields().get(DublinCore.PROPERTY_SUBJECT.getLocalName());
+    MetadataField subject = metadata.getOutputFields().get(DublinCore.PROPERTY_SUBJECT.getLocalName());
     metadata.removeField(subject);
-    MetadataField<String> newSubject = MetadataUtils.copyMetadataField(subject);
+    MetadataField newSubject = new MetadataField(subject);
     newSubject.setValue(series.getSubject());
     metadata.addField(newSubject);
 
-    MetadataField<?> description = metadata.getOutputFields().get(DublinCore.PROPERTY_DESCRIPTION.getLocalName());
+    MetadataField description = metadata.getOutputFields().get(DublinCore.PROPERTY_DESCRIPTION.getLocalName());
     metadata.removeField(description);
-    MetadataField<String> newDescription = MetadataUtils.copyMetadataField(description);
+    MetadataField newDescription = new MetadataField(description);
     newDescription.setValue(series.getDescription());
     metadata.addField(newDescription);
 
-    MetadataField<?> language = metadata.getOutputFields().get(DublinCore.PROPERTY_LANGUAGE.getLocalName());
+    MetadataField language = metadata.getOutputFields().get(DublinCore.PROPERTY_LANGUAGE.getLocalName());
     metadata.removeField(language);
-    MetadataField<String> newLanguage = MetadataUtils.copyMetadataField(language);
+    MetadataField newLanguage = new MetadataField(language);
     newLanguage.setValue(series.getLanguage());
     metadata.addField(newLanguage);
 
-    MetadataField<?> rightsHolder = metadata.getOutputFields().get(DublinCore.PROPERTY_RIGHTS_HOLDER.getLocalName());
+    MetadataField rightsHolder = metadata.getOutputFields().get(DublinCore.PROPERTY_RIGHTS_HOLDER.getLocalName());
     metadata.removeField(rightsHolder);
-    MetadataField<String> newRightsHolder = MetadataUtils.copyMetadataField(rightsHolder);
+    MetadataField newRightsHolder = new MetadataField(rightsHolder);
     newRightsHolder.setValue(series.getRightsHolder());
     metadata.addField(newRightsHolder);
 
-    MetadataField<?> license = metadata.getOutputFields().get(DublinCore.PROPERTY_LICENSE.getLocalName());
+    MetadataField license = metadata.getOutputFields().get(DublinCore.PROPERTY_LICENSE.getLocalName());
     metadata.removeField(license);
-    MetadataField<String> newLicense = MetadataUtils.copyMetadataField(license);
+    MetadataField newLicense = new MetadataField(license);
     newLicense.setValue(series.getLicense());
     metadata.addField(newLicense);
 
-    MetadataField<?> organizers = metadata.getOutputFields().get(DublinCore.PROPERTY_CREATOR.getLocalName());
+    MetadataField organizers = metadata.getOutputFields().get(DublinCore.PROPERTY_CREATOR.getLocalName());
     metadata.removeField(organizers);
-    MetadataField<String> newOrganizers = MetadataUtils.copyMetadataField(organizers);
+    MetadataField newOrganizers = new MetadataField(organizers);
     newOrganizers.setValue(StringUtils.join(series.getOrganizers(), ", "));
     metadata.addField(newOrganizers);
 
-    MetadataField<?> contributors = metadata.getOutputFields().get(DublinCore.PROPERTY_CONTRIBUTOR.getLocalName());
+    MetadataField contributors = metadata.getOutputFields().get(DublinCore.PROPERTY_CONTRIBUTOR.getLocalName());
     metadata.removeField(contributors);
-    MetadataField<String> newContributors = MetadataUtils.copyMetadataField(contributors);
+    MetadataField newContributors = new MetadataField(contributors);
     newContributors.setValue(StringUtils.join(series.getContributors(), ", "));
     metadata.addField(newContributors);
 
-    MetadataField<?> publishers = metadata.getOutputFields().get(DublinCore.PROPERTY_PUBLISHER.getLocalName());
+    MetadataField publishers = metadata.getOutputFields().get(DublinCore.PROPERTY_PUBLISHER.getLocalName());
     metadata.removeField(publishers);
-    MetadataField<String> newPublishers = MetadataUtils.copyMetadataField(publishers);
+    MetadataField newPublishers = new MetadataField(publishers);
     newPublishers.setValue(StringUtils.join(series.getPublishers(), ", "));
     metadata.addField(newPublishers);
 
     // Admin UI only field
-    MetadataField<String> createdBy = MetadataField.createTextMetadataField("createdBy", Opt.<String> none(),
-            "EVENTS.SERIES.DETAILS.METADATA.CREATED_BY", true, false, Opt.<Boolean> none(),
-            Opt.<Map<String, String>> none(), Opt.<String> none(), Opt.some(CREATED_BY_UI_ORDER), Opt.<String> none());
+    MetadataField createdBy = new MetadataField(
+            "createdBy",
+            null,
+            "EVENTS.SERIES.DETAILS.METADATA.CREATED_BY",
+            true,
+            false,
+            null,
+            null,
+            MetadataField.Type.TEXT,
+            null,
+            null,
+            CREATED_BY_UI_ORDER,
+            null,
+            null,
+            null,
+            null);
     createdBy.setValue(series.getCreator());
     metadata.addField(createdBy);
 
-    MetadataField<?> uid = metadata.getOutputFields().get(DublinCore.PROPERTY_IDENTIFIER.getLocalName());
+    MetadataField uid = metadata.getOutputFields().get(DublinCore.PROPERTY_IDENTIFIER.getLocalName());
     metadata.removeField(uid);
-    MetadataField<String> newUID = MetadataUtils.copyMetadataField(uid);
+    MetadataField newUID = new MetadataField(uid);
     newUID.setValue(series.getIdentifier());
     metadata.addField(newUID);
 
@@ -496,7 +637,7 @@ public class SeriesEndpoint {
     if (StringUtils.trimToNull(type) == null) {
       return false;
     }
-    MediaPackageElementFlavor catalogFlavor = MediaPackageElementFlavor.parseFlavor(catalog.getFlavor());
+    MediaPackageElementFlavor catalogFlavor = MediaPackageElementFlavor.parseFlavor(catalog.getFlavor().toString());
     try {
       MediaPackageElementFlavor flavor = MediaPackageElementFlavor.parseFlavor(type);
       return flavor.equals(catalogFlavor);
@@ -516,11 +657,10 @@ public class SeriesEndpoint {
 
   @PUT
   @Path("{seriesId}/metadata")
-  @Produces({ "application/json", "application/v1.0.0+json" })
   @RestQuery(name = "updateseriesmetadata", description = "Update a series' metadata of the given type. For a metadata catalog there is the flavor such as 'dublincore/series' and this is the unique type.", returnDescription = "", pathParameters = {
           @RestParameter(name = "seriesId", description = "The series id", isRequired = true, type = STRING) }, restParameters = {
                   @RestParameter(name = "type", isRequired = true, description = "The type of metadata to update", type = STRING),
-                  @RestParameter(name = "metadata", description = "Series metadata as Form param", isRequired = true, type = STRING) }, reponses = {
+                  @RestParameter(name = "metadata", description = "Series metadata as Form param", isRequired = true, type = STRING) }, responses = {
                           @RestResponse(description = "The series' metadata have been updated.", responseCode = HttpServletResponse.SC_OK),
                           @RestResponse(description = "The request is invalid or inconsistent.", responseCode = HttpServletResponse.SC_BAD_REQUEST),
                           @RestResponse(description = "The specified series does not exist.", responseCode = HttpServletResponse.SC_NOT_FOUND) })
@@ -533,10 +673,9 @@ public class SeriesEndpoint {
     try {
       updatedFields = RequestUtils.getKeyValueMap(metadataJSON);
     } catch (ParseException e) {
-      logger.debug("Unable to update series '{}' with metadata type '{}' and content '{}' because: {}",
-              id, type, metadataJSON, ExceptionUtils.getStackTrace(e));
+      logger.debug("Unable to update series '{}' with metadata type '{}' and content '{}'", id, type, metadataJSON, e);
       return RestUtil.R.badRequest(String.format("Unable to parse metadata fields as json from '%s' because '%s'",
-              metadataJSON, ExceptionUtils.getStackTrace(e)));
+              metadataJSON, e.getMessage()));
     } catch (IllegalArgumentException e) {
       return RestUtil.R.badRequest(e.getMessage());
     }
@@ -547,7 +686,7 @@ public class SeriesEndpoint {
                       metadataJSON));
     }
 
-    Opt<MetadataCollection> optCollection = Opt.none();
+    Opt<DublinCoreMetadataCollection> optCollection = Opt.none();
     SeriesCatalogUIAdapter adapter = null;
 
     Opt<Series> optSeries = indexService.getSeries(id, externalIndex);
@@ -573,7 +712,7 @@ public class SeriesEndpoint {
           optCollection = catalogUIAdapter.getFields(id);
           adapter = catalogUIAdapter;
         } else {
-          Opt<MetadataCollection> current = catalogUIAdapter.getFields(id);
+          Opt<DublinCoreMetadataCollection> current = catalogUIAdapter.getFields(id);
           if (current.isSome()) {
             metadataList.add(catalogUIAdapter, current.get());
           }
@@ -585,10 +724,10 @@ public class SeriesEndpoint {
       return ApiResponses.notFound("Cannot find a catalog with type '%s' for series with id '%s'.", type, id);
     }
 
-    MetadataCollection collection = optCollection.get();
+    DublinCoreMetadataCollection collection = optCollection.get();
 
     for (String key : updatedFields.keySet()) {
-      MetadataField<?> field = collection.getOutputFields().get(key);
+      MetadataField field = collection.getOutputFields().get(key);
       if (field == null) {
         return ApiResponses.notFound(
                 "Cannot find a metadata field with id '%s' from event with id '%s' and the metadata type '%s'.", key,
@@ -599,20 +738,19 @@ public class SeriesEndpoint {
                 key, type));
       }
       collection.removeField(field);
-      collection.addField(MetadataField.copyMetadataFieldWithValue(field, updatedFields.get(key)));
+      collection.addField(MetadataJson.copyWithDifferentJsonValue(field, updatedFields.get(key)));
     }
 
     metadataList.add(adapter, collection);
     indexService.updateAllSeriesMetadata(id, metadataList, externalIndex);
-    return ApiResponses.Json.ok(ApiVersion.VERSION_1_0_0, "");
+    return ApiResponses.Json.ok(acceptHeader, "");
   }
 
   @DELETE
   @Path("{seriesId}/metadata")
-  @Produces({ "application/json", "application/v1.0.0+json" })
   @RestQuery(name = "deleteseriesmetadata", description = "Deletes a series' metadata catalog of the given type. All fields and values of that catalog will be deleted.", returnDescription = "", pathParameters = {
           @RestParameter(name = "seriesId", description = "The series id", isRequired = true, type = STRING) }, restParameters = {
-                  @RestParameter(name = "type", isRequired = true, description = "The type of metadata to delete", type = STRING) }, reponses = {
+                  @RestParameter(name = "type", isRequired = true, description = "The type of metadata to delete", type = STRING) }, responses = {
                           @RestResponse(description = "The metadata have been deleted.", responseCode = HttpServletResponse.SC_NO_CONTENT),
                           @RestResponse(description = "The main metadata catalog dublincore/series cannot be deleted as it has mandatory fields.", responseCode = HttpServletResponse.SC_FORBIDDEN),
                           @RestResponse(description = "The specified series does not exist.", responseCode = HttpServletResponse.SC_NOT_FOUND) })
@@ -646,22 +784,27 @@ public class SeriesEndpoint {
     } catch (NotFoundException e) {
       return ApiResponses.notFound(e.getMessage());
     }
-    return ApiResponses.Json.noContent(ApiVersion.VERSION_1_0_0);
+    return Response.noContent().build();
   }
 
   @GET
   @Path("{seriesId}/acl")
-  @Produces({ "application/json", "application/v1.0.0+json" })
   @RestQuery(name = "getseriesacl", description = "Returns a series' access policy.", returnDescription = "", pathParameters = {
-          @RestParameter(name = "seriesId", description = "The series id", isRequired = true, type = STRING) }, reponses = {
+          @RestParameter(name = "seriesId", description = "The series id", isRequired = true, type = STRING) }, responses = {
                   @RestResponse(description = "The series' access policy is returned.", responseCode = HttpServletResponse.SC_OK),
                   @RestResponse(description = "The specified series does not exist.", responseCode = HttpServletResponse.SC_NOT_FOUND) })
-  public Response getSeriesAcl(@PathParam("seriesId") String id) throws Exception {
+  public Response getSeriesAcl(@HeaderParam("Accept") String acceptHeader, @PathParam("seriesId") String id) throws Exception {
+    final ApiVersion requestedVersion = ApiMediaType.parse(acceptHeader).getVersion();
     JSONParser parser = new JSONParser();
     for (final Series series : indexService.getSeries(id, externalIndex)) {
       // The ACL is stored as JSON string in the index. Parse it and extract the part we want to have in the API.
       JSONObject acl = (JSONObject) parser.parse(series.getAccessPolicy());
-      return ApiResponses.Json.ok(VERSION_1_0_0, ((JSONArray) ((JSONObject) acl.get("acl")).get("ace")).toJSONString());
+
+      if (!((JSONObject) acl.get("acl")).containsKey("ace")) {
+        return ApiResponses.notFound("Cannot find acl for series with id '%s'.", id);
+      } else {
+        return ApiResponses.Json.ok(requestedVersion, ((JSONArray) ((JSONObject) acl.get("acl")).get("ace")).toJSONString());
+      }
     }
 
     return ApiResponses.notFound("Cannot find an series with id '%s'.", id);
@@ -669,16 +812,15 @@ public class SeriesEndpoint {
 
   @GET
   @Path("{seriesId}/properties")
-  @Produces({ "application/json", "application/v1.0.0+json" })
   @RestQuery(name = "getseriesproperties", description = "Returns a series' properties", returnDescription = "", pathParameters = {
-          @RestParameter(name = "seriesId", description = "The series id", isRequired = true, type = STRING) }, reponses = {
+          @RestParameter(name = "seriesId", description = "The series id", isRequired = true, type = STRING) }, responses = {
                   @RestResponse(description = "The series' properties are returned.", responseCode = HttpServletResponse.SC_OK),
                   @RestResponse(description = "The specified series does not exist.", responseCode = HttpServletResponse.SC_NOT_FOUND) })
-  public Response getSeriesProperties(@PathParam("seriesId") String id) throws Exception {
+  public Response getSeriesProperties(@HeaderParam("Accept") String acceptHeader, @PathParam("seriesId") String id) throws Exception {
     if (indexService.getSeries(id, externalIndex).isSome()) {
       final Map<String, String> properties = seriesService.getSeriesProperties(id);
 
-      return ApiResponses.Json.ok(VERSION_1_0_0, obj($(properties.entrySet()).map(new Fn<Entry<String, String>, Field>() {
+      return ApiResponses.Json.ok(acceptHeader, obj($(properties.entrySet()).map(new Fn<Entry<String, String>, Field>() {
                 @Override
                 public Field apply(Entry<String, String> a) {
                   return f(a.getKey(), v(a.getValue(), BLANK));
@@ -692,7 +834,7 @@ public class SeriesEndpoint {
   @DELETE
   @Path("{seriesId}")
   @RestQuery(name = "deleteseries", description = "Deletes a series.", returnDescription = "", pathParameters = {
-          @RestParameter(name = "seriesId", description = "The series id", isRequired = true, type = STRING) }, reponses = {
+          @RestParameter(name = "seriesId", description = "The series id", isRequired = true, type = STRING) }, responses = {
                   @RestResponse(description = "The series has been deleted.", responseCode = HttpServletResponse.SC_NO_CONTENT),
                   @RestResponse(description = "The specified series does not exist.", responseCode = HttpServletResponse.SC_NOT_FOUND) })
   public Response deleteSeries(@HeaderParam("Accept") String acceptHeader, @PathParam("seriesId") String id)
@@ -703,7 +845,7 @@ public class SeriesEndpoint {
     } catch (NotFoundException e) {
       return ApiResponses.notFound("Cannot find a series with id '%s'.", id);
     } catch (Exception e) {
-      logger.error("Unable to delete the series '{}' due to: {}", id, ExceptionUtils.getStackTrace(e));
+      logger.error("Unable to delete the series '{}' due to", id, e);
       return Response.serverError().build();
     }
   }
@@ -712,34 +854,31 @@ public class SeriesEndpoint {
   @Path("{seriesId}")
   @RestQuery(name = "updateallseriesmetadata", description = "Update all series metadata.", returnDescription = "", pathParameters = {
           @RestParameter(name = "seriesId", description = "The series id", isRequired = true, type = STRING) }, restParameters = {
-                  @RestParameter(name = "metadata", description = "Series metadata as Form param", isRequired = true, type = STRING) }, reponses = {
+                  @RestParameter(name = "metadata", description = "Series metadata as Form param", isRequired = true, type = STRING) }, responses = {
                           @RestResponse(description = "The series' metadata have been updated.", responseCode = HttpServletResponse.SC_OK),
                           @RestResponse(description = "The request is invalid or inconsistent.", responseCode = HttpServletResponse.SC_BAD_REQUEST),
                           @RestResponse(description = "The specified series does not exist.", responseCode = HttpServletResponse.SC_NOT_FOUND) })
-  public Response updateSeriesMetadata(@PathParam("seriesId") String seriesID,
+  public Response updateSeriesMetadata(@HeaderParam("Accept") String acceptHeader, @PathParam("seriesId") String seriesID,
           @FormParam("metadata") String metadataJSON)
           throws UnauthorizedException, NotFoundException, SearchIndexException {
     try {
       MetadataList metadataList = indexService.updateAllSeriesMetadata(seriesID, metadataJSON, externalIndex);
-      return okJson(metadataList.toJSON());
+      return ApiResponses.Json.ok(acceptHeader, MetadataJson.listToJson(metadataList, true));
     } catch (IllegalArgumentException e) {
-      logger.debug("Unable to update series '{}' with metadata '{}' because: {}",
-              seriesID, metadataJSON, ExceptionUtils.getStackTrace(e));
+      logger.debug("Unable to update series '{}' with metadata '{}'", seriesID, metadataJSON, e);
       return RestUtil.R.badRequest(e.getMessage());
     } catch (IndexServiceException e) {
-      logger.error("Unable to update series '{}' with metadata '{}' because: {}",
-              seriesID, metadataJSON, ExceptionUtils.getStackTrace(e));
+      logger.error("Unable to update series '{}' with metadata '{}'", seriesID, metadataJSON, e);
       return RestUtil.R.serverError();
     }
   }
 
   @POST
   @Path("")
-  @Produces({ "application/json", "application/v1.0.0+json" })
   @RestQuery(name = "createseries", description = "Creates a series.", returnDescription = "", restParameters = {
           @RestParameter(name = "metadata", isRequired = true, description = "Series metadata", type = STRING),
-          @RestParameter(name = "acl", description = "A collection of roles with their possible action", isRequired = false, type = STRING),
-          @RestParameter(name = "theme", description = "The theme ID to be applied to the series", isRequired = false, type = STRING) }, reponses = {
+          @RestParameter(name = "acl", description = "A collection of roles with their possible action", isRequired = true, type = STRING),
+          @RestParameter(name = "theme", description = "The theme ID to be applied to the series", isRequired = false, type = STRING) }, responses = {
                   @RestResponse(description = "A new series is created and its identifier is returned in the Location header.", responseCode = HttpServletResponse.SC_CREATED),
                   @RestResponse(description = "The request is invalid or inconsistent..", responseCode = HttpServletResponse.SC_BAD_REQUEST),
                   @RestResponse(description = "The user doesn't have the rights to create the series.", responseCode = HttpServletResponse.SC_UNAUTHORIZED) })
@@ -749,18 +888,20 @@ public class SeriesEndpoint {
     if (isBlank(metadataParam))
       return R.badRequest("Required parameter 'metadata' is missing or invalid");
 
+    if (isBlank(aclParam))
+      return R.badRequest("Required parameter 'acl' is missing or invalid");
+
     MetadataList metadataList;
     try {
       metadataList = deserializeMetadataList(metadataParam);
     } catch (ParseException e) {
-      logger.debug("Unable to parse series metadata '{}' because: {}", metadataParam, ExceptionUtils.getStackTrace(e));
-      return R.badRequest(String.format("Unable to parse metadata because '%s'", e.toString()));
+      logger.debug("Unable to parse series metadata '{}'", metadataParam, e);
+      return R.badRequest(String.format("Unable to parse metadata because '%s'", e.getMessage()));
     } catch (NotFoundException e) {
       // One of the metadata fields could not be found in the catalogs or one of the catalogs cannot be found.
       return R.badRequest(e.getMessage());
     } catch (IllegalArgumentException e) {
-      logger.debug("Unable to create series with metadata '{}' because: {}", metadataParam,
-              ExceptionUtils.getStackTrace(e));
+      logger.debug("Unable to create series with metadata '{}'", metadataParam, e);
       return R.badRequest(e.getMessage());
     }
     Map<String, String> options = new TreeMap<>();
@@ -777,21 +918,20 @@ public class SeriesEndpoint {
     try {
       acl = AclUtils.deserializeJsonToAcl(aclParam, false);
     } catch (ParseException e) {
-      logger.debug("Unable to parse acl '{}' because: '{}'", aclParam, ExceptionUtils.getStackTrace(e));
+      logger.debug("Unable to parse acl '{}'", aclParam, e);
       return R.badRequest(String.format("Unable to parse acl '%s' because '%s'", aclParam, e.getMessage()));
     } catch (IllegalArgumentException e) {
-      logger.debug("Unable to create new series with acl '{}' because: '{}'", aclParam,
-              ExceptionUtils.getStackTrace(e));
+      logger.debug("Unable to create new series with acl '{}'", aclParam, e);
       return R.badRequest(e.getMessage());
     }
 
     try {
       String seriesId = indexService.createSeries(metadataList, options, Opt.some(acl), optThemeId);
-      return ApiResponses.Json.created(VERSION_1_0_0, URI.create(getSeriesUrl(seriesId)),
+      return ApiResponses.Json.created(acceptHeader, URI.create(getSeriesUrl(seriesId)),
                                        obj(f("identifier", v(seriesId, BLANK))));
     } catch (IndexServiceException e) {
-      logger.error("Unable to create series with metadata '{}', acl '{}', theme '{}' because: ",
-              metadataParam, aclParam, themeIdParam, ExceptionUtils.getStackTrace(e));
+      logger.error("Unable to create series with metadata '{}', acl '{}', theme '{}'",
+              metadataParam, aclParam, themeIdParam, e);
       throw new WebApplicationException(e, Status.INTERNAL_SERVER_ERROR);
     }
   }
@@ -821,11 +961,11 @@ public class SeriesEndpoint {
 
       MediaPackageElementFlavor flavor = MediaPackageElementFlavor.parseFlavor(flavorString);
 
-      MetadataCollection collection = null;
+      DublinCoreMetadataCollection collection = null;
       SeriesCatalogUIAdapter adapter = null;
       for (SeriesCatalogUIAdapter seriesCatalogUIAdapter : indexService.getSeriesCatalogUIAdapters()) {
         MediaPackageElementFlavor catalogFlavor = MediaPackageElementFlavor
-                .parseFlavor(seriesCatalogUIAdapter.getFlavor());
+                .parseFlavor(seriesCatalogUIAdapter.getFlavor().toString());
         if (catalogFlavor.equals(flavor)) {
           adapter = seriesCatalogUIAdapter;
           collection = seriesCatalogUIAdapter.getRawFields();
@@ -842,7 +982,7 @@ public class SeriesEndpoint {
         Map<String, String> fields = RequestUtils.getKeyValueMap(fieldsJson);
         for (String key : fields.keySet()) {
           if ("subjects".equals(key)) {
-            MetadataField<?> field = collection.getOutputFields().get("subject");
+            MetadataField field = collection.getOutputFields().get("subject");
             if (field == null) {
               throw new NotFoundException(String.format(
                       "Cannot find a metadata field with id '%s' from Catalog with Flavor '%s'.", key, flavorString));
@@ -851,19 +991,19 @@ public class SeriesEndpoint {
             try {
               JSONArray subjects = (JSONArray) parser.parse(fields.get(key));
               collection.addField(
-                      MetadataField.copyMetadataFieldWithValue(field, StringUtils.join(subjects.iterator(), ",")));
+                      MetadataJson.copyWithDifferentJsonValue(field, StringUtils.join(subjects.iterator(), ",")));
             } catch (ParseException e) {
               throw new IllegalArgumentException(
                       String.format("Unable to parse the 'subjects' metadata array field because: %s", e.toString()));
             }
           } else {
-            MetadataField<?> field = collection.getOutputFields().get(key);
+            MetadataField field = collection.getOutputFields().get(key);
             if (field == null) {
               throw new NotFoundException(String.format(
                       "Cannot find a metadata field with id '%s' from Catalog with Flavor '%s'.", key, flavorString));
             }
             collection.removeField(field);
-            collection.addField(MetadataField.copyMetadataFieldWithValue(field, fields.get(key)));
+            collection.addField(MetadataJson.copyWithDifferentJsonValue(field, fields.get(key)));
           }
         }
       }
@@ -874,23 +1014,30 @@ public class SeriesEndpoint {
 
   @PUT
   @Path("{seriesId}/acl")
-  @Produces({ "application/json", "application/v1.0.0+json" })
   @RestQuery(name = "updateseriesacl", description = "Updates a series' access policy.", returnDescription = "", pathParameters = {
           @RestParameter(name = "seriesId", description = "The series id", isRequired = true, type = STRING) }, restParameters = {
-                  @RestParameter(name = "acl", isRequired = true, description = "Access policy", type = STRING) }, reponses = {
+                  @RestParameter(name = "acl", isRequired = true, description = "Access policy", type = STRING),
+                  @RestParameter(name = "override", isRequired = false, description = "If true the series ACL will take precedence over any existing episode ACL", type = STRING)}, responses = {
                           @RestResponse(description = "The access control list for the specified series is updated.", responseCode = HttpServletResponse.SC_OK),
                           @RestResponse(description = "The specified series does not exist.", responseCode = HttpServletResponse.SC_NOT_FOUND) })
   public Response updateSeriesAcl(@HeaderParam("Accept") String acceptHeader, @PathParam("seriesId") String seriesID,
-          @FormParam("acl") String aclJson) throws NotFoundException, SeriesException, UnauthorizedException {
+          @FormParam("acl") String aclJson, @DefaultValue("false") @FormParam("override") boolean override)
+          throws NotFoundException, SeriesException, UnauthorizedException {
     if (isBlank(aclJson))
       return R.badRequest("Missing form parameter 'acl'");
+
+    final ApiVersion requestedVersion = ApiMediaType.parse(acceptHeader).getVersion();
+    if (requestedVersion.isSmallerThan(VERSION_1_2_0)) {
+      // override was added in version 1.2.0 and should be ignored for smaller versions
+      override = false;
+    }
 
     JSONParser parser = new JSONParser();
     JSONArray acl;
     try {
       acl = (JSONArray) parser.parse(aclJson);
     } catch (ParseException e) {
-      logger.debug("Could not parse ACL ({}): {}", aclJson, getStackTrace(e));
+      logger.debug("Could not parse ACL ({})", aclJson, e);
       return R.badRequest("Could not parse ACL");
     }
 
@@ -902,17 +1049,16 @@ public class SeriesEndpoint {
       }
     }).toList();
 
-    seriesService.updateAccessControl(seriesID, new AccessControlList(accessControlEntries));
-    return ApiResponses.Json.ok(VERSION_1_0_0, aclJson);
+    seriesService.updateAccessControl(seriesID, new AccessControlList(accessControlEntries), override);
+    return ApiResponses.Json.ok(acceptHeader, aclJson);
   }
 
   @SuppressWarnings("unchecked")
   @PUT
-  @Produces({ "application/json", "application/v1.0.0+json" })
   @Path("{seriesId}/properties")
   @RestQuery(name = "updateseriesproperties", description = "Updates a series' properties", returnDescription = "", pathParameters = {
           @RestParameter(name = "seriesId", description = "The series id", isRequired = true, type = STRING) }, restParameters = {
-                  @RestParameter(name = "properties", isRequired = true, description = "Series properties", type = STRING) }, reponses = {
+                  @RestParameter(name = "properties", isRequired = true, description = "Series properties", type = STRING) }, responses = {
                           @RestResponse(description = "Successfully updated the series' properties.", responseCode = HttpServletResponse.SC_OK),
                           @RestResponse(description = "The specified series does not exist.", responseCode = HttpServletResponse.SC_NOT_FOUND) })
   public Response updateSeriesProperties(@HeaderParam("Accept") String acceptHeader,
@@ -926,7 +1072,7 @@ public class SeriesEndpoint {
     try {
       props = (JSONObject) parser.parse(propertiesJson);
     } catch (ParseException e) {
-      logger.debug("Could not parse properties ({}): {}", propertiesJson, getStackTrace(e));
+      logger.debug("Could not parse properties ({})", propertiesJson, e);
       return R.badRequest("Could not parse series properties");
     }
 
@@ -935,7 +1081,7 @@ public class SeriesEndpoint {
       seriesService.updateSeriesProperty(seriesID, field.getKey(), field.getValue().toString());
     }
 
-    return ApiResponses.Json.ok(VERSION_1_0_0, propertiesJson);
+    return ApiResponses.Json.ok(acceptHeader, propertiesJson);
   }
 
   /**
@@ -964,10 +1110,10 @@ public class SeriesEndpoint {
         try {
           createdFromDate = new Date(DateTimeSupport.fromUTC(createdFrom));
         } catch (IllegalStateException e) {
-          logger.error("Unable to parse createdFrom parameter '{}':{}", createdFrom, ExceptionUtils.getStackTrace(e));
+          logger.error("Unable to parse createdFrom parameter '{}'", createdFrom, e);
           throw new IllegalArgumentException("Unable to parse createdFrom parameter.");
         } catch (java.text.ParseException e) {
-          logger.error("Unable to parse createdFrom parameter '{}':{}", createdFrom, ExceptionUtils.getStackTrace(e));
+          logger.error("Unable to parse createdFrom parameter '{}'", createdFrom, e);
           throw new IllegalArgumentException("Unable to parse createdFrom parameter.");
         }
       }
@@ -976,10 +1122,10 @@ public class SeriesEndpoint {
         try {
           createdToDate = new Date(DateTimeSupport.fromUTC(createdTo));
         } catch (IllegalStateException e) {
-          logger.error("Unable to parse createdTo parameter '{}':{}", createdTo, ExceptionUtils.getStackTrace(e));
+          logger.error("Unable to parse createdTo parameter '{}'", createdTo, e);
           throw new IllegalArgumentException("Unable to parse createdTo parameter.");
         } catch (java.text.ParseException e) {
-          logger.error("Unable to parse createdTo parameter '{}':{}", createdTo, ExceptionUtils.getStackTrace(e));
+          logger.error("Unable to parse createdTo parameter '{}'", createdTo, e);
           throw new IllegalArgumentException("Unable to parse createdTo parameter.");
         }
       }
@@ -988,7 +1134,6 @@ public class SeriesEndpoint {
   }
 
   private String getSeriesUrl(String seriesId) {
-    return UrlSupport.concat(serverUrl, serviceUrl, seriesId);
+    return UrlSupport.concat(endpointBaseUrl, seriesId);
   }
-
 }

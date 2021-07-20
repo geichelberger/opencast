@@ -31,6 +31,7 @@ import java.util.Date;
 public class SearchQuery {
   protected boolean includeEpisode = true;
   protected boolean includeSeries = false;
+  protected boolean includeDeleted = false;
   protected String id;
   protected String seriesId;
   protected String text;
@@ -40,11 +41,29 @@ public class SearchQuery {
   protected String[] tags = null;
   protected MediaPackageElementFlavor[] flavors = null;
   protected Date deletedDate = null;
+  protected Date updatedSince = null;
   protected Sort sort = Sort.DATE_CREATED;
   protected boolean sortAscending = true;
+  protected boolean signURL = false;
 
   public enum Sort {
-    DATE_CREATED, DATE_PUBLISHED, TITLE, SERIES_ID, MEDIA_PACKAGE_ID, CREATOR, CONTRIBUTOR, LANGUAGE, LICENSE, SUBJECT, DESCRIPTION, PUBLISHER
+    DATE_CREATED,
+    DATE_MODIFIED,
+    TITLE,
+    SERIES_ID,
+    MEDIA_PACKAGE_ID,
+    CREATOR,
+    CONTRIBUTOR,
+    LANGUAGE,
+    LICENSE,
+    SUBJECT,
+    DESCRIPTION,
+    PUBLISHER
+  }
+
+  public SearchQuery signURLs(final boolean sign) {
+    this.signURL = sign;
+    return this;
   }
 
   public SearchQuery includeEpisodes(boolean includeEpisode) {
@@ -54,6 +73,17 @@ public class SearchQuery {
 
   public SearchQuery includeSeries(boolean includeSeries) {
     this.includeSeries = includeSeries;
+    return this;
+  }
+
+  /**
+   * Specifies whether deleted events should be included in the results.
+   *
+   * Deleted events are automatically included if <code>deleteDate</code> is set. Otherwise,
+   * this defaults to <code>false</code>.
+   */
+  public SearchQuery includeDeleted(boolean includeDeleted) {
+    this.includeDeleted = includeDeleted;
     return this;
   }
 
@@ -111,12 +141,24 @@ public class SearchQuery {
     return seriesId;
   }
 
-  public boolean isIncludeEpisodes() {
+  public boolean willSignURLs() {
+    return signURL;
+  }
+
+  public boolean willIncludeEpisodes() {
     return includeEpisode;
   }
 
-  public boolean isIncludeSeries() {
+  public boolean willIncludeSeries() {
     return includeSeries;
+  }
+
+  /**
+   * Returns true if <code>includeDeleted</code> was set to `true` or <code>withDeletedDate</code>
+   * was set. In those cases, the results of the query will include deleted elements.
+   */
+  public boolean willIncludeDeleted() {
+    return includeDeleted || this.deletedDate != null;
   }
 
   public MediaPackageElementFlavor[] getElementFlavors() {
@@ -144,6 +186,19 @@ public class SearchQuery {
 
   public Date getDeletedDate() {
     return deletedDate;
+  }
+
+  /**
+   * Adds a filter to only retrieve results that have been published or deleted since
+   * the given date.
+   */
+  public SearchQuery withUpdatedSince(Date date) {
+    this.updatedSince = date;
+    return this;
+  }
+
+  public Date getUpdatedSince() {
+    return updatedSince;
   }
 
    /**
@@ -184,7 +239,7 @@ public class SearchQuery {
    *
    * @return whether the search results should be sorted in ascending order
    */
-  public boolean isSortAscending() {
+  public boolean willSortAscending() {
     return sortAscending;
   }
 }

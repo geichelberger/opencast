@@ -37,6 +37,7 @@ import org.opencastproject.security.api.SecurityService;
 import org.opencastproject.security.api.UserDirectoryService;
 import org.opencastproject.serviceregistry.api.ServiceRegistry;
 import org.opencastproject.serviceregistry.api.ServiceRegistryException;
+import org.opencastproject.util.XmlSafeParser;
 import org.opencastproject.workspace.api.Workspace;
 
 import org.apache.batik.apps.rasterizer.DestinationType;
@@ -65,7 +66,6 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.transform.Result;
-import javax.xml.transform.Source;
 import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerConfigurationException;
 import javax.xml.transform.TransformerException;
@@ -73,7 +73,6 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.TransformerFactoryConfigurationError;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
-import javax.xml.transform.stream.StreamSource;
 
 /**
  * Service for creating cover images
@@ -137,19 +136,20 @@ public abstract class AbstractCoverImageService extends AbstractJobProducer impl
           String targetFlavor) throws CoverImageException {
 
     // Null values are not passed to the arguments list
-    if (posterImageUri == null)
+    if (posterImageUri == null) {
       posterImageUri = "";
+    }
 
     try {
       return serviceRegistry.createJob(JOB_TYPE, Operation.Generate.toString(),
-              Arrays.asList(xml, xsl, width, height, posterImageUri, targetFlavor));
+          Arrays.asList(xml, xsl, width, height, posterImageUri, targetFlavor));
     } catch (ServiceRegistryException e) {
       throw new CoverImageException("Unable to create a job", e);
     }
   }
 
   protected Attachment generateCoverImageInternal(Job job, String xml, String xsl, int width, int height,
-          String posterImage, String targetFlavor) throws CoverImageException {
+      String posterImage, String targetFlavor) throws CoverImageException {
 
     URI result;
     File tempSvg = null;
@@ -165,7 +165,7 @@ public abstract class AbstractCoverImageService extends AbstractJobProducer impl
 
       // Load Metadata (from resources)
       xmlReader = new StringReader(xml);
-      Source xmlSource = new StreamSource(xmlReader);
+      InputSource xmlSource = new InputSource(xmlReader);
 
       // Transform XML metadata with stylesheet to SVG
       transformSvg(svg, xmlSource, xslDoc, width, height, posterImage);
@@ -198,14 +198,16 @@ public abstract class AbstractCoverImageService extends AbstractJobProducer impl
     }
 
     return (Attachment) MediaPackageElementBuilderFactory.newInstance().newElementBuilder()
-            .elementFromURI(result, Type.Attachment, MediaPackageElementFlavor.parseFlavor(targetFlavor));
+        .elementFromURI(result, Type.Attachment, MediaPackageElementFlavor.parseFlavor(targetFlavor));
   }
 
   protected static Document parseXsl(String xsl) throws CoverImageException {
-    if (StringUtils.isBlank(xsl))
+    if (StringUtils.isBlank(xsl)) {
       throw new IllegalArgumentException("XSL string must not be empty");
+    }
 
-    DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
+    DocumentBuilderFactory dbFactory = XmlSafeParser.newDocumentBuilderFactory();
+
     dbFactory.setNamespaceAware(true);
     Document xslDoc;
     try {
@@ -225,31 +227,39 @@ public abstract class AbstractCoverImageService extends AbstractJobProducer impl
     return xslDoc;
   }
 
-  protected static void transformSvg(Result svg, Source xmlSource, Document xslDoc, int width, int height,
-          String posterImage) throws TransformerFactoryConfigurationError, CoverImageException {
-    if (svg == null || xmlSource == null || xslDoc == null)
+  protected static void transformSvg(Result svg, InputSource xmlSource, Document xslDoc, int width, int height,
+      String posterImage) throws TransformerFactoryConfigurationError, CoverImageException {
+    if (svg == null || xmlSource == null || xslDoc == null) {
       throw new IllegalArgumentException("Neither svg nor xmlSource nor xslDoc must be null");
+    }
 
-    TransformerFactory factory = TransformerFactory.newInstance();
     Transformer transformer;
     try {
-      transformer = factory.newTransformer(new DOMSource(xslDoc));
+      // CHECKSTYLE:OFF
+      // Xalan Transformer can't be configured safely
+      // xslDoc is an already parsed Document
+      transformer = TransformerFactory.newInstance()
+              .newTransformer(new DOMSource(xslDoc));
+      // CHECKSTYLE:ON
     } catch (TransformerConfigurationException e) {
       // this should never happen...
       throw new CoverImageException("The XSL transformer factory has serious configuration errors", e);
     }
     transformer.setParameter("width", width);
     transformer.setParameter("height", height);
-    if (isNotBlank(posterImage))
+    if (isNotBlank(posterImage)) {
       transformer.setParameter("posterimage", posterImage);
+    }
 
     Thread thread = Thread.currentThread();
     ClassLoader loader = thread.getContextClassLoader();
     thread.setContextClassLoader(AbstractCoverImageService.class.getClassLoader());
     try {
       log.debug("Transform XML source to SVG");
-      transformer.transform(xmlSource, svg);
-    } catch (TransformerException e) {
+      // Xalan Transformer can't be configured safely
+      // Preparsing the XML with a safe parser
+      transformer.transform(new DOMSource(XmlSafeParser.parse(xmlSource)), svg);
+    } catch (TransformerException | IOException | SAXException e) {
       log.warn("Error while transforming SVG to image: {}", e.getMessage());
       throw new CoverImageException("Error while transforming SVG to image", e);
     } finally {
@@ -263,7 +273,7 @@ public abstract class AbstractCoverImageService extends AbstractJobProducer impl
       tempFile = File.createTempFile(COVERIMAGE_WORKSPACE_COLLECTION, Long.toString(job.getId()) + "_" + suffix);
       log.debug("Created temporary file {}", tempFile);
     } catch (IOException e) {
-      log.warn("Error creating temporary file: {}", e);
+      log.warn("Error creating temporary file:", e);
       throw new CoverImageException("Error creating temporary file", e);
     }
     return tempFile;

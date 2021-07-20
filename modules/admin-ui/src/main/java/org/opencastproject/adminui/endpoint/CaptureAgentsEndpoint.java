@@ -35,11 +35,13 @@ import static org.opencastproject.util.doc.rest.RestParameter.Type.STRING;
 import org.opencastproject.adminui.util.TextFilter;
 import org.opencastproject.capture.CaptureParameters;
 import org.opencastproject.capture.admin.api.Agent;
+import org.opencastproject.capture.admin.api.AgentState;
 import org.opencastproject.capture.admin.api.CaptureAgentStateService;
 import org.opencastproject.index.service.resources.list.query.AgentsListQuery;
 import org.opencastproject.index.service.util.RestUtils;
-import org.opencastproject.matterhorn.search.SearchQuery.Order;
-import org.opencastproject.matterhorn.search.SortCriterion;
+import org.opencastproject.security.api.SecurityService;
+import org.opencastproject.security.api.UnauthorizedException;
+import org.opencastproject.security.util.SecurityUtil;
 import org.opencastproject.util.NotFoundException;
 import org.opencastproject.util.SmartIterator;
 import org.opencastproject.util.data.Option;
@@ -47,12 +49,16 @@ import org.opencastproject.util.doc.rest.RestParameter;
 import org.opencastproject.util.doc.rest.RestQuery;
 import org.opencastproject.util.doc.rest.RestResponse;
 import org.opencastproject.util.doc.rest.RestService;
+import org.opencastproject.util.requests.SortCriterion;
+import org.opencastproject.util.requests.SortCriterion.Order;
 
 import com.entwinemedia.fn.data.json.Field;
 import com.entwinemedia.fn.data.json.JValue;
 import com.entwinemedia.fn.data.json.Jsons;
 
 import org.apache.commons.lang3.StringUtils;
+import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Reference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -84,6 +90,15 @@ import javax.ws.rs.core.Response.Status;
               + "<em>This service is for exclusive use by the module admin-ui. Its API might change "
               + "anytime without prior notice. Any dependencies other than the admin UI will be strictly ignored. "
               + "DO NOT use this for integration of third-party applications.<em>"})
+@Component(
+  immediate = true,
+  service = CaptureAgentsEndpoint.class,
+  property = {
+    "service.description=Admin UI - Capture agents facade Endpoint",
+    "opencast.service.type=org.opencastproject.adminui.endpoint.UsersEndpoint",
+    "opencast.service.path=/admin-ng/capture-agents"
+  }
+)
 public class CaptureAgentsEndpoint {
 
   private static final String TRANSLATION_KEY_PREFIX = "CAPTURE_AGENT.DEVICE.";
@@ -94,14 +109,22 @@ public class CaptureAgentsEndpoint {
   /** The capture agent service */
   private CaptureAgentStateService service;
 
+  private SecurityService securityService;
+
   /**
    * Sets the capture agent service
    *
    * @param service
    *          the capture agent service to set
    */
+  @Reference
   public void setCaptureAgentService(CaptureAgentStateService service) {
     this.service = service;
+  }
+
+  @Reference
+  public void setSecurityService(SecurityService securityService) {
+    this.securityService = securityService;
   }
 
   @GET
@@ -112,7 +135,7 @@ public class CaptureAgentsEndpoint {
           @RestParameter(defaultValue = "100", description = "The maximum number of items to return per page.", isRequired = false, name = "limit", type = RestParameter.Type.STRING),
           @RestParameter(defaultValue = "0", description = "The page number.", isRequired = false, name = "offset", type = RestParameter.Type.STRING),
           @RestParameter(defaultValue = "false", description = "Define if the inputs should or not returned with the capture agent.", isRequired = false, name = "inputs", type = RestParameter.Type.BOOLEAN),
-          @RestParameter(name = "sort", isRequired = false, description = "The sort order. May include any of the following: STATUS, NAME OR LAST_UPDATED.  Add '_DESC' to reverse the sort order (e.g. STATUS_DESC).", type = STRING) }, reponses = { @RestResponse(description = "An XML representation of the agent capabilities", responseCode = HttpServletResponse.SC_OK) }, returnDescription = "")
+          @RestParameter(name = "sort", isRequired = false, description = "The sort order. May include any of the following: STATUS, NAME OR LAST_UPDATED.  Add '_DESC' to reverse the sort order (e.g. STATUS_DESC).", type = STRING) }, responses = { @RestResponse(description = "An XML representation of the agent capabilities", responseCode = HttpServletResponse.SC_OK) }, returnDescription = "")
   public Response getAgents(@QueryParam("limit") int limit, @QueryParam("offset") int offset,
           @QueryParam("inputs") boolean inputs, @QueryParam("filter") String filter, @QueryParam("sort") String sort) {
     Option<String> filterName = Option.none();
@@ -191,7 +214,7 @@ public class CaptureAgentsEndpoint {
     // Run through and build a map of updates (rather than states)
     List<JValue> agentsJSON = new ArrayList<>();
     for (Agent agent : filteredAgents) {
-      agentsJSON.add(generateJsonAgent(agent, /* Option.option(room), blacklist, */ inputs, false));
+      agentsJSON.add(generateJsonAgent(agent, inputs, false));
     }
 
     return okJsonList(agentsJSON, offset, limit, total);
@@ -200,12 +223,14 @@ public class CaptureAgentsEndpoint {
   @DELETE
   @Path("{name}")
   @Produces({ MediaType.APPLICATION_JSON })
-  @RestQuery(name = "removeAgent", description = "Remove record of a given capture agent", pathParameters = { @RestParameter(name = "name", description = "The name of a given capture agent", isRequired = true, type = RestParameter.Type.STRING) }, restParameters = {}, reponses = {
+  @RestQuery(name = "removeAgent", description = "Remove record of a given capture agent", pathParameters = { @RestParameter(name = "name", description = "The name of a given capture agent", isRequired = true, type = RestParameter.Type.STRING) }, restParameters = {}, responses = {
           @RestResponse(description = "{agentName} removed", responseCode = HttpServletResponse.SC_OK),
           @RestResponse(description = "The agent {agentname} does not exist", responseCode = HttpServletResponse.SC_NOT_FOUND) }, returnDescription = "")
-  public Response removeAgent(@PathParam("name") String agentName) throws NotFoundException {
+  public Response removeAgent(@PathParam("name") String agentName) throws NotFoundException, UnauthorizedException {
     if (service == null)
       return Response.serverError().status(Response.Status.SERVICE_UNAVAILABLE).build();
+
+    SecurityUtil.checkAgentAccess(securityService, agentName);
 
     service.removeAgent(agentName);
 
@@ -221,7 +246,7 @@ public class CaptureAgentsEndpoint {
     description = "Return the capture agent including its configuration and capabilities",
     pathParameters = {
       @RestParameter(description = "Name of the capture agent", isRequired = true, name = "name", type = RestParameter.Type.STRING),
-    }, restParameters = {}, reponses = {
+    }, restParameters = {}, responses = {
       @RestResponse(description = "A JSON representation of the capture agent", responseCode = HttpServletResponse.SC_OK),
       @RestResponse(description = "The agent {name} does not exist in the system", responseCode = HttpServletResponse.SC_NOT_FOUND)
     }, returnDescription = "")
@@ -240,7 +265,7 @@ public class CaptureAgentsEndpoint {
   }
 
   /**
-   * Generate a JSON Object for the given capture agent with its related blacklist periods
+   * Generate a JSON Object for the given capture agent
    *
    * @param agent
    *          The target capture agent
@@ -252,7 +277,7 @@ public class CaptureAgentsEndpoint {
    */
   private JValue generateJsonAgent(Agent agent, boolean withInputs, boolean details) {
     List<Field> fields = new ArrayList<>();
-    fields.add(f("Status", v(agent.getState(), Jsons.BLANK)));
+    fields.add(f("Status", v(AgentState.TRANSLATION_PREFIX + agent.getState().toUpperCase(), Jsons.BLANK)));
     fields.add(f("Name", v(agent.getName())));
     fields.add(f("Update", v(toUTC(agent.getLastHeardFrom()), Jsons.BLANK)));
     fields.add(f("URL", v(agent.getUrl(), Jsons.BLANK)));
@@ -301,5 +326,4 @@ public class CaptureAgentsEndpoint {
     }
     return arr(jsonDevices);
   }
-
 }

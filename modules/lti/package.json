@@ -1,0 +1,75 @@
+{
+  "name": "opencast-lti",
+  "version": "0.1.0",
+  "private": true,
+  "homepage": "/ltitools",
+  "dependencies": {
+    "@fortawesome/fontawesome-svg-core": "^1.2.35",
+    "@fortawesome/free-solid-svg-icons": "^5.15.3",
+    "@fortawesome/react-fontawesome": "^0.1.14",
+    "axios": "^0.21.1",
+    "bootstrap": "^5.0.2",
+    "i18next": "^20.3.3",
+    "i18next-browser-languagedetector": "^6.1.2",
+    "iframe-resizer": "^4.3.2",
+    "query-string": "^7.0.1",
+    "react": "^17.0.2",
+    "react-bootstrap": "^1.6.1",
+    "react-dom": "^17.0.2",
+    "react-helmet": "^6.1.0",
+    "react-i18next": "^11.11.3",
+    "react-js-pagination": "^3.0.2",
+    "react-scripts": "^4.0.3",
+    "react-select": "^4.3.1",
+    "typescript": "3.9.9"
+  },
+  "scripts": {
+    "i18n": "./copy-translations.sh",
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject",
+    "mock-proxy": "./node_modules/http-mock-server/bin/apimocker.js --config mock-server-config.json --proxy http://localhost:3000"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "shared-config"
+    ],
+    "rules": {
+      "no-console": "error"
+    },
+    "overrides": [
+      {
+        "files": [
+          "**/*.ts?(x)"
+        ],
+        "rules": {
+          "no-console": "error"
+        }
+      }
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "devDependencies": {
+    "http-mock-server": "^0.5.2",
+    "@types/jest": "26.0.24",
+    "@types/node": "16.3.3",
+    "@types/react": "17.0.14",
+    "@types/react-dom": "17.0.9",
+    "@types/react-helmet": "^6.1.2",
+    "@types/react-js-pagination": "^3.0.4",
+    "@types/react-select": "^4.0.17"
+  }
+}

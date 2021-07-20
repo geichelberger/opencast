@@ -38,9 +38,6 @@ import org.osgi.service.component.ComponentContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.SortedMap;
-import java.util.TreeMap;
-
 /**
  * Workflow operation for retracting a media package from youtube publication channel.
  */
@@ -48,21 +45,8 @@ public class RetractYouTubeWorkflowOperationHandler extends AbstractWorkflowOper
 
   private static final Logger logger = LoggerFactory.getLogger(RetractYouTubeWorkflowOperationHandler.class);
 
-  /** The configuration options for this handler */
-  private static final SortedMap<String, String> CONFIG_OPTIONS = new TreeMap<String, String>();
-
   /** The youtube publication service */
   private YouTubePublicationService publicationService = null;
-
-  /**
-   * {@inheritDoc}
-   *
-   * @see org.opencastproject.workflow.api.WorkflowOperationHandler#getConfigurationOptions()
-   */
-  @Override
-  public SortedMap<String, String> getConfigurationOptions() {
-    return CONFIG_OPTIONS;
-  }
 
   /**
    * OSGi declarative service configuration callback.
@@ -74,11 +58,6 @@ public class RetractYouTubeWorkflowOperationHandler extends AbstractWorkflowOper
     this.publicationService = publicationService;
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * @see org.opencastproject.workflow.api.AbstractWorkflowOperationHandler#activate(org.osgi.service.component.ComponentContext)
-   */
   @Override
   protected void activate(ComponentContext cc) {
     super.activate(cc);
@@ -97,8 +76,9 @@ public class RetractYouTubeWorkflowOperationHandler extends AbstractWorkflowOper
 
       // Wait for youtube retraction to finish
       Job retractJob = publicationService.retract(mediaPackage);
-      if (!waitForStatus(retractJob).isSuccess())
+      if (!waitForStatus(retractJob).isSuccess()) {
         throw new WorkflowOperationException("The youtube retract job did not complete successfully");
+      }
 
       logger.debug("Retraction from youtube operation complete");
 

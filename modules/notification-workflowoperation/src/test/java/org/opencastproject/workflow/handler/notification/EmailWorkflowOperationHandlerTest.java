@@ -25,8 +25,11 @@ import org.opencastproject.kernel.mail.SmtpService;
 import org.opencastproject.mediapackage.MediaPackage;
 import org.opencastproject.mediapackage.MediaPackageBuilder;
 import org.opencastproject.mediapackage.MediaPackageBuilderFactory;
+import org.opencastproject.security.api.User;
+import org.opencastproject.security.api.UserDirectoryService;
 import org.opencastproject.workflow.api.WorkflowInstance.WorkflowState;
 import org.opencastproject.workflow.api.WorkflowInstanceImpl;
+import org.opencastproject.workflow.api.WorkflowOperationException;
 import org.opencastproject.workflow.api.WorkflowOperationInstance;
 import org.opencastproject.workflow.api.WorkflowOperationInstance.OperationState;
 import org.opencastproject.workflow.api.WorkflowOperationInstanceImpl;
@@ -51,14 +54,17 @@ public class EmailWorkflowOperationHandlerTest {
   private URI uriMP;
   // private MimeMessage message;
 
-  private static final String DEFAULT_TO = "somebody@hotmail.com";
+  private static final String DEFAULT_TO = "somebody@testemail.com";
   private static final String DEFAULT_CC = "carboncopy@testemail.com";
   private static final String DEFAULT_BCC = "blindcarboncopy@testemail.com";
   private static final String DEFAULT_SUBJECT = "This is a subject";
+  private static final String USER_NAME = "username";
+  private static final String USER_NAME_EMAIL = "username@testemail.com";
+  private static final String USER_NAME_NO_EMAIL = "username_no_email";
 
-  private Capture<String> capturedTo;
-  private Capture<String> capturedCC;
-  private Capture<String> capturedBCC;
+  private Capture<String[]> capturedTo;
+  private Capture<String[]> capturedCC;
+  private Capture<String[]> capturedBCC;
   private Capture<String> capturedSubject;
   private Capture<String> capturedBody;
 
@@ -89,10 +95,23 @@ public class EmailWorkflowOperationHandlerTest {
     capturedSubject = Capture.newInstance();
     capturedBody = Capture.newInstance();
     smtpService.send(EasyMock.capture(capturedTo), EasyMock.capture(capturedCC), EasyMock.capture(capturedBCC),
-            EasyMock.capture(capturedSubject), EasyMock.capture(capturedBody));
+            EasyMock.capture(capturedSubject), EasyMock.capture(capturedBody), EasyMock.anyBoolean());
     EasyMock.expectLastCall().once();
     EasyMock.replay(smtpService);
     operationHandler.setSmtpService(smtpService);
+
+    User user = EasyMock.createNiceMock(User.class);
+    EasyMock.expect(user.getEmail()).andReturn(DEFAULT_TO).anyTimes();
+    User emailUser = EasyMock.createNiceMock(User.class);
+    EasyMock.expect(emailUser.getEmail()).andReturn(DEFAULT_TO).anyTimes();
+    User noEmailUser = EasyMock.createNiceMock(User.class);
+    EasyMock.expect(noEmailUser.getEmail()).andReturn(null).anyTimes();
+    UserDirectoryService userDirectoryService = EasyMock.createNiceMock(UserDirectoryService.class);
+    EasyMock.expect(userDirectoryService.loadUser(USER_NAME)).andReturn(user).anyTimes();
+    EasyMock.expect(userDirectoryService.loadUser(USER_NAME_EMAIL)).andReturn(emailUser).anyTimes();
+    EasyMock.expect(userDirectoryService.loadUser(USER_NAME_NO_EMAIL)).andReturn(noEmailUser).anyTimes();
+    EasyMock.replay(user, emailUser, noEmailUser, userDirectoryService);
+    operationHandler.setUserDirectoryService(userDirectoryService);
 
     workflowInstance.setId(1);
     workflowInstance.setState(WorkflowState.RUNNING);
@@ -114,7 +133,6 @@ public class EmailWorkflowOperationHandlerTest {
 
   @Test
   public void testDefaultBody() throws Exception {
-    workflowInstance.setTitle("testDefaultBody");
     operation.setConfiguration(EmailWorkflowOperationHandler.TO_PROPERTY, DEFAULT_TO);
     operation.setConfiguration(EmailWorkflowOperationHandler.CC_PROPERTY, DEFAULT_CC);
     operation.setConfiguration(EmailWorkflowOperationHandler.BCC_PROPERTY, DEFAULT_BCC);
@@ -123,16 +141,15 @@ public class EmailWorkflowOperationHandlerTest {
     WorkflowOperationResult result = operationHandler.start(workflowInstance, null);
 
     Assert.assertEquals(Action.CONTINUE, result.getAction());
-    Assert.assertEquals(DEFAULT_TO, capturedTo.getValue());
-    Assert.assertEquals(DEFAULT_CC, capturedCC.getValue());
-    Assert.assertEquals(DEFAULT_BCC, capturedBCC.getValue());
+    Assert.assertArrayEquals(new String[] {DEFAULT_TO}, capturedTo.getValue());
+    Assert.assertArrayEquals(new String[] {DEFAULT_CC}, capturedCC.getValue());
+    Assert.assertArrayEquals(new String[] {DEFAULT_BCC}, capturedBCC.getValue());
     Assert.assertEquals(DEFAULT_SUBJECT, capturedSubject.getValue());
-    Assert.assertEquals("Test Media Package(3e7bb56d-2fcc-4efe-9f0e-d6e56422f557)", capturedBody.getValue());
+    Assert.assertEquals("Test Media Package (3e7bb56d-2fcc-4efe-9f0e-d6e56422f557)", capturedBody.getValue());
   }
 
   @Test
   public void testTemplateInBody() throws Exception {
-    workflowInstance.setTitle("testTemplateInBody");
     operation.setConfiguration(EmailWorkflowOperationHandler.TO_PROPERTY, DEFAULT_TO);
     operation.setConfiguration(EmailWorkflowOperationHandler.CC_PROPERTY, DEFAULT_CC);
     operation.setConfiguration(EmailWorkflowOperationHandler.BCC_PROPERTY, DEFAULT_BCC);
@@ -143,16 +160,15 @@ public class EmailWorkflowOperationHandlerTest {
     WorkflowOperationResult result = operationHandler.start(workflowInstance, null);
 
     Assert.assertEquals(Action.CONTINUE, result.getAction());
-    Assert.assertEquals(DEFAULT_TO, capturedTo.getValue());
-    Assert.assertEquals(DEFAULT_CC, capturedCC.getValue());
-    Assert.assertEquals(DEFAULT_BCC, capturedBCC.getValue());
+    Assert.assertArrayEquals(new String[] {DEFAULT_TO}, capturedTo.getValue());
+    Assert.assertArrayEquals(new String[] {DEFAULT_CC}, capturedCC.getValue());
+    Assert.assertArrayEquals(new String[] {DEFAULT_BCC}, capturedBCC.getValue());
     Assert.assertEquals(DEFAULT_SUBJECT, capturedSubject.getValue());
     Assert.assertEquals("This is the media package: 3e7bb56d-2fcc-4efe-9f0e-d6e56422f557", capturedBody.getValue());
   }
 
   @Test
   public void testTemplateInFile() throws Exception {
-    workflowInstance.setTitle("testTemplateInFile");
     operation.setConfiguration(EmailWorkflowOperationHandler.TO_PROPERTY, DEFAULT_TO);
     operation.setConfiguration(EmailWorkflowOperationHandler.CC_PROPERTY, DEFAULT_CC);
     operation.setConfiguration(EmailWorkflowOperationHandler.BCC_PROPERTY, DEFAULT_BCC);
@@ -162,15 +178,15 @@ public class EmailWorkflowOperationHandlerTest {
     WorkflowOperationResult result = operationHandler.start(workflowInstance, null);
 
     Assert.assertEquals(Action.CONTINUE, result.getAction());
-    Assert.assertEquals(DEFAULT_TO, capturedTo.getValue());
-    Assert.assertEquals(DEFAULT_CC, capturedCC.getValue());
-    Assert.assertEquals(DEFAULT_BCC, capturedBCC.getValue());
+    Assert.assertArrayEquals(new String[] {DEFAULT_TO}, capturedTo.getValue());
+    Assert.assertArrayEquals(new String[] {DEFAULT_CC}, capturedCC.getValue());
+    Assert.assertArrayEquals(new String[] {DEFAULT_BCC}, capturedBCC.getValue());
     Assert.assertEquals(DEFAULT_SUBJECT, capturedSubject.getValue());
     Assert.assertEquals("This is the media package: 3e7bb56d-2fcc-4efe-9f0e-d6e56422f557", capturedBody.getValue());
   }
 
+  @Test
   public void testTemplateNotFound() throws Exception {
-    workflowInstance.setTitle("testErrorInTemplate");
     operation.setConfiguration(EmailWorkflowOperationHandler.TO_PROPERTY, DEFAULT_TO);
     operation.setConfiguration(EmailWorkflowOperationHandler.CC_PROPERTY, DEFAULT_CC);
     operation.setConfiguration(EmailWorkflowOperationHandler.BCC_PROPERTY, DEFAULT_BCC);
@@ -179,10 +195,107 @@ public class EmailWorkflowOperationHandlerTest {
 
     operationHandler.start(workflowInstance, null);
 
-    Assert.assertEquals(DEFAULT_TO, capturedTo.getValue());
-    Assert.assertEquals(DEFAULT_CC, capturedCC.getValue());
-    Assert.assertEquals(DEFAULT_BCC, capturedBCC.getValue());
+    Assert.assertArrayEquals(new String[] {DEFAULT_TO}, capturedTo.getValue());
+    Assert.assertArrayEquals(new String[] {DEFAULT_CC}, capturedCC.getValue());
+    Assert.assertArrayEquals(new String[] {DEFAULT_BCC}, capturedBCC.getValue());
     Assert.assertEquals(DEFAULT_SUBJECT, capturedSubject.getValue());
     Assert.assertEquals("TEMPLATE NOT FOUND!", capturedBody.getValue());
   }
+
+  @Test
+  public void testDestinationAsUserName() throws Exception {
+    operation.setConfiguration(EmailWorkflowOperationHandler.TO_PROPERTY, USER_NAME);
+    operation.setConfiguration(EmailWorkflowOperationHandler.CC_PROPERTY, USER_NAME);
+    operation.setConfiguration(EmailWorkflowOperationHandler.BCC_PROPERTY, USER_NAME);
+    operation.setConfiguration(EmailWorkflowOperationHandler.SUBJECT_PROPERTY, DEFAULT_SUBJECT);
+    operation.setConfiguration(EmailWorkflowOperationHandler.BODY_PROPERTY,
+            "This is the media package: ${mediaPackage.identifier}");
+
+    WorkflowOperationResult result = operationHandler.start(workflowInstance, null);
+
+    Assert.assertEquals(Action.CONTINUE, result.getAction());
+    Assert.assertArrayEquals(new String[] {DEFAULT_TO}, capturedTo.getValue());
+    Assert.assertArrayEquals(new String[] {DEFAULT_TO}, capturedCC.getValue());
+    Assert.assertArrayEquals(new String[] {DEFAULT_TO}, capturedBCC.getValue());
+    Assert.assertEquals(DEFAULT_SUBJECT, capturedSubject.getValue());
+    Assert.assertEquals("This is the media package: 3e7bb56d-2fcc-4efe-9f0e-d6e56422f557", capturedBody.getValue());
+  }
+
+  @Test
+  public void testManyDestinationEmails() throws Exception {
+    operation.setConfiguration(EmailWorkflowOperationHandler.TO_PROPERTY,
+            USER_NAME + "," + DEFAULT_BCC + " " + DEFAULT_CC);
+    operation.setConfiguration(EmailWorkflowOperationHandler.CC_PROPERTY, null);
+    operation.setConfiguration(EmailWorkflowOperationHandler.BCC_PROPERTY, null);
+    operation.setConfiguration(EmailWorkflowOperationHandler.SUBJECT_PROPERTY, DEFAULT_SUBJECT);
+    operation.setConfiguration(EmailWorkflowOperationHandler.BODY_PROPERTY,
+            "This is the media package: ${mediaPackage.identifier}");
+
+    WorkflowOperationResult result = operationHandler.start(workflowInstance, null);
+
+    Assert.assertEquals(Action.CONTINUE, result.getAction());
+    Assert.assertArrayEquals(new String[] {DEFAULT_TO, DEFAULT_BCC, DEFAULT_CC}, capturedTo.getValue());
+    Assert.assertEquals(0, capturedCC.getValue().length);
+    Assert.assertEquals(0, capturedBCC.getValue().length);
+    Assert.assertEquals(DEFAULT_SUBJECT, capturedSubject.getValue());
+    Assert.assertEquals("This is the media package: 3e7bb56d-2fcc-4efe-9f0e-d6e56422f557", capturedBody.getValue());
+  }
+
+  @Test
+  public void testUserNameIsAnEmail() throws Exception {
+    operation.setConfiguration(EmailWorkflowOperationHandler.TO_PROPERTY, USER_NAME_EMAIL);
+    operation.setConfiguration(EmailWorkflowOperationHandler.CC_PROPERTY, USER_NAME_EMAIL);
+    operation.setConfiguration(EmailWorkflowOperationHandler.BCC_PROPERTY, USER_NAME_EMAIL);
+    operation.setConfiguration(EmailWorkflowOperationHandler.SUBJECT_PROPERTY, DEFAULT_SUBJECT);
+    operation.setConfiguration(EmailWorkflowOperationHandler.BODY_PROPERTY,
+            "This is the media package: ${mediaPackage.identifier}");
+
+    WorkflowOperationResult result = operationHandler.start(workflowInstance, null);
+
+    Assert.assertEquals(Action.CONTINUE, result.getAction());
+    Assert.assertArrayEquals(new String[] {DEFAULT_TO}, capturedTo.getValue());
+    Assert.assertArrayEquals(new String[] {DEFAULT_TO}, capturedCC.getValue());
+    Assert.assertArrayEquals(new String[] {DEFAULT_TO}, capturedBCC.getValue());
+    Assert.assertEquals(DEFAULT_SUBJECT, capturedSubject.getValue());
+    Assert.assertEquals("This is the media package: 3e7bb56d-2fcc-4efe-9f0e-d6e56422f557", capturedBody.getValue());
+  }
+
+  @Test(expected = WorkflowOperationException.class)
+  public void testUserNoEmail() throws Exception {
+    operation.setConfiguration(EmailWorkflowOperationHandler.TO_PROPERTY, USER_NAME_NO_EMAIL);
+    operation.setConfiguration(EmailWorkflowOperationHandler.CC_PROPERTY, USER_NAME_NO_EMAIL);
+    operation.setConfiguration(EmailWorkflowOperationHandler.BCC_PROPERTY, USER_NAME_NO_EMAIL);
+    operation.setConfiguration(EmailWorkflowOperationHandler.SUBJECT_PROPERTY, DEFAULT_SUBJECT);
+    operation.setConfiguration(EmailWorkflowOperationHandler.BODY_PROPERTY,
+            "This is the media package: ${mediaPackage.identifier}");
+
+    WorkflowOperationResult result = operationHandler.start(workflowInstance, null);
+
+    Assert.assertEquals(Action.CONTINUE, result.getAction());
+    Assert.assertEquals(DEFAULT_TO, capturedTo.getValue());
+    Assert.assertEquals(DEFAULT_TO, capturedCC.getValue());
+    Assert.assertEquals(DEFAULT_TO, capturedBCC.getValue());
+    Assert.assertEquals(DEFAULT_SUBJECT, capturedSubject.getValue());
+    Assert.assertEquals("This is the media package: 3e7bb56d-2fcc-4efe-9f0e-d6e56422f557", capturedBody.getValue());
+  }
+
+  @Test
+  public void testSeparators() throws Exception {
+    final String separator = "~|~";
+    operation.setConfiguration(EmailWorkflowOperationHandler.TO_PROPERTY, USER_NAME_EMAIL
+        + separator + USER_NAME_EMAIL);
+    operation.setConfiguration(EmailWorkflowOperationHandler.ADDRESS_SEPARATOR_PROPERTY, separator);
+
+    operationHandler.start(workflowInstance, null);
+    Assert.assertArrayEquals(new String[] {DEFAULT_TO, DEFAULT_TO}, capturedTo.getValue());
+  }
+
+  @Test
+  public void testNoRecipient() throws Exception {
+    operation.setConfiguration(EmailWorkflowOperationHandler.SKIP_INVALID_ADDRESS_PROPERTY, "true");
+
+    WorkflowOperationResult result = operationHandler.start(workflowInstance, null);
+    Assert.assertEquals(Action.SKIP, result.getAction());
+  }
+
 }

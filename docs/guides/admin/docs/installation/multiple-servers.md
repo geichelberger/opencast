@@ -41,10 +41,8 @@ distributions.
 
 ### Two-Server Set-up
 
-This set-up is the minimum set-up recommended for productive use. It will separate the presentation layer from the
-administrative and working layer. This means that even if one server is under heavy load while videos are processed, it
-will not effect the distribution and users should still be able to watch videos smoothly. However, it might happen that
-under heavy load the handling of the administrative user interface gets a bit rough.
+This set-up is the minimum set-up recommended for productive use. It will separate the video processing from the rest of
+the system, making the user-facing parts of your system much less affected by heavier loads.
 
 
 ### Three (or more) Server Set-up
@@ -138,10 +136,10 @@ ActiveMQ 5.10 or above should work. ActiveMQ 5.6 will not work. Versions in betw
 
 ### Installation
 
- - If you use the Opencast RPM repository, simply install the `activemq-dist` package.
- - If you are running RHEL, CentOS or Fedora you can use the [ActiveMQ-dist Copr RPM repository
-   ](https://copr.fedoraproject.org/coprs/lkiesow/apache-activemq-dist/)
- - You can download binary distributions from the [Apache ActiveMQ website](http://activemq.apache.org/download.html)
+* If you use the Opencast RPM repository, simply install the `activemq-dist` package.
+* If you are running RHEL, CentOS or Fedora you can use the [ActiveMQ-dist Copr RPM
+  repository](https://copr.fedoraproject.org/coprs/lkiesow/apache-activemq-dist/)
+* You can download binary distributions from the [Apache ActiveMQ website](http://activemq.apache.org/download.html)
 
 
 ### Configuration
@@ -171,10 +169,6 @@ Set the location of the shared storage directory:
 
     org.opencastproject.storage.dir=/srv/opencast
 
-Define that the file repository shall access all files locally:
-
-    org.opencastproject.file.repo.url=${org.opencastproject.admin.ui.url}
-
 ### org.opencastproject.organization-mh\_default\_org.cfg
 
 Set the base URL of the server hosting the administrative tools. Again use a domain name instead of an IP address if
@@ -195,4 +189,4 @@ set all servers to use the same URL (e.g. URL of the admin node).
 
 To ensure that jobs are not dispatched by non-admin nodes, on these you should also set:
 
-    dispatchinterval=0
+    dispatch.interval=0

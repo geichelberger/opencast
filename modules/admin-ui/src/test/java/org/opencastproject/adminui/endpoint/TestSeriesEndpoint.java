@@ -22,35 +22,28 @@
 package org.opencastproject.adminui.endpoint;
 
 import static org.opencastproject.index.service.util.CatalogAdapterUtil.getCatalogProperties;
-import static org.opencastproject.util.data.Option.none;
-import static org.opencastproject.util.data.Option.some;
 
-import org.opencastproject.adminui.impl.index.AdminUISearchIndex;
+import org.opencastproject.adminui.index.AdminUISearchIndex;
 import org.opencastproject.authorization.xacml.manager.api.AclService;
 import org.opencastproject.authorization.xacml.manager.api.AclServiceFactory;
-import org.opencastproject.authorization.xacml.manager.api.EpisodeACLTransition;
 import org.opencastproject.authorization.xacml.manager.api.ManagedAcl;
-import org.opencastproject.authorization.xacml.manager.api.SeriesACLTransition;
-import org.opencastproject.authorization.xacml.manager.api.TransitionQuery;
-import org.opencastproject.authorization.xacml.manager.api.TransitionResult;
 import org.opencastproject.authorization.xacml.manager.impl.ManagedAclImpl;
-import org.opencastproject.authorization.xacml.manager.impl.TransitionResultImpl;
+import org.opencastproject.elasticsearch.api.SearchIndexException;
+import org.opencastproject.elasticsearch.api.SearchResult;
+import org.opencastproject.elasticsearch.api.SearchResultItem;
+import org.opencastproject.elasticsearch.index.event.Event;
+import org.opencastproject.elasticsearch.index.event.EventSearchQuery;
+import org.opencastproject.elasticsearch.index.series.Series;
+import org.opencastproject.elasticsearch.index.series.SeriesSearchQuery;
+import org.opencastproject.elasticsearch.index.theme.IndexTheme;
+import org.opencastproject.elasticsearch.index.theme.ThemeSearchQuery;
 import org.opencastproject.index.service.catalog.adapter.series.CommonSeriesCatalogUIAdapter;
 import org.opencastproject.index.service.impl.IndexServiceImpl;
-import org.opencastproject.index.service.impl.index.event.Event;
-import org.opencastproject.index.service.impl.index.event.EventSearchQuery;
-import org.opencastproject.index.service.impl.index.series.Series;
-import org.opencastproject.index.service.impl.index.series.SeriesSearchQuery;
-import org.opencastproject.index.service.impl.index.theme.ThemeSearchQuery;
-import org.opencastproject.index.service.resources.list.api.ListProvidersService;
-import org.opencastproject.index.service.resources.list.api.ResourceListProvider;
-import org.opencastproject.index.service.resources.list.api.ResourceListQuery;
-import org.opencastproject.index.service.resources.list.impl.ListProvidersServiceImpl;
 import org.opencastproject.index.service.resources.list.provider.UsersListProvider;
-import org.opencastproject.matterhorn.search.SearchIndexException;
-import org.opencastproject.matterhorn.search.SearchQuery.Order;
-import org.opencastproject.matterhorn.search.SearchResult;
-import org.opencastproject.matterhorn.search.SearchResultItem;
+import org.opencastproject.list.api.ListProvidersService;
+import org.opencastproject.list.api.ResourceListProvider;
+import org.opencastproject.list.api.ResourceListQuery;
+import org.opencastproject.list.impl.ListProvidersServiceImpl;
 import org.opencastproject.metadata.dublincore.DublinCore;
 import org.opencastproject.metadata.dublincore.DublinCoreCatalog;
 import org.opencastproject.metadata.dublincore.DublinCoreCatalogList;
@@ -64,7 +57,6 @@ import org.opencastproject.security.api.DefaultOrganization;
 import org.opencastproject.security.api.JaxbOrganization;
 import org.opencastproject.security.api.JaxbRole;
 import org.opencastproject.security.api.JaxbUser;
-import org.opencastproject.security.api.Organization;
 import org.opencastproject.security.api.Permissions;
 import org.opencastproject.security.api.SecurityService;
 import org.opencastproject.security.api.User;
@@ -76,7 +68,7 @@ import org.opencastproject.util.DateTimeSupport;
 import org.opencastproject.util.NotFoundException;
 import org.opencastproject.util.PropertiesUtil;
 import org.opencastproject.util.data.Option;
-import org.opencastproject.workflow.api.ConfiguredWorkflowRef;
+import org.opencastproject.util.requests.SortCriterion.Order;
 
 import org.easymock.Capture;
 import org.easymock.EasyMock;
@@ -126,7 +118,7 @@ public class TestSeriesEndpoint extends SeriesEndpoint {
       }
 
       @Override
-      public Map<String, String> getList(String listName, ResourceListQuery query, Organization organization) {
+      public Map<String, String> getList(String listName, ResourceListQuery query) {
         return new HashMap<>();
       }
 
@@ -140,7 +132,6 @@ public class TestSeriesEndpoint extends SeriesEndpoint {
         return null;
       }
     });
-    listProvidersServiceImpl.activate(null);
     return listProvidersServiceImpl;
   }
 
@@ -214,17 +205,9 @@ public class TestSeriesEndpoint extends SeriesEndpoint {
     managedAcls.add(managedAcl1);
     managedAcls.add(new ManagedAclImpl(44L, "Private", defaultOrganization.getId(), acl));
 
-    Date transitionDate = new Date(DateTimeSupport.fromUTC("2014-06-05T15:00:00Z"));
-    TransitionResult transitionResult = getTransitionResult(managedAcl1, transitionDate);
-
     AclService aclService = EasyMock.createNiceMock(AclService.class);
     EasyMock.expect(aclService.getAcls()).andReturn(managedAcls).anyTimes();
     EasyMock.expect(aclService.getAcl(EasyMock.anyLong())).andReturn(Option.some(managedAcl1)).anyTimes();
-    Option<ConfiguredWorkflowRef> anyWorkflowOption = EasyMock.anyObject();
-    EasyMock.expect(aclService.applyAclToSeries(EasyMock.anyString(), EasyMock.anyObject(AccessControlList.class),
-            EasyMock.anyBoolean(), anyWorkflowOption)).andReturn(true).anyTimes();
-    EasyMock.expect(aclService.getTransitions(EasyMock.anyObject(TransitionQuery.class))).andReturn(transitionResult)
-            .anyTimes();
     EasyMock.replay(aclService);
 
     AclServiceFactory aclServiceFactory = EasyMock.createNiceMock(AclServiceFactory.class);
@@ -269,35 +252,14 @@ public class TestSeriesEndpoint extends SeriesEndpoint {
   }
 
   @SuppressWarnings("unchecked")
-  private SearchResultItem<Event>[] createEvents(int readyCount, int blacklistedCount, int optedOutCount) {
-    SearchResultItem<Event>[] eventitems = new SearchResultItem[readyCount + blacklistedCount + optedOutCount];
+  private SearchResultItem<Event>[] createEvents(int readyCount) {
+    SearchResultItem<Event>[] eventitems = new SearchResultItem[readyCount];
     int total = 1;
     String orgId = new DefaultOrganization().getId();
     for (int i = 0; i < readyCount; i++) {
       Event readyEvent = new Event(Integer.toString(i + total), orgId);
-      readyEvent.setOptedOut(false);
       SearchResultItem<Event> eventItem = EasyMock.createMock(SearchResultItem.class);
       EasyMock.expect(eventItem.getSource()).andReturn(readyEvent);
-      EasyMock.replay(eventItem);
-      eventitems[total - 1] = eventItem;
-      total++;
-    }
-
-    for (int i = 0; i < blacklistedCount; i++) {
-      Event blacklistedEvent = new Event(Integer.toString(i + total), orgId);
-      blacklistedEvent.setBlacklisted(true);
-      SearchResultItem<Event> eventItem = EasyMock.createMock(SearchResultItem.class);
-      EasyMock.expect(eventItem.getSource()).andReturn(blacklistedEvent);
-      EasyMock.replay(eventItem);
-      eventitems[total - 1] = eventItem;
-      total++;
-    }
-
-    for (int i = 0; i < optedOutCount; i++) {
-      Event optedOutEvent = new Event(Integer.toString(i + total), orgId);
-      optedOutEvent.setOptedOut(true);
-      SearchResultItem<Event> eventItem = EasyMock.createMock(SearchResultItem.class);
-      EasyMock.expect(eventItem.getSource()).andReturn(optedOutEvent);
       EasyMock.replay(eventItem);
       eventitems[total - 1] = eventItem;
       total++;
@@ -317,9 +279,10 @@ public class TestSeriesEndpoint extends SeriesEndpoint {
     time = DateTimeSupport.fromUTC("2014-04-29T14:35:50Z");
     Series series3 = createSeries("3", "title 3", "contributor 3", "organizer 3", time, null);
 
-    org.opencastproject.index.service.impl.index.theme.Theme theme1 = new org.opencastproject.index.service.impl.index.theme.Theme(
+    IndexTheme theme1 = new IndexTheme(
             1L, new DefaultOrganization().getId());
     theme1.setName("theme-1-name");
+    theme1.setDescription("theme-1-description");
 
     SearchResultItem<Series> item1 = EasyMock.createMock(SearchResultItem.class);
     EasyMock.expect(item1.getSource()).andReturn(series1).anyTimes();
@@ -341,15 +304,15 @@ public class TestSeriesEndpoint extends SeriesEndpoint {
     descSeriesItems[2] = item1;
 
     // final SearchResultItem<Event>[] eventItems1 = new SearchResultItem[0];
-    final SearchResultItem<Event>[] eventItems1 = createEvents(1, 1, 1);
+    final SearchResultItem<Event>[] eventItems1 = createEvents(1);
 
     // Setup the events for series 2
     final SearchResultItem<Event>[] eventItems2 = new SearchResultItem[0];
 
     // Setup the events for series 3
-    final SearchResultItem<Event>[] eventItems3 = createEvents(0, 1, 2);
+    final SearchResultItem<Event>[] eventItems3 = createEvents(0);
 
-    final SearchResultItem<org.opencastproject.index.service.impl.index.theme.Theme> themeItem1 = EasyMock
+    final SearchResultItem<IndexTheme> themeItem1 = EasyMock
             .createMock(SearchResultItem.class);
     EasyMock.expect(themeItem1.getSource()).andReturn(theme1);
 
@@ -357,20 +320,30 @@ public class TestSeriesEndpoint extends SeriesEndpoint {
     final SearchResult<Series> ascSeriesSearchResult = EasyMock.createMock(SearchResult.class);
     EasyMock.expect(ascSeriesSearchResult.getItems()).andReturn(ascSeriesItems);
     EasyMock.expect(ascSeriesSearchResult.getHitCount()).andReturn((long) ascSeriesItems.length);
+    EasyMock.expect(ascSeriesSearchResult.getDocumentCount()).andReturn((long) ascSeriesItems.length);
+    EasyMock.expect(ascSeriesSearchResult.getSearchTime()).andReturn(0L);
     final SearchResult<Series> descSeriesSearchResult = EasyMock.createMock(SearchResult.class);
     EasyMock.expect(descSeriesSearchResult.getItems()).andReturn(descSeriesItems);
     EasyMock.expect(descSeriesSearchResult.getHitCount()).andReturn((long) descSeriesItems.length);
+    EasyMock.expect(descSeriesSearchResult.getDocumentCount()).andReturn((long) descSeriesItems.length);
+    EasyMock.expect(descSeriesSearchResult.getSearchTime()).andReturn(0L);
     // Create an empty search result.
     final SearchResult<Series> emptySearchResult = EasyMock.createMock(SearchResult.class);
     EasyMock.expect(emptySearchResult.getPageSize()).andReturn(0L).anyTimes();
+    EasyMock.expect(emptySearchResult.getDocumentCount()).andReturn(0L);
+    EasyMock.expect(emptySearchResult.getSearchTime()).andReturn(0L);
     // Create a single search result for series 1.
     final SearchResult<Series> oneSearchResult = EasyMock.createMock(SearchResult.class);
     EasyMock.expect(oneSearchResult.getPageSize()).andReturn(1L).anyTimes();
     EasyMock.expect(oneSearchResult.getItems()).andReturn(new SearchResultItem[] { item1 }).anyTimes();
+    EasyMock.expect(oneSearchResult.getDocumentCount()).andReturn(1L);
+    EasyMock.expect(oneSearchResult.getSearchTime()).andReturn(0L);
     // Create a single search result for series 2.
     final SearchResult<Series> twoSearchResult = EasyMock.createMock(SearchResult.class);
     EasyMock.expect(twoSearchResult.getPageSize()).andReturn(1L).anyTimes();
     EasyMock.expect(twoSearchResult.getItems()).andReturn(new SearchResultItem[] { item2 }).anyTimes();
+    EasyMock.expect(twoSearchResult.getDocumentCount()).andReturn(2L);
+    EasyMock.expect(twoSearchResult.getSearchTime()).andReturn(0L);
 
     adminuiSearchIndex = EasyMock.createMock(AdminUISearchIndex.class);
 
@@ -479,11 +452,11 @@ public class TestSeriesEndpoint extends SeriesEndpoint {
             }).anyTimes();
 
     EasyMock.expect(adminuiSearchIndex.getByQuery(EasyMock.capture(captureThemeSearchQuery)))
-            .andAnswer(new IAnswer<SearchResult<org.opencastproject.index.service.impl.index.theme.Theme>>() {
+            .andAnswer(new IAnswer<SearchResult<IndexTheme>>() {
 
               @Override
-              public SearchResult<org.opencastproject.index.service.impl.index.theme.Theme> answer() throws Throwable {
-                SearchResult<org.opencastproject.index.service.impl.index.theme.Theme> themeSearchResult = EasyMock
+              public SearchResult<IndexTheme> answer() throws Throwable {
+                SearchResult<IndexTheme> themeSearchResult = EasyMock
                         .createMock(SearchResult.class);
                 // Setup theme search results
                 EasyMock.expect(themeSearchResult.getPageSize()).andReturn(1L).anyTimes();
@@ -496,91 +469,6 @@ public class TestSeriesEndpoint extends SeriesEndpoint {
 
     EasyMock.replay(adminuiSearchIndex, item1, item2, item3, themeItem1, ascSeriesSearchResult, descSeriesSearchResult,
             emptySearchResult, oneSearchResult, twoSearchResult);
-  }
-
-  private TransitionResult getTransitionResult(final ManagedAcl macl, final Date now) {
-    return new TransitionResultImpl(
-            org.opencastproject.util.data.Collections.<EpisodeACLTransition> list(new EpisodeACLTransition() {
-              @Override
-              public String getEpisodeId() {
-                return "episode";
-              }
-
-              @Override
-              public Option<ManagedAcl> getAccessControlList() {
-                return some(macl);
-              }
-
-              @Override
-              public boolean isDelete() {
-                return getAccessControlList().isNone();
-              }
-
-              @Override
-              public long getTransitionId() {
-                return 1L;
-              }
-
-              @Override
-              public String getOrganizationId() {
-                return "org";
-              }
-
-              @Override
-              public Date getApplicationDate() {
-                return now;
-              }
-
-              @Override
-              public Option<ConfiguredWorkflowRef> getWorkflow() {
-                return none();
-              }
-
-              @Override
-              public boolean isDone() {
-                return false;
-              }
-            }), org.opencastproject.util.data.Collections.<SeriesACLTransition> list(new SeriesACLTransition() {
-              @Override
-              public String getSeriesId() {
-                return "series";
-              }
-
-              @Override
-              public ManagedAcl getAccessControlList() {
-                return macl;
-              }
-
-              @Override
-              public boolean isOverride() {
-                return true;
-              }
-
-              @Override
-              public long getTransitionId() {
-                return 2L;
-              }
-
-              @Override
-              public String getOrganizationId() {
-                return "org";
-              }
-
-              @Override
-              public Date getApplicationDate() {
-                return now;
-              }
-
-              @Override
-              public Option<ConfiguredWorkflowRef> getWorkflow() {
-                return none();
-              }
-
-              @Override
-              public boolean isDone() {
-                return false;
-              }
-            }));
   }
 
 }

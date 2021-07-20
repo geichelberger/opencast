@@ -26,7 +26,6 @@ import org.opencastproject.execute.api.ExecuteService;
 import org.opencastproject.inspection.api.MediaInspectionException;
 import org.opencastproject.inspection.api.MediaInspectionService;
 import org.opencastproject.job.api.Job;
-import org.opencastproject.job.api.JobBarrier;
 import org.opencastproject.job.api.JobContext;
 import org.opencastproject.mediapackage.MediaPackage;
 import org.opencastproject.mediapackage.MediaPackageElement;
@@ -35,6 +34,7 @@ import org.opencastproject.mediapackage.MediaPackageElementParser;
 import org.opencastproject.mediapackage.MediaPackageException;
 import org.opencastproject.util.NotFoundException;
 import org.opencastproject.workflow.api.AbstractWorkflowOperationHandler;
+import org.opencastproject.workflow.api.ConfiguredTagsAndFlavors;
 import org.opencastproject.workflow.api.WorkflowInstance;
 import org.opencastproject.workflow.api.WorkflowOperationException;
 import org.opencastproject.workflow.api.WorkflowOperationInstance;
@@ -53,10 +53,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.SortedMap;
-import java.util.TreeMap;
 
 /**
  * Runs an operation once with using elements within a certain MediaPackage as parameters
@@ -90,8 +89,14 @@ public class ExecuteOnceWorkflowOperationHandler extends AbstractWorkflowOperati
   /** Property containing the flavor that the resulting mediapackage elements will be assigned */
   public static final String TARGET_FLAVOR_PROPERTY = "target-flavor";
 
+  /** Property should be empty, but is needed in order to parse optional target-flavors */
+  public static final String TARGET_FLAVORS_PROPERTY = "target-flavors";
+
   /** Property containing the tags that the resulting mediapackage elements will be assigned */
   public static final String TARGET_TAGS_PROPERTY = "target-tags";
+
+  /** Property should be empty, but will be checked, if target-tags is empty */
+  public static final String TARGET_TAG_PROPERTY = "target-tag";
 
   /** Property to control whether command output will be used to set workflow properties */
   public static final String SET_WF_PROPS_PROPERTY = "set-workflow-properties";
@@ -104,22 +109,6 @@ public class ExecuteOnceWorkflowOperationHandler extends AbstractWorkflowOperati
 
   /** The workspace service */
   protected Workspace workspace;
-
-  /** The configuration options for this handler */
-  private static final SortedMap<String, String> CONFIG_OPTIONS;
-
-  static {
-    CONFIG_OPTIONS = new TreeMap<String, String>();
-    CONFIG_OPTIONS.put(EXEC_PROPERTY, "The full path the executable to run");
-    CONFIG_OPTIONS.put(PARAMS_PROPERTY, "Space separated list of command line parameters to pass to the executable')");
-    CONFIG_OPTIONS.put(LOAD_PROPERTY, "A floating point estimate of the load imposed on the node by this job");
-    CONFIG_OPTIONS.put(OUTPUT_FILENAME_PROPERTY, "The name of the elements created by this operation");
-    CONFIG_OPTIONS.put(EXPECTED_TYPE_PROPERTY,
-            "The type of the element returned by this operation. Accepted values are: manifest, timeline, track, catalog, attachment, other");
-    CONFIG_OPTIONS.put(TARGET_FLAVOR_PROPERTY, "The flavor that the resulting mediapackage elements will be assigned");
-    CONFIG_OPTIONS.put(TARGET_TAGS_PROPERTY, "The tags that the resulting mediapackage elements will be assigned");
-    CONFIG_OPTIONS.put(SET_WF_PROPS_PROPERTY, "If true, command output will be used to set workflow properties");
-  }
 
   /**
    * {@inheritDoc}
@@ -147,8 +136,10 @@ public class ExecuteOnceWorkflowOperationHandler extends AbstractWorkflowOperati
         logger.warn("Ignoring invalid load value '{}' on execute operation with description '{}'", loadPropertyStr, description);
       }
     }
-    String targetFlavorStr = StringUtils.trimToNull(operation.getConfiguration(TARGET_FLAVOR_PROPERTY));
-    String targetTags = StringUtils.trimToNull(operation.getConfiguration(TARGET_TAGS_PROPERTY));
+    ConfiguredTagsAndFlavors tagsAndFlavors = getTagsAndFlavors(workflowInstance,
+        Configuration.none, Configuration.none, Configuration.many, Configuration.many);
+    List<MediaPackageElementFlavor> targetFlavorStr = tagsAndFlavors.getTargetFlavors();
+    List<String> targetTags = tagsAndFlavors.getTargetTags();
     String outputFilename = StringUtils.trimToNull(operation.getConfiguration(OUTPUT_FILENAME_PROPERTY));
     String expectedTypeStr = StringUtils.trimToNull(operation.getConfiguration(EXPECTED_TYPE_PROPERTY));
 
@@ -156,8 +147,8 @@ public class ExecuteOnceWorkflowOperationHandler extends AbstractWorkflowOperati
 
     // Unmarshall target flavor
     MediaPackageElementFlavor targetFlavor = null;
-    if (targetFlavorStr != null)
-      targetFlavor = MediaPackageElementFlavor.parseFlavor(targetFlavorStr);
+    if (!targetFlavorStr.isEmpty())
+      targetFlavor = targetFlavorStr.get(0);
 
     // Unmarshall expected mediapackage element type
     MediaPackageElement.Type expectedType = null;
@@ -209,8 +200,8 @@ public class ExecuteOnceWorkflowOperationHandler extends AbstractWorkflowOperati
             // Have the track inspected and return the result
             Job inspectionJob = null;
             inspectionJob = inspectionService.inspect(resultElement.getURI());
-            JobBarrier barrier = new JobBarrier(job, serviceRegistry, inspectionJob);
-            if (!barrier.waitForJobs().isSuccess()) {
+
+            if (!waitForStatus(inspectionJob).isSuccess()) {
               throw new ExecuteException("Media inspection of " + resultElement.getURI() + " failed");
             }
 
@@ -228,9 +219,9 @@ public class ExecuteOnceWorkflowOperationHandler extends AbstractWorkflowOperati
             resultElement.setFlavor(targetFlavor);
 
           // Set new tags
-          if (targetTags != null) {
+          if (!targetTags.isEmpty()) {
             // Assume the tags starting with "-" means we want to eliminate such tags form the result element
-            for (String tag : asList(targetTags)) {
+            for (String tag : targetTags) {
               if (tag.startsWith("-"))
                 // We remove the tag resulting from stripping all the '-' characters at the beginning of the tag
                 resultElement.removeTag(tag.replaceAll("^-+", ""));
@@ -286,17 +277,6 @@ public class ExecuteOnceWorkflowOperationHandler extends AbstractWorkflowOperati
   @Override
   public void destroy(WorkflowInstance workflowInstance, JobContext context) throws WorkflowOperationException {
     // Do nothing (nothing to clean up, the command line program should do this itself)
-  }
-
-
-  /**
-   * {@inheritDoc}
-   * 
-   * @see org.opencastproject.workflow.api.WorkflowOperationHandler#getConfigurationOptions()
-   */
-  @Override
-  public SortedMap<String, String> getConfigurationOptions() {
-    return CONFIG_OPTIONS;
   }
 
   /**

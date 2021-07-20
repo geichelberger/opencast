@@ -20,7 +20,7 @@
  */
 package org.opencastproject.userdirectory;
 
-import static org.opencastproject.kernel.userdirectory.InMemoryUserAndRoleProvider.PROVIDER_NAME;
+import static org.opencastproject.userdirectory.InMemoryUserAndRoleProvider.PROVIDER_NAME;
 
 import org.opencastproject.security.api.Organization;
 import org.opencastproject.security.api.OrganizationDirectoryListener;
@@ -32,41 +32,54 @@ import org.opencastproject.security.impl.jpa.JpaOrganization;
 import org.opencastproject.security.impl.jpa.JpaRole;
 import org.opencastproject.security.impl.jpa.JpaUser;
 import org.opencastproject.security.util.SecurityUtil;
-import org.opencastproject.util.NotFoundException;
 import org.opencastproject.util.UrlSupport;
-import org.opencastproject.util.data.Effect0;
 
 import com.entwinemedia.fn.Fn;
 import com.entwinemedia.fn.Stream;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.osgi.framework.BundleContext;
 import org.osgi.service.component.ComponentContext;
+import org.osgi.service.component.annotations.Activate;
+import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Reference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Arrays;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.stream.Collectors;
 
 /**
  * User and group loader to create a system administrator group for each tenant along with a user named after the
  * organization.
  */
+@Component(
+  property = {
+    "service.description=System admin user and group loader"
+  },
+  immediate = true,
+  service = { AdminUserAndGroupLoader.class }
+)
 public class AdminUserAndGroupLoader implements OrganizationDirectoryListener {
 
   /** The logging facility */
   private static final Logger logger = LoggerFactory.getLogger(AdminUserAndGroupLoader.class);
 
-  /** The administrator user configuration option */
-  public static final String OPT_ADMIN_USER = "org.opencastproject.security.admin.user";
-
   /** The administrator password configuration option */
   public static final String OPT_ADMIN_PASSWORD = "org.opencastproject.security.admin.pass";
+
+  /**
+   * The administrator password set by default in the configuration file.
+   * Note that this is not set if it is not defined in the configuration file.
+   **/
+  private static final String DEFAULT_ADMIN_PASSWORD_CONFIGURATION = "opencast";
 
   /** The administrator email configuration option */
   public static final String OPT_ADMIN_EMAIL = "org.opencastproject.admin.email";
@@ -116,13 +129,28 @@ public class AdminUserAndGroupLoader implements OrganizationDirectoryListener {
    * @param cc
    *          the component context
    */
+  @Activate
   public void activate(ComponentContext cc) throws Exception {
     logger.debug("Activating admin group loader");
     BundleContext bundleCtx = cc.getBundleContext();
-    adminUserName = StringUtils.trimToNull(bundleCtx.getProperty(OPT_ADMIN_USER));
+    adminUserName = StringUtils.trimToNull(bundleCtx.getProperty(SecurityConstants.GLOBAL_ADMIN_USER_PROPERTY));
     adminPassword = StringUtils.trimToNull(bundleCtx.getProperty(OPT_ADMIN_PASSWORD));
     adminEmail = StringUtils.trimToNull(bundleCtx.getProperty(OPT_ADMIN_EMAIL));
     adminRoles = StringUtils.trimToNull(bundleCtx.getProperty(OPT_ADMIN_ROLES));
+
+    if (DEFAULT_ADMIN_PASSWORD_CONFIGURATION.equals(adminPassword)) {
+    logger.warn("\n"
+            + "######################################################\n"
+            + "#                                                    #\n"
+            + "# WARNING: Opencast still uses the default admin     #\n"
+            + "#          credentials. Never do this in production. #\n"
+            + "#                                                    #\n"
+            + "#          To change the password, edit the key      #\n"
+            + "#          org.opencastproject.security.admin.pass   #\n"
+            + "#          in custom.properties.                     #\n"
+            + "#                                                    #\n"
+            + "######################################################");
+    }
 
     // Keep a reference to the component context
     componentCtx = cc;
@@ -163,104 +191,89 @@ public class AdminUserAndGroupLoader implements OrganizationDirectoryListener {
       return;
     }
 
-    SecurityUtil.runAs(securityService, organization, SecurityUtil.createSystemUser(componentCtx, organization), new Effect0() {
-      @Override
-      protected void run() {
-        try {
-          JpaOrganization org = fromOrganization(organizationDirectoryService.getOrganization(organization.getId()));
+    SecurityUtil.runAs(securityService, organization, SecurityUtil.createSystemUser(componentCtx, organization), () -> {
+      try {
+        JpaOrganization org = fromOrganization(organizationDirectoryService.getOrganization(organization.getId()));
 
-          // Make sure the administrator exists for this organization. Note that the user will gain its roles through
-          // membership in the administrator group
-          JpaUser adminUser = (JpaUser) userAndRoleProvider.loadUser(adminUserName);
-          boolean userExists = adminUser != null;
-          // Add roles according to the system configuration
-          Set<JpaRole> adminRolesSet = new HashSet<JpaRole>();
-          if (adminRoles != null) {
-            for (String r : StringUtils.split(adminRoles, ',')) {
-              String roleId = StringUtils.trimToNull(r);
-              if (roleId != null) {
-                adminRolesSet.add(new JpaRole(roleId, org));
-              }
-            }
-          }
-          String adminUserFullName = organization.getName().concat(" Administrator");
-          adminUser = new JpaUser(adminUserName, adminPassword, org, adminUserFullName, adminEmail, PROVIDER_NAME,
-                                  false, adminRolesSet);
-          if (userExists) {
-            userAndRoleProvider.updateUser(adminUser);
-            logger.info("Administrator user for '{}' updated", org.getId());
-          } else {
-            userAndRoleProvider.addUser(adminUser);
-            logger.info("Administrator user for '{}' created", org.getId());
-          }
-
-          // System administrator group
-          String adminGroupId = org.getId().toUpperCase().concat(SYSTEM_ADMIN_GROUP_SUFFIX);
-          JpaGroup systemAdminGroup = (JpaGroup) groupRoleProvider.loadGroup(adminGroupId, org.getId());
-          Set<JpaRole> systemAdminRoles = new HashSet<JpaRole>();
-          Set<String> systemAdminRolesIds = new HashSet<String>();
-
-          // Add global system roles as defined in the code base
-          for (String role : SecurityConstants.GLOBAL_SYSTEM_ROLES) {
-            systemAdminRoles.add(new JpaRole(role, org));
-            systemAdminRolesIds.add(role);
-          }
-
-          // Add roles as defined in the code base
-          for (String role : loadGroupRoles(SYSTEM_ADMIN_FILE)) {
-            systemAdminRoles.add(new JpaRole(role, org));
-            systemAdminRolesIds.add(role);
-          }
-
-          // Add roles as defined by the organization
-          if (StringUtils.isNotBlank(org.getAdminRole())) {
-            systemAdminRoles.add(new JpaRole(org.getAdminRole(), org));
-            systemAdminRolesIds.add(org.getAdminRole());
-          }
-          if (StringUtils.isNotBlank(org.getAnonymousRole())) {
-            systemAdminRoles.add(new JpaRole(org.getAnonymousRole(), org));
-            systemAdminRolesIds.add(org.getAnonymousRole());
-          }
-
-          // Add roles according to the system configuration
-          if (adminRoles != null) {
-            for (String r : StringUtils.split(adminRoles, ',')) {
-              String roleId = StringUtils.trimToNull(r);
-              if (roleId != null) {
-                systemAdminRoles.add(new JpaRole(roleId, org));
-                systemAdminRolesIds.add(roleId);
-              }
-            }
-          }
-
-          // Make sure the organization administrator is part of this group
-          Set<String> groupMembers = new HashSet<String>();
-          groupMembers.add(adminUserName);
-
-          // Create the group
-          String adminGroupName = org.getName().concat(" System Administrators");
-          String adminGroupDescription = "System administrators of '" + org.getName() + "'";
-          if (systemAdminGroup == null) {
-            logger.info("Creating {}'s system administrator group", org.getId());
-            systemAdminGroup = new JpaGroup(adminGroupId, org, adminGroupName, adminGroupDescription, systemAdminRoles);
-            systemAdminGroup.setMembers(groupMembers);
-            groupRoleProvider.addGroup(systemAdminGroup);
-          } else {
-            logger.info("Updating roles of {}'s system administrator group", org.getId());
-            groupMembers.addAll(systemAdminGroup.getMembers());
-            groupRoleProvider.updateGroup(adminGroupId, adminGroupName, adminGroupDescription,
-                    StringUtils.join(systemAdminRolesIds, ','), StringUtils.join(groupMembers, ','));
-          }
-
-        } catch (NotFoundException e) {
-          logger.error("Unable to load system administrator group because {}", ExceptionUtils.getStackTrace(e));
-        } catch (IllegalStateException e) {
-          logger.error("Unable to load system administrator group because {}", ExceptionUtils.getStackTrace(e));
-        } catch (IOException e) {
-          logger.error("Unable to load system administrator group because {}", ExceptionUtils.getStackTrace(e));
-        } catch (Throwable t) {
-          logger.error("Unable to load system administrator group because {}", ExceptionUtils.getStackTrace(t));
+        // Make sure the administrator exists for this organization. Note that the user will gain its roles through
+        // membership in the administrator group
+        boolean userExists = userAndRoleProvider.loadUser(adminUserName) != null;
+        // Add roles according to the system configuration
+        Set<JpaRole> adminRolesSet = Arrays.stream(StringUtils.split(Objects.toString(adminRoles, ""), ','))
+            .map(StringUtils::trimToNull)
+            .filter(Objects::nonNull)
+            .map(r -> new JpaRole(r, org))
+            .collect(Collectors.toSet());
+        JpaUser adminUser = new JpaUser(adminUserName, adminPassword, org, "Administrator", adminEmail, PROVIDER_NAME,
+                                false, adminRolesSet);
+        if (userExists) {
+          userAndRoleProvider.updateUser(adminUser);
+          logger.info("Administrator user for '{}' updated", org.getId());
+        } else {
+          userAndRoleProvider.addUser(adminUser);
+          logger.info("Administrator user for '{}' created", org.getId());
         }
+
+        // System administrator group
+        String adminGroupId = org.getId().toUpperCase().concat(SYSTEM_ADMIN_GROUP_SUFFIX);
+        JpaGroup systemAdminGroup = (JpaGroup) groupRoleProvider.loadGroup(adminGroupId, org.getId());
+        Set<JpaRole> systemAdminRoles = new HashSet<>();
+        Set<String> systemAdminRolesIds = new HashSet<>();
+
+        // Add global system roles as defined in the code base
+        for (String role : SecurityConstants.GLOBAL_SYSTEM_ROLES) {
+          systemAdminRoles.add(new JpaRole(role, org));
+          systemAdminRolesIds.add(role);
+        }
+
+        // Add roles as defined in the code base
+        for (String role : loadGroupRoles(SYSTEM_ADMIN_FILE)) {
+          systemAdminRoles.add(new JpaRole(role, org));
+          systemAdminRolesIds.add(role);
+        }
+
+        // Add roles as defined by the organization
+        if (StringUtils.isNotBlank(org.getAdminRole())) {
+          systemAdminRoles.add(new JpaRole(org.getAdminRole(), org));
+          systemAdminRolesIds.add(org.getAdminRole());
+        }
+        if (StringUtils.isNotBlank(org.getAnonymousRole())) {
+          systemAdminRoles.add(new JpaRole(org.getAnonymousRole(), org));
+          systemAdminRolesIds.add(org.getAnonymousRole());
+        }
+
+        // Add roles according to the system configuration
+        if (adminRoles != null) {
+          for (String r : StringUtils.split(adminRoles, ',')) {
+            String roleId = StringUtils.trimToNull(r);
+            if (roleId != null) {
+              systemAdminRoles.add(new JpaRole(roleId, org));
+              systemAdminRolesIds.add(roleId);
+            }
+          }
+        }
+
+        // Make sure the organization administrator is part of this group
+        Set<String> groupMembers = new HashSet<String>();
+        groupMembers.add(adminUserName);
+
+        // Create the group
+        String adminGroupName = org.getName().concat(" System Administrators");
+        String adminGroupDescription = "System administrators of '" + org.getName() + "'";
+        if (systemAdminGroup == null) {
+          logger.info("Creating {}'s system administrator group", org.getId());
+          systemAdminGroup = new JpaGroup(adminGroupId, org, adminGroupName, adminGroupDescription, systemAdminRoles);
+          systemAdminGroup.setMembers(groupMembers);
+          groupRoleProvider.addGroup(systemAdminGroup);
+        } else {
+          logger.info("Updating roles of {}'s system administrator group", org.getId());
+          groupMembers.addAll(systemAdminGroup.getMembers());
+          groupRoleProvider.updateGroup(adminGroupId, adminGroupName, adminGroupDescription,
+                  StringUtils.join(systemAdminRolesIds, ','), StringUtils.join(groupMembers, ','));
+        }
+
+      } catch (Throwable t) {
+        logger.error("Unable to load system administrator group", t);
       }
     });
   }
@@ -321,6 +334,7 @@ public class AdminUserAndGroupLoader implements OrganizationDirectoryListener {
    * @param groupRoleProvider
    *          the groupRoleProvider to set
    */
+  @Reference(name = "groupRoleProvider")
   void setGroupRoleProvider(JpaGroupRoleProvider groupRoleProvider) {
     this.groupRoleProvider = groupRoleProvider;
   }
@@ -331,6 +345,7 @@ public class AdminUserAndGroupLoader implements OrganizationDirectoryListener {
    * @param userAndRoleProvider
    *          the user and role provider to set
    */
+  @Reference(name = "userAndRoleProvider")
   void setUserAndRoleProvider(JpaUserAndRoleProvider userAndRoleProvider) {
     this.userAndRoleProvider = userAndRoleProvider;
   }
@@ -341,6 +356,7 @@ public class AdminUserAndGroupLoader implements OrganizationDirectoryListener {
    * @param organizationDirectoryService
    *          the organizationDirectoryService to set
    */
+  @Reference(name = "organizationDirectoryService")
   void setOrganizationDirectoryService(OrganizationDirectoryService organizationDirectoryService) {
     this.organizationDirectoryService = organizationDirectoryService;
     this.organizationDirectoryService.addOrganizationDirectoryListener(this);
@@ -352,6 +368,7 @@ public class AdminUserAndGroupLoader implements OrganizationDirectoryListener {
    * @param securityService
    *          the security service
    */
+  @Reference(name = "security-service")
   void setSecurityService(SecurityService securityService) {
     this.securityService = securityService;
   }

@@ -28,7 +28,10 @@ import org.opencastproject.security.api.UserProvider;
 import org.opencastproject.userdirectory.JpaGroupRoleProvider;
 import org.opencastproject.util.NotFoundException;
 
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.math.NumberUtils;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.ServiceRegistration;
 import org.osgi.service.cm.ConfigurationException;
@@ -39,9 +42,15 @@ import org.slf4j.LoggerFactory;
 import org.springframework.security.ldap.userdetails.LdapAuthoritiesPopulator;
 
 import java.lang.management.ManagementFactory;
+import java.util.Arrays;
 import java.util.Dictionary;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import javax.management.MalformedObjectNameException;
@@ -53,10 +62,10 @@ import javax.management.ObjectName;
 public class LdapUserProviderFactory implements ManagedServiceFactory {
 
   /** The logger */
-  protected static final Logger logger = LoggerFactory.getLogger(LdapUserProviderFactory.class);
+  private static final Logger logger = LoggerFactory.getLogger(LdapUserProviderFactory.class);
 
   /** This service factory's PID */
-  public static final String PID = "org.opencastproject.userdirectory.ldap";
+  private static final String PID = "org.opencastproject.userdirectory.ldap";
 
   /** The key to look up the ldap search filter in the service configuration properties */
   private static final String SEARCH_FILTER_KEY = "org.opencastproject.userdirectory.ldap.searchfilter";
@@ -94,6 +103,30 @@ public class LdapUserProviderFactory implements ManagedServiceFactory {
    */
   private static final String EXCLUDE_PREFIXES_KEY = "org.opencastproject.userdirectory.ldap.exclude.prefixes";
 
+  /**
+   * The key to indicate a prefix,
+   * which is used to check whether a roleattribute value shall be added as a group to the user
+   */
+  private static final String GROUP_CHECK_PREFIX_KEY = "org.opencastproject.userdirectory.ldap.groupcheckprefix";
+
+  /** Specifies, whether the roleattributes should be added as a role */
+  private static final String APPLY_ROLEATTRIBUTES_AS_ROLES_KEY = "org.opencastproject.userdirectory.ldap.roleattributes.applyasroles";
+
+  /** Specifies, whether the roleattributes should be added as a group */
+  private static final String APPLY_ROLEATTRIBUTES_AS_GROUPS_KEY = "org.opencastproject.userdirectory.ldap.roleattributes.applyasgroups";
+
+  /** The prefix of the keys, which map a ldap attribute to opencast roles */
+  private static final String ATTRIBUTE_MAPPING_KEY_PREFIX = "org.opencastproject.userdirectory.ldap.map.";
+
+  /** The postfix of the attribute maps, which specifiy the value to map */
+  private static final String ATTRIBUTE_MAPPING_KEY_POSTFIX_VALUE = "value";
+
+  /** The postfix of the attribute maps, which map a ldap attribute to opencast roles */
+  private static final String ATTRIBUTE_MAPPING_KEY_POSTFIX_ROLES = "roles";
+
+  /** The postfix of the attribute maps, which map a ldap attribute to opencast groups */
+  private static final String ATTRIBUTE_MAPPING_KEY_POSTFIX_GROUPS = "groups";
+
   /** The key to indicate whether or not the roles should be converted to uppercase */
   private static final String UPPERCASE_KEY = "org.opencastproject.userdirectory.ldap.uppercase";
 
@@ -113,7 +146,7 @@ public class LdapUserProviderFactory implements ManagedServiceFactory {
   private Map<String, ServiceRegistration> authoritiesPopulatorRegistrations = new ConcurrentHashMap<>();
 
   /** The OSGI bundle context */
-  protected BundleContext bundleContext = null;
+  private BundleContext bundleContext = null;
 
   /** The organization directory service */
   private OrganizationDirectoryService orgDirectory;
@@ -161,6 +194,26 @@ public class LdapUserProviderFactory implements ManagedServiceFactory {
   }
 
   /**
+   * Retrieve configuration values and check for a proper value.
+   *
+   * @param properties
+   *      Configuration dictionary
+   * @param key
+   *      Configuration key to check for
+   * @return
+   *      The configuration value
+   * @throws ConfigurationException
+   *      Thrown if the configuration value is blank
+   */
+  private String getRequiredProperty(final Dictionary properties, final String key) throws ConfigurationException {
+    final String value = (String) properties.get(key);
+    if (StringUtils.isBlank(value)) {
+      throw new ConfigurationException(key, "missing configuration value");
+    }
+    return value;
+  }
+
+  /**
    * {@inheritDoc}
    *
    * @see org.osgi.service.cm.ManagedServiceFactory#updated(java.lang.String, java.util.Dictionary)
@@ -168,65 +221,115 @@ public class LdapUserProviderFactory implements ManagedServiceFactory {
   @Override
   public void updated(String pid, Dictionary properties) throws ConfigurationException {
     logger.debug("Updating LdapUserProviderFactory");
+
+    // required settings
+    String searchBase = getRequiredProperty(properties, SEARCH_BASE_KEY);
+    String searchFilter = getRequiredProperty(properties, SEARCH_FILTER_KEY);
+    String url = getRequiredProperty(properties, LDAP_URL_KEY);
+    String instanceId = getRequiredProperty(properties, INSTANCE_ID_KEY);
+    String roleAttributes = getRequiredProperty(properties, ROLE_ATTRIBUTES_KEY);
+
+    // optional settings
     String organization = (String) properties.get(ORGANIZATION_KEY);
-    if (StringUtils.isBlank(organization))
-      throw new ConfigurationException(ORGANIZATION_KEY, "is not set");
-    String searchBase = (String) properties.get(SEARCH_BASE_KEY);
-    if (StringUtils.isBlank(searchBase))
-      throw new ConfigurationException(SEARCH_BASE_KEY, "is not set");
-    String searchFilter = (String) properties.get(SEARCH_FILTER_KEY);
-    if (StringUtils.isBlank(searchFilter))
-      throw new ConfigurationException(SEARCH_FILTER_KEY, "is not set");
-    String url = (String) properties.get(LDAP_URL_KEY);
-    if (StringUtils.isBlank(url))
-      throw new ConfigurationException(LDAP_URL_KEY, "is not set");
-    String instanceId = (String) properties.get(INSTANCE_ID_KEY);
-    if (StringUtils.isBlank(instanceId))
-      throw new ConfigurationException(INSTANCE_ID_KEY, "is not set");
     String userDn = (String) properties.get(SEARCH_USER_DN);
     String password = (String) properties.get(SEARCH_PASSWORD);
-    String roleAttributes = (String) properties.get(ROLE_ATTRIBUTES_KEY);
-    String rolePrefix = (String) properties.get(ROLE_PREFIX_KEY);
 
-    String[] excludePrefixes = null;
-    String strExcludePrefixes = (String) properties.get(EXCLUDE_PREFIXES_KEY);
-    if (StringUtils.isNotBlank(strExcludePrefixes)) {
-      excludePrefixes = strExcludePrefixes.split(",");
+    // optional with default values
+    String rolePrefix = Objects.toString(properties.get(ROLE_PREFIX_KEY), "ROLE_");
+    String[] excludePrefixes = StringUtils.split((String) properties.get(EXCLUDE_PREFIXES_KEY), ",");
+    String groupCheckPrefix = Objects.toString(properties.get(GROUP_CHECK_PREFIX_KEY), "ROLE_GROUP_");
+    boolean convertToUppercase = BooleanUtils.toBoolean(Objects.toString(properties.get(UPPERCASE_KEY), "true"));
+    int cacheSize = NumberUtils.toInt((String) properties.get(CACHE_SIZE), 1000);
+    int cacheExpiration = NumberUtils.toInt((String) properties.get(CACHE_EXPIRATION), 5);
+    boolean applyRoleattributesAsRoles = BooleanUtils.toBoolean(Objects.toString(
+            properties.get(APPLY_ROLEATTRIBUTES_AS_ROLES_KEY), "true"));
+    boolean applyRoleattributesAsGroups = BooleanUtils.toBoolean(Objects.toString(
+            properties.get(APPLY_ROLEATTRIBUTES_AS_GROUPS_KEY), "true"));
+    if (applyRoleattributesAsGroups && !applyRoleattributesAsRoles) {
+      throw new ConfigurationException(APPLY_ROLEATTRIBUTES_AS_GROUPS_KEY,
+              "'" + APPLY_ROLEATTRIBUTES_AS_ROLES_KEY + "' needs to be 'true' to enable this option");
     }
 
-    // Make sure that property convertToUppercase is true by default
-    String strUppercase = (String) properties.get(UPPERCASE_KEY);
-    boolean convertToUppercase = StringUtils.isBlank(strUppercase) ? true : Boolean.valueOf(strUppercase);
+    // extra roles
+    String[] extraRoles =  StringUtils.split(Objects.toString(properties.get(EXTRA_ROLES_KEY), ""), ",");
+    Set<String> extraRoleSet = new HashSet<>(Arrays.asList(extraRoles));
+    extraRoleSet.addAll(Arrays.asList("ROLE_ANONYMOUS", "ROLE_USER"));
+    extraRoles = extraRoleSet.toArray(new String[extraRoles.length]);
 
-    String[] extraRoles = new String[0];
-    String strExtraRoles = (String) properties.get(EXTRA_ROLES_KEY);
-    if (StringUtils.isNotBlank(strExtraRoles)) {
-      extraRoles = strExtraRoles.split(",");
-    }
+    // maps
+    HashMap<String, HashMap<String, String>> ldapAssignmentMappingsPreparation = new HashMap();
+    for (Enumeration<String> e = properties.keys(); e.hasMoreElements();) {
+      String key = e.nextElement();
 
-    int cacheSize = 1000;
-    logger.debug("Using cache size {} for {}", properties.get(CACHE_SIZE), LdapUserProviderFactory.class.getName());
-    try {
-      if (properties.get(CACHE_SIZE) != null) {
-        Integer configuredCacheSize = Integer.parseInt(properties.get(CACHE_SIZE).toString());
-        if (configuredCacheSize != null) {
-          cacheSize = configuredCacheSize.intValue();
+      if (key.startsWith(ATTRIBUTE_MAPPING_KEY_PREFIX)) {
+        final String[] postfix = key.substring(ATTRIBUTE_MAPPING_KEY_PREFIX.length()).split("\\.");
+
+        if (postfix.length != 2) {
+          throw new ConfigurationException(key,
+                  "Invalid Configkey format, the following format is needed: "
+                  + ATTRIBUTE_MAPPING_KEY_PREFIX + "<identifier>.<key>");
         }
-      }
-    } catch (Exception e) {
-      logger.warn("{} could not be loaded, default value is used: {}", CACHE_SIZE, cacheSize);
-    }
 
-    int cacheExpiration = 1;
-    try {
-      if (properties.get(CACHE_EXPIRATION) != null) {
-        Integer configuredCacheExpiration = Integer.parseInt(properties.get(CACHE_EXPIRATION).toString());
-        if (configuredCacheExpiration != null) {
-          cacheExpiration = configuredCacheExpiration.intValue();
-        }
+        final String mappingIdentifier = postfix[0];
+        final String mappingKey = postfix[1];
+
+        HashMap keyValueMap = ldapAssignmentMappingsPreparation.getOrDefault(mappingIdentifier, new HashMap());
+
+        keyValueMap.put(mappingKey, (String) properties.get(key));
+
+        ldapAssignmentMappingsPreparation.put(mappingIdentifier, keyValueMap);
       }
-    } catch (Exception e) {
-      logger.warn("{} could not be loaded, default value is used: {}", CACHE_EXPIRATION, cacheExpiration);
+    }
+    HashMap<String, String[]> ldapAssignmentRoleMap = new HashMap();
+    HashMap<String, String[]> ldapAssignmentGroupMap = new HashMap();
+    for (HashMap.Entry<String, HashMap<String, String>> entry : ldapAssignmentMappingsPreparation.entrySet()) {
+      HashMap<String, String> mappingConf = entry.getValue();
+      String value = StringUtils.trimToNull(mappingConf.get(ATTRIBUTE_MAPPING_KEY_POSTFIX_VALUE));
+      String roles = StringUtils.trimToNull(mappingConf.get(ATTRIBUTE_MAPPING_KEY_POSTFIX_ROLES));
+      String groups = StringUtils.trimToNull(mappingConf.get(ATTRIBUTE_MAPPING_KEY_POSTFIX_GROUPS));
+
+      if (value == null) {
+        throw new ConfigurationException(ATTRIBUTE_MAPPING_KEY_PREFIX + entry.getKey() + ".*",
+                "LDAP mapping incomplete, the key 'value' is needed");
+      }
+      if (roles == null && groups == null) {
+        throw new ConfigurationException(ATTRIBUTE_MAPPING_KEY_PREFIX + entry.getKey() + ".*",
+                "LDAP mapping incomplete, one of the keys 'roles' or 'groups' is needed");
+      }
+
+      if (convertToUppercase) {
+        value = value.toUpperCase();
+      }
+
+      if (roles != null) {
+        if (convertToUppercase) {
+          roles = roles.toUpperCase();
+        }
+        ldapAssignmentRoleMap.put(value,
+                ArrayUtils.addAll(
+                        ldapAssignmentRoleMap.getOrDefault(value, new String[0]),
+                        Arrays.stream(roles.split(","))
+                                .map(r -> StringUtils.trimToNull(r))
+                                .filter(r -> r != null)
+                                .toArray(String[]::new)
+                )
+        );
+      }
+
+      if (groups != null) {
+        if (convertToUppercase) {
+          groups = groups.toUpperCase();
+        }
+        ldapAssignmentGroupMap.put(value,
+                ArrayUtils.addAll(
+                        ldapAssignmentGroupMap.getOrDefault(value, new String[0]),
+                        Arrays.stream(groups.split(","))
+                                .map(r -> StringUtils.trimToNull(r))
+                                .filter(r -> r != null)
+                                .toArray(String[]::new)
+                )
+        );
+      }
     }
 
     // Now that we have everything we need, go ahead and activate a new provider, removing an old one if necessary
@@ -235,12 +338,19 @@ public class LdapUserProviderFactory implements ManagedServiceFactory {
       existingRegistration.unregister();
     }
 
+    // Defaults to first available organization
     Organization org;
     try {
-      org = orgDirectory.getOrganization(organization);
+      if (StringUtils.isNoneBlank(organization)) {
+        org = orgDirectory.getOrganization(organization);
+      } else {
+        if (orgDirectory.getOrganizations().size() != 1) {
+          throw new NotFoundException("Multiple organizations exist but none is specified");
+        }
+        org = orgDirectory.getOrganizations().get(0);
+      }
     } catch (NotFoundException e) {
-      logger.warn("Organization {} not found!", organization);
-      throw new ConfigurationException(ORGANIZATION_KEY, "not found");
+      throw new ConfigurationException(ORGANIZATION_KEY, "no organization with configured id", e);
     }
 
     // Dictionary to include a property to identify this LDAP instance in the security.xml file
@@ -249,13 +359,14 @@ public class LdapUserProviderFactory implements ManagedServiceFactory {
 
     // Instantiate this LDAP instance and register it as such
     LdapUserProviderInstance provider = new LdapUserProviderInstance(pid, org, searchBase, searchFilter, url, userDn,
-            password, roleAttributes, rolePrefix, extraRoles, excludePrefixes, convertToUppercase, cacheSize,
-            cacheExpiration, securityService);
+            password, roleAttributes, convertToUppercase, cacheSize, cacheExpiration, securityService);
 
     providerRegistrations.put(pid, bundleContext.registerService(UserProvider.class.getName(), provider, null));
 
     OpencastLdapAuthoritiesPopulator authoritiesPopulator = new OpencastLdapAuthoritiesPopulator(roleAttributes,
-            rolePrefix, excludePrefixes, convertToUppercase, org, securityService, groupRoleProvider, extraRoles);
+            rolePrefix, excludePrefixes, groupCheckPrefix, applyRoleattributesAsRoles, applyRoleattributesAsGroups,
+            ldapAssignmentRoleMap, ldapAssignmentGroupMap, convertToUppercase, org, securityService,
+            groupRoleProvider, extraRoles);
 
     // Also, register this instance as LdapAuthoritiesPopulator so that it can be used within the security.xml file
     authoritiesPopulatorRegistrations.put(pid,

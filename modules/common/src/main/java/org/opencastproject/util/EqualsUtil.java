@@ -25,6 +25,8 @@ package org.opencastproject.util;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 /** Utility function helping to implement equality. */
 public final class EqualsUtil {
@@ -32,13 +34,15 @@ public final class EqualsUtil {
   }
 
   /** Check if <code>a</code> and <code>b</code> are equal. Each of them may be null. */
+  @Deprecated
   public static boolean eqObj(Object a, Object b) {
-    return (a == b) || (a != null && a.equals(b));
+    return Objects.equals(a, b);
   }
 
   /** Check if <code>a</code> and <code>b</code> are equal. Each of them may be null. */
+  @Deprecated
   public static boolean eq(Object a, Object b) {
-    return (a == b) || (a != null && a.equals(b));
+    return Objects.equals(a, b);
   }
 
   /** Check if <code>a</code> and <code>b</code> are not equal. Each of them may be null. */
@@ -51,17 +55,34 @@ public final class EqualsUtil {
     return bothNotNull(a, b) && a.getClass().equals(b.getClass());
   }
 
-  /** Compare the elements of two lists for equality treating the lists as sets. */
+  /**
+   * Compare the (distinct) elements of two lists for equality treating the lists as sets.
+   * <p>
+   * Sets by definition do not allow multiplicity of elements; a set is a (possibly empty) collection of distinct elements.
+   * As Lists may contain non-unique entries, this method removes duplicates before continuing with the comparison check.
+   *
+   * Examples of
+   * 1. equality: {1, 2} = {2, 1} = {1, 1, 2} = {1, 2, 2, 1, 2}, null = null
+   * 2. unequal: {1, 2, 2} != {1, 2, 3}, null != {}
+   */
   public static boolean eqListUnsorted(List<?> as, List<?> bs) {
-    if (as != null && bs != null && as.size() == bs.size()) {
-      for (Object a : as) {
-        if (!bs.contains(a))
-          return false;
-      }
-      return true;
-    } else {
+    if (as == null || bs == null) {
       return eqObj(as, bs);
     }
+
+    as = as.stream().distinct().collect(Collectors.toList());
+    bs = bs.stream().distinct().collect(Collectors.toList());
+
+    if (as.size() != bs.size()) {
+      return false;
+    }
+    for (Object a : as) {
+      if (!bs.contains(a)) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   /**
@@ -97,37 +118,17 @@ public final class EqualsUtil {
     return true;
   }
 
-  /** Check if both objects are either null or not null. */
-  public static boolean bothNullOrNot(Object a, Object b) {
-    return !(a == null ^ b == null);
-  }
-
   public static boolean bothNotNull(Object a, Object b) {
     return a != null && b != null;
-  }
-
-  public static boolean bothNull(Object a, Object b) {
-    return a == null && b == null;
   }
 
   /**
    * Create a hash code for a list of objects. Each of them may be null.
    * Algorithm adapted from "Programming in Scala, Second Edition", p670.
    */
+  @Deprecated
   public static int hash(Object... as) {
-    if (as == null)
-      return 0;
-    int hash = 0;
-    for (Object a : as) {
-      if (hash != 0)
-        hash = 41 * hash + hash1(a);
-      else
-        hash = 41 + hash1(a);
-    }
-    return hash;
+    return Objects.hash(as);
   }
 
-  private static int hash1(Object a) {
-    return a != null ? a.hashCode() : 0;
-  }
 }

@@ -51,9 +51,7 @@ import org.opencastproject.util.SolrUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrServer;
 import org.apache.solr.client.solrj.SolrServerException;
@@ -63,6 +61,10 @@ import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrDocumentList;
 import org.apache.solr.common.SolrInputDocument;
 import org.osgi.service.component.ComponentContext;
+import org.osgi.service.component.annotations.Activate;
+import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Deactivate;
+import org.osgi.service.component.annotations.Reference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -85,6 +87,10 @@ import java.util.concurrent.Executors;
 /**
  * Implements {@link SeriesServiceIndex}.
  */
+@Component(
+    immediate = true,
+    service = { SeriesServiceIndex.class }
+)
 public class SeriesServiceSolrIndex implements SeriesServiceIndex {
 
   /** Configuration key for a remote solr server */
@@ -142,6 +148,7 @@ public class SeriesServiceSolrIndex implements SeriesServiceIndex {
    * @param dcService
    *          {@link DublinCoreCatalogService} object
    */
+  @Reference(name = "dc")
   public void setDublinCoreService(DublinCoreCatalogService dcService) {
     this.dcService = dcService;
   }
@@ -152,6 +159,7 @@ public class SeriesServiceSolrIndex implements SeriesServiceIndex {
    * @param securityService
    *          the securityService to set
    */
+  @Reference(name = "security-service")
   public void setSecurityService(SecurityService securityService) {
     this.securityService = securityService;
   }
@@ -162,11 +170,13 @@ public class SeriesServiceSolrIndex implements SeriesServiceIndex {
    * @param cc
    *          the component context
    */
+  @Activate
   public void activate(ComponentContext cc) {
 
     if (cc == null) {
-      if (solrRoot == null)
+      if (solrRoot == null) {
         throw new IllegalStateException("Storage dir must be set");
+      }
       // default to synchronous indexing
       synchronousIndexing = true;
     } else {
@@ -182,11 +192,8 @@ public class SeriesServiceSolrIndex implements SeriesServiceIndex {
       }
 
       Object syncIndexingConfig = cc.getProperties().get("synchronousIndexing");
-      if ((syncIndexingConfig != null) && ((syncIndexingConfig instanceof Boolean))) {
-        synchronousIndexing = ((Boolean) syncIndexingConfig).booleanValue();
-      } else {
-        synchronousIndexing = true;
-      }
+      synchronousIndexing = (syncIndexingConfig == null) || !(syncIndexingConfig instanceof Boolean)
+              || (Boolean) syncIndexingConfig;
     }
 
     activate();
@@ -198,6 +205,7 @@ public class SeriesServiceSolrIndex implements SeriesServiceIndex {
    * @param cc
    *          the component context
    */
+  @Deactivate
   public void deactivate(ComponentContext cc) {
     deactivate();
   }
@@ -210,9 +218,7 @@ public class SeriesServiceSolrIndex implements SeriesServiceIndex {
     } else {
       try {
         setupSolr(new File(solrRoot));
-      } catch (IOException e) {
-        throw new IllegalStateException("Unable to connect to solr at " + solrRoot, e);
-      } catch (SolrServerException e) {
+      } catch (IOException | SolrServerException e) {
         throw new IllegalStateException("Unable to connect to solr at " + solrRoot, e);
       }
     }
@@ -323,45 +329,6 @@ public class SeriesServiceSolrIndex implements SeriesServiceIndex {
           } catch (Exception e) {
             logger.warn("Unable to index series {}: {}", doc.getFieldValue(SolrFields.COMPOSITE_ID_KEY),
                     e.getMessage());
-          }
-        }
-      });
-    }
-  }
-
-  @Override
-  public void updateOptOutStatus(String seriesId, boolean optedOut)
-          throws NotFoundException, SeriesServiceDatabaseException {
-    SolrDocument seriesDoc = getSolrDocumentByID(seriesId);
-    if (seriesDoc == null) {
-      logger.debug("No series with ID " + seriesId + " found.");
-      throw new NotFoundException("Series with ID " + seriesId + " was not found.");
-    }
-
-    final SolrInputDocument inputDoc = ClientUtils.toSolrInputDocument(seriesDoc);
-    inputDoc.setField(SolrFields.OPT_OUT, optedOut);
-
-    if (synchronousIndexing) {
-      try {
-        synchronized (solrServer) {
-          solrServer.add(inputDoc);
-          solrServer.commit();
-        }
-      } catch (Exception e) {
-        throw new SeriesServiceDatabaseException("Unable to index opt out status", e);
-      }
-    } else {
-      indexingExecutor.submit(new Runnable() {
-        @Override
-        public void run() {
-          try {
-            synchronized (solrServer) {
-              solrServer.add(inputDoc);
-              solrServer.commit();
-            }
-          } catch (Exception e) {
-            logger.warn("Unable to index opt out status for series {}: {}",
-                    inputDoc.getFieldValue(SolrFields.COMPOSITE_ID_KEY), ExceptionUtils.getStackTrace(e));
           }
         }
       });
@@ -649,21 +616,6 @@ public class SeriesServiceSolrIndex implements SeriesServiceIndex {
     return append(sb, "AND", key, values);
   }
 
-  /**
-   * Appends a multivalued query parameter to a solr query
-   *
-   * @param sb
-   *          The {@link StringBuilder} containing the query
-   * @param key
-   *          the key for this search parameter
-   * @param values
-   *          the values for this search parameter
-   * @return the appended {@link StringBuilder}
-   */
-  private StringBuilder appendOr(StringBuilder sb, String key, String[] values) {
-    return append(sb, "OR", key, values);
-  }
-
   private StringBuilder append(StringBuilder sb, String bool, String key, String[] values) {
     if (StringUtils.isBlank(key) || values.length == 0) {
       return sb;
@@ -726,10 +678,12 @@ public class SeriesServiceSolrIndex implements SeriesServiceIndex {
     if (sb.length() > 0) {
       sb.append(" AND ");
     }
-    if (startDate == null)
+    if (startDate == null) {
       startDate = new Date(0);
-    if (endDate == null)
+    }
+    if (endDate == null) {
       endDate = new Date(Long.MAX_VALUE);
+    }
     sb.append(key);
     sb.append(":");
     sb.append(SolrUtils.serializeDateRange(option(startDate), option(endDate)));
@@ -978,7 +932,7 @@ public class SeriesServiceSolrIndex implements SeriesServiceIndex {
       try {
         dc = parseDublinCore(dcXML);
       } catch (IOException e) {
-        logger.error("Could not parse Dublin core: {}", e);
+        logger.error("Could not parse Dublin core:", e);
         throw new SeriesServiceDatabaseException(e);
       }
       return dc;
@@ -1012,16 +966,6 @@ public class SeriesServiceSolrIndex implements SeriesServiceIndex {
     return accessControl;
   }
 
-  @Override
-  public boolean isOptOut(String seriesId) throws NotFoundException, SeriesServiceDatabaseException {
-    SolrDocument seriesDoc = getSolrDocumentByID(seriesId);
-    if (seriesDoc == null) {
-      logger.debug("No series exists with ID '{}'", seriesId);
-      throw new NotFoundException("No series with ID " + seriesId + " found.");
-    }
-    return BooleanUtils.toBoolean((Boolean) seriesDoc.get(SolrFields.OPT_OUT));
-  }
-
   /**
    * Returns SolrDocument corresponding to given ID or null if such document does not exist.
    *
@@ -1046,7 +990,7 @@ public class SeriesServiceSolrIndex implements SeriesServiceIndex {
         return response.getResults().get(0);
       }
     } catch (SolrServerException e) {
-      logger.error("Could not perform series retrieval: {}", e);
+      logger.error("Could not perform series retrieval:", e);
       throw new SeriesServiceDatabaseException(e);
     }
   }

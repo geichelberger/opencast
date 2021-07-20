@@ -35,7 +35,6 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
@@ -151,15 +150,7 @@ public final class JobBarrier {
       try {
         final Job waiter = serviceRegistry.getJob(waiterJobId.get());
         waiter.setStatus(Job.Status.WAITING);
-        List<Long> blockedForJobs = new LinkedList<Long>();
-        for (Job j : jobs) {
-          Job blockerJob = this.serviceRegistry.getJob(j.getId());
-          blockedForJobs.add(blockerJob.getId());
-          blockerJob.setBlockingJobId(waiter.getId());
-          // FYI not updating local j in jobs collection
-          this.serviceRegistry.updateJob(blockerJob);
-        }
-        waiter.setBlockedJobIds(blockedForJobs);
+        logger.debug("Job {} set to WAITING state.", waiter.getId());
         this.serviceRegistry.updateJob(waiter);
       } catch (ServiceRegistryException e) {
         logger.warn("Unable to put {} into a waiting state, this may cause a deadlock: {}", waiterJobId, e.getMessage());
@@ -176,13 +167,7 @@ public final class JobBarrier {
       try {
         final Job waiter = serviceRegistry.getJob(waiterJobId.get());
         waiter.setStatus(Job.Status.RUNNING);
-        for (Job j : jobs) {
-          Job updatedJob = this.serviceRegistry.getJob(j.getId());
-          updatedJob.removeBlockingJobId();
-          // FYI not updating local j in jobs collection
-          this.serviceRegistry.updateJob(updatedJob);
-        }
-        waiter.removeBlockedJobsIds();
+        logger.debug("Job {} wakened and set back to RUNNING state.", waiter.getId());
         this.serviceRegistry.updateJob(waiter);
       } catch (ServiceRegistryException e) {
         logger.warn("Unable to put {} into a waiting state, this may cause a deadlock: {}", waiterJobId, e.getMessage());
@@ -310,7 +295,7 @@ public final class JobBarrier {
               final Job processedJob = serviceRegistry.getJob(job.getId());
               final Job.Status jobStatus = processedJob.getStatus();
               switch (jobStatus) {
-                case CANCELED:
+                case CANCELLED:
                   throw new JobCanceledException(processedJob);
                 case DELETED:
                 case FAILED:

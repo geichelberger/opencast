@@ -23,6 +23,7 @@ package org.opencastproject.workflow.api;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 
 import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 
@@ -82,16 +83,29 @@ public interface WorkflowDefinition extends Comparable<WorkflowDefinition> {
   String getConfigurationPanel();
 
   /**
+   * An integer describing the display order for this workflow definition. The display order is supposed to define the
+   * order workflow lists as displayed to users.
+   * Default is 0.
+   */
+  int getDisplayOrder();
+
+  /**
+   * Set the display order
+   *
+   * @param displayOrder
+   *          the workflow definition display order
+   */
+  void setDisplayOrder(int displayOrder);
+
+  /**
    * The operations, listed in order, that this workflow definition includes.
    */
   List<WorkflowOperationDefinition> getOperations();
 
   /**
-   * Whether this definition is published. This information is useful for user interfaces.
-   *
-   * @return Whether this is a published workflow definition
+   * The custom state mappings to use for this workflow.
    */
-  boolean isPublished();
+  Set<WorkflowStateMapping> getStateMappings();
 
   /**
    * Tags the workflow definition with the given tag.
@@ -136,9 +150,22 @@ public interface WorkflowDefinition extends Comparable<WorkflowDefinition> {
   String[] getTags();
 
   /**
+   * Returns the roles for this workflow definition
+   *
+   * @return the tags
+   */
+  Collection<String> getRoles();
+
+  /**
    * Removes all tags associated with this workflow definition
    */
   void clearTags();
+
+  /**
+   * Gets the organization associated with this workflow (or <code>null</code>, if it's global)
+   * @return the organization
+   */
+  String getOrganization();
 
   /**
    * Appends the operation to the workflow definition.

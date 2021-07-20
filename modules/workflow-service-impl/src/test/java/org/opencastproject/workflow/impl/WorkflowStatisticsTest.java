@@ -24,12 +24,15 @@ package org.opencastproject.workflow.impl;
 import static org.junit.Assert.assertEquals;
 import static org.opencastproject.workflow.impl.SecurityServiceStub.DEFAULT_ORG_ADMIN;
 
+import org.opencastproject.assetmanager.api.AssetManager;
+import org.opencastproject.elasticsearch.api.SearchResult;
+import org.opencastproject.elasticsearch.index.AbstractSearchIndex;
+import org.opencastproject.elasticsearch.index.event.EventSearchQuery;
 import org.opencastproject.mediapackage.DefaultMediaPackageSerializerImpl;
 import org.opencastproject.mediapackage.MediaPackage;
 import org.opencastproject.mediapackage.MediaPackageBuilder;
 import org.opencastproject.mediapackage.MediaPackageBuilderFactory;
-import org.opencastproject.mediapackage.identifier.UUIDIdBuilderImpl;
-import org.opencastproject.message.broker.api.MessageSender;
+import org.opencastproject.mediapackage.identifier.IdImpl;
 import org.opencastproject.metadata.api.MediaPackageMetadataService;
 import org.opencastproject.security.api.AccessControlList;
 import org.opencastproject.security.api.AclScope;
@@ -58,6 +61,8 @@ import org.opencastproject.workflow.api.WorkflowStatistics.WorkflowDefinitionRep
 import org.opencastproject.workflow.impl.WorkflowServiceImpl.HandlerRegistration;
 import org.opencastproject.workspace.api.Workspace;
 
+import com.entwinemedia.fn.data.Opt;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.easymock.EasyMock;
@@ -70,6 +75,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -143,6 +149,15 @@ public class WorkflowStatisticsTest {
     scanner = new WorkflowDefinitionScanner();
     service.addWorkflowDefinitionScanner(scanner);
 
+    final AssetManager assetManager = EasyMock.createMock(AssetManager.class);
+    EasyMock.expect(assetManager.selectProperties(EasyMock.anyString(), EasyMock.anyString()))
+            .andReturn(Collections.emptyList())
+            .anyTimes();
+    EasyMock.expect(assetManager.getMediaPackage(EasyMock.anyString())).andReturn(Opt.none()).anyTimes();
+    EasyMock.expect(assetManager.snapshotExists(EasyMock.anyString())).andReturn(true).anyTimes();
+    EasyMock.replay(assetManager);
+    service.setAssetManager(assetManager);
+
     // security service
     securityService = EasyMock.createNiceMock(SecurityService.class);
     EasyMock.expect(securityService.getUser()).andReturn(SecurityServiceStub.DEFAULT_ORG_ADMIN).anyTimes();
@@ -173,18 +188,9 @@ public class WorkflowStatisticsTest {
     EasyMock.replay(organizationDirectoryService);
     service.setOrganizationDirectoryService(organizationDirectoryService);
 
-    MessageSender messageSender = EasyMock.createNiceMock(MessageSender.class);
-    EasyMock.replay(messageSender);
-    service.setMessageSender(messageSender);
-
     MediaPackageMetadataService mds = EasyMock.createNiceMock(MediaPackageMetadataService.class);
     EasyMock.replay(mds);
     service.addMetadataService(mds);
-
-    // Register the workflow definitions
-    for (WorkflowDefinition workflowDefinition : workflowDefinitions) {
-      service.registerWorkflowDefinition(workflowDefinition);
-    }
 
     // Mock the workspace
     workspace = EasyMock.createNiceMock(Workspace.class);
@@ -220,6 +226,16 @@ public class WorkflowStatisticsTest {
     } catch (Exception e) {
       Assert.fail(e.getMessage());
     }
+
+    SearchResult result = EasyMock.createNiceMock(SearchResult.class);
+
+    final AbstractSearchIndex index = EasyMock.createNiceMock(AbstractSearchIndex.class);
+    EasyMock.expect(index.getIndexName()).andReturn("index").anyTimes();
+    EasyMock.expect(index.getByQuery(EasyMock.anyObject(EventSearchQuery.class))).andReturn(result).anyTimes();
+    EasyMock.replay(result, index);
+
+    service.setAdminUiIndex(index);
+    service.setExternalApiIndex(index);
 
     // Register the workflow service with the service registry
     serviceRegistry.registerService(service);
@@ -299,7 +315,7 @@ public class WorkflowStatisticsTest {
     List<WorkflowInstance> instances = new ArrayList<WorkflowInstance>();
     for (WorkflowDefinition def : workflowDefinitions) {
       for (int j = 0; j < def.getOperations().size(); j++) {
-        mediaPackage.setIdentifier(new UUIDIdBuilderImpl().createNew());
+        mediaPackage.setIdentifier(IdImpl.fromUUID());
         instances.add(service.start(def, mediaPackage));
         total++;
         paused++;

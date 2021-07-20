@@ -53,6 +53,11 @@ public class AQueryBuilderDecorator implements AQueryBuilder {
     return delegate.delete(owner, target);
   }
 
+  @Override
+  public Predicate mediaPackageIds(String... mpIds) {
+    return this.delegate.mediaPackageIds(mpIds);
+  }
+
   @Override public Predicate mediaPackageId(String mpId) {
     return delegate.mediaPackageId(mpId);
   }
@@ -77,8 +82,8 @@ public class AQueryBuilderDecorator implements AQueryBuilder {
     return delegate.availability(availability);
   }
 
-  @Override public Field<Availability> availability() {
-    return delegate.availability();
+  @Override public Predicate storage(String storageId) {
+    return delegate.storage(storageId);
   }
 
   @Override public Predicate hasPropertiesOf(String namespace) {
@@ -120,10 +125,6 @@ public class AQueryBuilderDecorator implements AQueryBuilder {
 
   @Override public Target nothing() {
     return delegate.nothing();
-  }
-
-  @Override public Field zero() {
-    return delegate.zero();
   }
 
   @Override public Predicate always() {
