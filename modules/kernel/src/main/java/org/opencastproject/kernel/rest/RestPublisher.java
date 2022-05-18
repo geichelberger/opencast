@@ -365,6 +365,33 @@ public class RestPublisher implements RestConstants {
     if (reg != null) {
       reg.unregister();
     }
+
+    servletRegistrationMap.values().stream().findFirst().ifPresent(r -> {
+      RestServlet rs = (RestServlet)r.getReference().getBundle().getBundleContext().getService(r.getReference());
+      Bus bus = rs.getBus();
+      JAXRSServerFactoryBean sf = new JAXRSServerFactoryBean();
+      sf.setBus(bus);
+      sf.setProviders(providers);
+
+      // Set the service class
+      sf.setResourceProviders(new ArrayList<>(resourceProviders.values()));
+      sf.setResourceComparator(new OsgiCxfEndpointComparator());
+
+      sf.setAddress("/");
+
+      BindingFactoryManager manager = sf.getBus().getExtension(BindingFactoryManager.class);
+      JAXRSBindingFactory factory = new JAXRSBindingFactory();
+      factory.setBus(sf.getBus());
+      manager.registerBindingFactory(JAXRSBindingFactory.JAXRS_BINDING_ID, factory);
+
+      if (server != null) {
+        logger.debug("Destroying JAX-RS server");
+        server.stop();
+        server.destroy();
+      }
+
+      server = sf.create();
+    });
   }
 
   /**
