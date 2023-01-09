@@ -518,7 +518,7 @@ public class DownloadDistributionServiceImpl extends AbstractDistributionService
 
   @Override
   public Job retract(String channelId, MediaPackage mediapackage, String elementId) throws DistributionException {
-    Set<String> elementIds = new HashSet();
+    Set<String> elementIds = new HashSet<>();
     elementIds.add(elementId);
     return retract(channelId, mediapackage, elementIds);
   }
@@ -541,7 +541,7 @@ public class DownloadDistributionServiceImpl extends AbstractDistributionService
   @Override
   public List<MediaPackageElement> distributeSync(String channelId, MediaPackage mediapackage, String elementId)
           throws DistributionException, MediaPackageException {
-    Set<String> elementIds = new HashSet<String>();
+    Set<String> elementIds = new HashSet<>();
     elementIds.add(elementId);
     return distributeSync(channelId, mediapackage, elementIds, true, false);
   }
@@ -587,8 +587,8 @@ public class DownloadDistributionServiceImpl extends AbstractDistributionService
 
   @Override
   public List<MediaPackageElement> retractSync(String channelId, MediaPackage mediapackage, String elementId)
-          throws DistributionException, MediaPackageException {
-    Set<String> elementIds = new HashSet();
+          throws DistributionException {
+    Set<String> elementIds = new HashSet<>();
     elementIds.add(elementId);
     return retractSync(channelId, mediapackage, elementIds);
   }
@@ -600,6 +600,7 @@ public class DownloadDistributionServiceImpl extends AbstractDistributionService
     notNull(channelId, "channelId");
     MediaPackageElement[] retractedElements = retractElements(channelId, mediapackage, elementIds);
     return Arrays.asList(retractedElements);
+  }
 
   /**
    * Retract a media package element from the distribution channel. The retracted element must not necessarily be the
