@@ -447,8 +447,7 @@ public class JobDispatcher {
           Throwable cause = (e.getCause() != null) ? e.getCause() : e;
           logger.error("Error dispatching {}: {}", job, cause);
         } finally {
-          securityService.setUser(null);
-          securityService.setOrganization(null);
+          securityService.clearContext();
         }
       }
     }

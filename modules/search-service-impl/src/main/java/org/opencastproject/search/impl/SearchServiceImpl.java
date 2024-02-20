@@ -656,8 +656,7 @@ public final class SearchServiceImpl extends AbstractJobProducer implements Sear
           }
           errors.incrementAndGet();
         } finally {
-          securityService.setOrganization(null);
-          securityService.setUser(null);
+          securityService.clearContext();
         }
 
         // log progress

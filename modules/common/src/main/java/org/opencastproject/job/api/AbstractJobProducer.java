@@ -316,8 +316,7 @@ public abstract class AbstractJobProducer implements JobProducer {
         handleFailedProcessing(t);
       } finally {
         serviceRegistry.setCurrentJob(null);
-        securityService.setUser(null);
-        securityService.setOrganization(null);
+        securityService.clearContext();
       }
 
       return null;

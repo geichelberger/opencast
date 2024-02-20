@@ -74,4 +74,9 @@ public interface SecurityService {
    */
   void setUserIP(String userIP);
 
+  /**
+   * Clears the current thread's user and organization context.
+   */
+  void clearContext();
+
 }

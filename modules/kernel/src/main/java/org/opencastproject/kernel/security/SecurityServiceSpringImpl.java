@@ -181,6 +181,13 @@ public class SecurityServiceSpringImpl implements SecurityService {
     delegatedUserIPHolder.set(userIP);
   }
 
+  @Override
+  public void clearContext() {
+    delegatedUserHolder.remove();
+    delegatedUserIPHolder.remove();
+    organization.remove();
+  }
+
   /**
    * OSGi callback for setting the user directory.
    *

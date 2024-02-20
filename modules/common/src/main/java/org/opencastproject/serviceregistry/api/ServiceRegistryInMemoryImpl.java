@@ -929,8 +929,7 @@ public class ServiceRegistryInMemoryImpl implements ServiceRegistry {
             } catch (IOException e) {
               throw new IllegalStateException("Error unmarshaling job", e);
             }
-            securityService.setUser(null);
-            securityService.setOrganization(null);
+            securityService.clearContext();
           }
         }
       }

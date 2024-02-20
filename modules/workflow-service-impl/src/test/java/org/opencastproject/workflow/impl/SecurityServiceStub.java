@@ -97,4 +97,10 @@ public class SecurityServiceStub implements SecurityService {
 
   }
 
+  @Override
+  public void clearContext() {
+    user.remove();
+    organization.remove();
+  }
+
 }

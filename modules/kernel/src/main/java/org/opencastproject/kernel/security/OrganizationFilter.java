@@ -154,9 +154,7 @@ public class OrganizationFilter implements Filter {
       chain.doFilter(request, response);
 
     } finally {
-      securityService.setOrganization(null);
-      securityService.setUser(null);
-      securityService.setUserIP(null);
+      securityService.clearContext();
     }
   }
 

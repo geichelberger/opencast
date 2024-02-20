@@ -290,8 +290,7 @@ public class WorkflowServiceImpl extends AbstractIndexProducer implements Workfl
             securityService.setOrganization(currentOrganization);
             listener.stateChanged(newWorkflowInstance);
           } finally {
-            securityService.setUser(null);
-            securityService.setOrganization(null);
+            securityService.clearContext();
           }
         };
         executorService.execute(runnable);
@@ -308,8 +307,7 @@ public class WorkflowServiceImpl extends AbstractIndexProducer implements Workfl
               securityService.setOrganization(currentOrganization);
               listener.operationChanged(newWorkflowInstance);
             } finally {
-              securityService.setUser(null);
-              securityService.setOrganization(null);
+              securityService.clearContext();
             }
           };
           executorService.execute(runnable);
@@ -2116,8 +2114,7 @@ public class WorkflowServiceImpl extends AbstractIndexProducer implements Workfl
         process(job);
       } finally {
         serviceRegistry.setCurrentJob(null);
-        securityService.setUser(null);
-        securityService.setOrganization(null);
+        securityService.clearContext();
       }
       return null;
     }
