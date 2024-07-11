@@ -196,13 +196,13 @@
     <module>modules/schema</module>
     <module>modules/search-service-api</module>
     <module>modules/search-service-impl</module>
-    <module>modules/security-aai</module>
+    <!--module>modules/security-aai</module>
     <module>modules/security-cas-client-wrapper</module>
     <module>modules/security-cas</module>
     <module>modules/security-jwt</module>
     <module>modules/security-ldap</module>
     <module>modules/security-lti</module>
-    <module>modules/security-shibboleth</module>
+    <module>modules/security-shibboleth</module-->
     <module>modules/series-service-api</module>
     <module>modules/series-service-impl</module>
     <module>modules/series-service-remote</module>

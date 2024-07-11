@@ -30,7 +30,7 @@ the oauthProtectedResourceFilter in the authentication filters section:
 ```
 
 Next, configure the OAuth consumer by setting custom credentials in
-`etc/org.opencastproject.kernel.security.OAuthConsumerDetailsService.cfg`:
+`etc/org.opencastproject.security.lti.OAuthConsumerDetailsService.cfg`:
 
 ```properties
 oauth.consumer.name.1=CONSUMERNAME

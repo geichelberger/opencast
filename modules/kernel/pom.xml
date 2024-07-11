@@ -80,16 +80,6 @@
       <artifactId>spring-security-web</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.springframework.security.oauth</groupId>
-      <artifactId>spring-security-oauth</artifactId>
-      <exclusions>
-        <exclusion>
-          <groupId>org.apache.httpcomponents</groupId>
-          <artifactId>httpclient</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
       <groupId>org.springframework.osgi</groupId>
       <artifactId>org.springframework.osgi.core</artifactId>
     </dependency>
@@ -247,10 +237,6 @@
         <extensions>true</extensions>
         <configuration>
           <instructions>
-            <Embed-Dependency>
-              spring-security-oauth;inline=true,
-              jboss-xacml;inline=true
-            </Embed-Dependency>
             <Import-Package>
               !org.springframework.jdbc.core.*,
               !org.springframework.security.core.codec.*,
@@ -267,10 +253,6 @@
               org.springframework.security.access.vote,
               org.springframework.security.core.userdetails.cache,
               org.springframework.security.core.userdetails.memory,
-              org.springframework.security.ldap,
-              org.springframework.security.ldap.authentication,
-              org.springframework.security.ldap.search,
-              org.springframework.security.ldap.userdetails,
               org.xml.sax;version=0,
               javax.ws.rs;version=2.0.1,
               javax.ws.rs.core;version=2.0.1,
@@ -291,12 +273,12 @@
               org.opencastproject.kernel.security.persistence;version=${project.version},
               org.opencastproject.kernel.bundleinfo;version=${project.version},
             </Export-Package>
-            <_exportcontents>
-              org.springframework.security.oauth.*
-            </_exportcontents>
             <Meta-Persistence>
               META-INF/persistence.xml
             </Meta-Persistence>
+            <DynamicImport-Package>
+              org.springframework.security.web.*
+            </DynamicImport-Package>
           </instructions>
         </configuration>
       </plugin>

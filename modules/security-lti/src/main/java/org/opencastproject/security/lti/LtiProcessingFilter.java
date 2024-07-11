@@ -19,7 +19,7 @@
  *
  */
 
-package org.opencastproject.kernel.security;
+package org.opencastproject.security.lti;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

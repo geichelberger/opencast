@@ -19,7 +19,7 @@
  *
  */
 
-package org.opencastproject.kernel.security;
+package org.opencastproject.security.lti;
 
 import org.apache.commons.lang3.StringUtils;
 import org.osgi.service.cm.ConfigurationException;
