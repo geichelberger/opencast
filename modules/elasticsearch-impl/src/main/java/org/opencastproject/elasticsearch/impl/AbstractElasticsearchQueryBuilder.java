@@ -30,15 +30,17 @@ import org.opencastproject.util.DateTimeSupport;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.search.Query;
 import org.elasticsearch.common.io.stream.StreamOutput;
+import org.elasticsearch.common.unit.Fuzziness;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.MatchAllQueryBuilder;
 import org.elasticsearch.index.query.MoreLikeThisQueryBuilder;
+import org.elasticsearch.index.query.MultiMatchQueryBuilder;
+import org.elasticsearch.index.query.Operator;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.index.query.QueryRewriteContext;
 import org.elasticsearch.index.query.QueryShardContext;
-import org.elasticsearch.index.query.QueryStringQueryBuilder;
 import org.elasticsearch.index.query.RangeQueryBuilder;
 import org.elasticsearch.index.query.TermsQueryBuilder;
 
@@ -134,7 +136,10 @@ public abstract class AbstractElasticsearchQueryBuilder<T extends SearchQuery> i
 
     // Text
     if (text != null) {
-      QueryStringQueryBuilder queryBuilder = QueryBuilders.queryStringQuery(text).field(TEXT);
+      MultiMatchQueryBuilder queryBuilder = QueryBuilders.multiMatchQuery(text, TEXT, TEXT + "._2gram", TEXT + "._3gram");
+      queryBuilder.fuzziness(Fuzziness.AUTO);
+      queryBuilder.fuzzyTranspositions(true);
+
       booleanQuery.must(queryBuilder);
       this.queryBuilder = booleanQuery;
     }

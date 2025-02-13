@@ -233,7 +233,7 @@
             }
         },
 
-        "text": { "type" : "text", "analyzer": "lowercasespaceanalyzer" },
+        "text": { "type" : "search_as_you_type", "analyzer": "lowercasespaceanalyzer" },
         "text_fuzzy": { "type" : "text", "analyzer": "lowercasespaceanalyzer" }
 
     },

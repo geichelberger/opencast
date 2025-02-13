@@ -103,7 +103,7 @@ public final class QueryPreprocessor {
           sanitizedToken = token;
         }
       } else {
-        sanitizedToken = enablePartialMatches(token, 0);
+        sanitizedToken = token; // enablePartialMatches(token, 0);
       }
 
       if (i != 0) {
