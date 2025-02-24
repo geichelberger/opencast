@@ -90,8 +90,8 @@ import javax.persistence.Version;
     @NamedQuery(name = "Job.statuses", query = "SELECT j FROM Job j "
         + "where j.status in :statuses order by j.dateCreated"),
     @NamedQuery(name = "Job.all", query = "SELECT j FROM Job j order by j.dateCreated"),
-    @NamedQuery(name = "Job.dispatchable.status", query = "SELECT j FROM Job j where j.dispatchable = true and "
-        + "j.status in :statuses order by j.dateCreated"),
+    @NamedQuery(name = "Job.dispatchable.status", query = "SELECT j FROM Job j "
+        + "where j.dispatchable = true and j.status in :statuses order by j.rootJobId, j.parentJobId, j.id"),
     @NamedQuery(name = "Job.dispatchable.status.idfilter", query = "SELECT j.id FROM Job j "
         + "WHERE j.dispatchable = true AND j.status IN :statuses AND j.id IN :jobids ORDER BY j.dateCreated"),
     @NamedQuery(name = "Job.undispatchable.status", query = "SELECT j FROM Job j where j.dispatchable = false and "
@@ -237,9 +237,15 @@ public class JpaJob {
   @JoinColumn(name = "parent", referencedColumnName = "id", nullable = true)
   private JpaJob parentJob = null;
 
+  @Column(name = "parent", insertable = false, updatable = false)
+  private Long parentJobId = null;
+
   @OneToOne(fetch = FetchType.LAZY, targetEntity = JpaJob.class, optional = true)
   @JoinColumn(name = "root", referencedColumnName = "id", nullable = true)
   private JpaJob rootJob = null;
+
+  @Column(name = "root", insertable = false, updatable = false)
+  private Long rootJobId = null;
 
   @OneToMany(mappedBy = "parentJob", fetch = FetchType.LAZY, cascade = { CascadeType.PERSIST, CascadeType.REFRESH,
           CascadeType.MERGE })
@@ -250,12 +256,6 @@ public class JpaJob {
 
   @Transient
   private String processingHost;
-
-  @Transient
-  private Long parentJobId = null;
-
-  @Transient
-  private Long rootJobId = null;
 
   @Transient
   private FailureReason failureReason = NONE;
