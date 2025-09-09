@@ -870,6 +870,100 @@
   </bean>
   -->
 
+  <!-- ########################## -->
+  <!-- # OpenID Connect Support # -->
+  <!-- ########################## -->
+
+  <bean id="openIdConnectAuthenticationFilter" class="org.mitre.openid.connect.client.OIDCAuthenticationFilter">
+    <property name="authenticationManager" ref="authenticationManager" />
+    <property name="validationServices" ref="jwkCacheService"/>
+    <property name="issuerService" ref="staticIssuerService" />
+    <property name="serverConfigurationService" ref="dynamicServerConfigurationService" />
+    <property name="clientConfigurationService" ref="staticClientConfigurationService" />
+    <property name="authRequestOptionsService" ref="staticAuthRequestOptionsService" />
+    <property name="authRequestUrlBuilder" ref="plainAuthRequestUrlBuilder" />
+    <property name="authenticationSuccessHandler" ref="authSuccessHandler">
+      <!--bean class="org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler">
+        <property name="useReferer" value="true"/>
+      </bean-->
+    </property>
+  </bean>
+
+  <bean class="org.mitre.jwt.signer.service.impl.JWKSetCacheService" id="jwkCacheService">
+  </bean>
+
+  <bean class="org.mitre.openid.connect.client.service.impl.StaticSingleIssuerService" id="staticIssuerService">
+    <property name="issuer" value="http://localhost:8081" />
+  </bean>
+  <bean class="org.mitre.openid.connect.client.service.impl.DynamicServerConfigurationService" id="dynamicServerConfigurationService" />
+  <bean class="org.mitre.openid.connect.client.service.impl.StaticClientConfigurationService" id="staticClientConfigurationService">
+    <property name="clients">
+      <map>
+        <entry key="http://localhost:8081">
+          <bean class="org.mitre.oauth2.model.RegisteredClient">
+            <property name="clientName" value="opencast" />
+            <property name="clientId" value="opencast-dev" />
+            <property name="clientSecret" value="tkPuNaSpScMH2domaiHAltOTltZLKobP" />
+            <property name="scope">
+              <set value-type="java.lang.String">
+                <value>openid</value>
+                <value>email</value>
+                <value>profile</value>
+              </set>
+            </property>
+            <property name="tokenEndpointAuthMethod" value="SECRET_POST" />
+            <property name="redirectUris">
+              <set>
+                <value>http://localhost:8080/openid_connect_login</value>
+              </set>
+            </property>
+          </bean>
+        </entry>
+      </map>
+    </property>
+  </bean>
+
+  <bean id="requestSingleLogoutFilter" class="org.springframework.security.web.authentication.logout.LogoutFilter">
+    <constructor-arg value="https://auth.example.ac.at/endsession"/>
+    <constructor-arg>
+      <bean class= "org.springframework.security.web.authentication.logout.SecurityContextLogoutHandler"/>
+    </constructor-arg>
+    <property name="filterProcessesUrl" value="/openid_connect_logout"/>
+  </bean>
+
+
+  <bean class="org.mitre.openid.connect.client.service.impl.PlainAuthRequestUrlBuilder" id="plainAuthRequestUrlBuilder" />
+
+  <bean class="org.mitre.openid.connect.client.service.impl.StaticAuthRequestOptionsService" id="staticAuthRequestOptionsService">
+    <property name="options">
+      <map>
+      </map>
+    </property>
+  </bean>
+
+  <bean id="openIdConnectAuthenticationProvider" class="org.opencastproject.security.openid.connect.OIDCCustomAuthenticationProvider">
+    <property name="authoritiesMapper">
+      <bean class="org.opencastproject.security.openid.connect.DefaultAuthoritiesMapper">
+        <property name="admins" ref="namedAdmins" />
+        <property name="userInfoHandler" ref="customUserInfoHandler"/>
+      </bean>
+    </property>
+  </bean>
+
+  <util:set id="namedAdmins" value-type="org.mitre.openid.connect.client.SubjectIssuerGrantedAuthority">
+    <bean class="org.mitre.openid.connect.client.SubjectIssuerGrantedAuthority">
+      <constructor-arg name="subject" value="FIXME_ADMIN_USER_ID" />
+      <constructor-arg name="issuer" value="https://auth.example.ac.at/" />
+    </bean>
+  </util:set>
+
+  <bean id="customUserInfoHandler" class="org.opencastproject.security.openid.connect.CustomUserInfoHandler">
+    <property name="userDetailsService" ref="userDetailsService" />
+    <property name="userDirectoryService" ref="userDirectoryService" />
+    <property name="securityService" ref="securityService" />
+    <property name="userReferenceProvider" ref="userReferenceProvider" />
+  </bean>
+
   <!-- #################### -->
   <!-- # OSGI Integration # -->
   <!-- #################### -->
@@ -917,6 +1011,7 @@
     <!-- <sec:authentication-provider ref="preauthAuthProvider" /> -->
     <!-- Uncomment the following line if using LDAP -->
     <!-- <sec:authentication-provider ref="ldapAuthProvider" /> -->
+    <sec:authentication-provider ref="openIdConnectAuthenticationProvider"/>
     <sec:authentication-provider user-service-ref="userDetailsService">
       <!-- The JPA user directory stores bcrypt hashed passwords, but still works with legacy md5 hashes -->
       <sec:password-encoder ref="passwordEncoder">

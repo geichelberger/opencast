@@ -25,6 +25,9 @@
     <bundle start-level="55">mvn:org.apache.servicemix.bundles/org.apache.servicemix.bundles.commons-httpclient/3.1_7</bundle>
     <bundle start-level="55">mvn:commons-codec/commons-codec/${commons-codec.version}</bundle>
 
+    <bundle start-level="80">wrap:mvn:org.mitre/openid-connect-common/1.2.6$Bundle-SymbolicName=openid-connect-common&amp;Bundle-Version=1.2.6</bundle>
+    <bundle start-level="80">wrap:mvn:org.mitre/openid-connect-client/1.2.6$Bundle-SymbolicName=openid-connect-client&amp;Bundle-Version=1.2.6</bundle>
+
     <!-- JPA -->
     <feature>jndi</feature>
     <feature>jpa</feature>
@@ -117,6 +120,7 @@
     <bundle start-level="82">mvn:org.opencastproject/opencast-security-lti/${project.version}</bundle>
     <bundle start-level="82">mvn:org.opencastproject/opencast-security-shibboleth/${project.version}</bundle>
     <bundle start-level="82">mvn:org.opencastproject/opencast-security-ldap/${project.version}</bundle>
+    <bundle start-level="82">mvn:org.opencastproject/opencast-security-openid-connect/${project.version}</bundle>
     <bundle start-level="82">mvn:org.opencastproject/opencast-series-service-api/${project.version}</bundle>
     <bundle start-level="82">mvn:org.opencastproject/opencast-serviceregistry/${project.version}</bundle>
     <bundle start-level="82">mvn:org.opencastproject/opencast-static/${project.version}</bundle>
