@@ -28,40 +28,58 @@ import com.nimbusds.openid.connect.sdk.claims.UserInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 import java.text.ParseException;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 
-public class NamedGroupAuthoritiesMapper implements OidcAuthoritiesMapper {
-  private static Logger logger = LoggerFactory.getLogger(
-      org.opencastproject.security.openid.connect.NamedGroupAuthoritiesMapper.class
-  );
+public class NamedAdminAuthoritiesMapper implements OidcAuthoritiesMapper {
 
-  private Set<SubjectIssuerGrantedAuthority> admins = new HashSet();
+  private static Logger logger = LoggerFactory.getLogger(NamedAdminAuthoritiesMapper.class);
 
+  private static final SimpleGrantedAuthority ROLE_ADMIN = new SimpleGrantedAuthority("ROLE_ADMIN");
+  private static final SimpleGrantedAuthority ROLE_USER = new SimpleGrantedAuthority("ROLE_USER");
+
+  private Set<SubjectIssuerGrantedAuthority> admins = new HashSet<>();
+
+  @Override
   public Collection<? extends GrantedAuthority> mapAuthorities(JWT idToken, UserInfo userInfo) {
-    Set<GrantedAuthority> out = new HashSet();
 
+    Set<GrantedAuthority> out = new HashSet<>();
     try {
       JWTClaimsSet claims = idToken.getJWTClaimsSet();
-      SubjectIssuerGrantedAuthority authority =
-          new SubjectIssuerGrantedAuthority(claims.getSubject(), claims.getIssuer());
+
+      SubjectIssuerGrantedAuthority authority = new SubjectIssuerGrantedAuthority(claims.getSubject(),
+          claims.getIssuer());
       out.add(authority);
 
-    } catch (ParseException var6) {
+      if (admins.contains(authority)) {
+        out.add(ROLE_ADMIN);
+      }
+
+      // everybody's a user by default
+      out.add(ROLE_USER);
+
+    } catch (ParseException e) {
       logger.error("Unable to parse ID Token inside of authorities mapper (huh?)");
     }
-
     return out;
   }
 
+  /**
+   * @return the admins
+   */
   public Set<SubjectIssuerGrantedAuthority> getAdmins() {
-    return this.admins;
+    return admins;
   }
 
+  /**
+   * @param admins the admins to set
+   */
   public void setAdmins(Set<SubjectIssuerGrantedAuthority> admins) {
     this.admins = admins;
   }
+
 }

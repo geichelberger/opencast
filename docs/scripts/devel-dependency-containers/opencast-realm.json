@@ -47,15 +47,32 @@
   "failureFactor" : 30,
   "roles" : {
     "realm" : [ {
+      "id" : "c7d118c3-b6ac-41e6-b59c-ddc612e4183d",
+      "name" : "offline_access",
+      "description" : "${role_offline-access}",
+      "composite" : false,
+      "clientRole" : false,
+      "containerId" : "4cabc898-e09b-4f7b-8753-3667be71ab9e",
+      "attributes" : { }
+    }, {
       "id" : "a4b368b2-0078-40b6-a81d-a825c9e5c1f2",
       "name" : "default-roles-opencast",
       "description" : "${role_default-roles}",
       "composite" : true,
       "composites" : {
+        "realm" : [ "offline_access", "uma_authorization" ],
         "client" : {
           "account" : [ "view-profile", "manage-account" ]
         }
       },
+      "clientRole" : false,
+      "containerId" : "4cabc898-e09b-4f7b-8753-3667be71ab9e",
+      "attributes" : { }
+    }, {
+      "id" : "166947a9-e583-4e50-b418-1b2b63a45b90",
+      "name" : "uma_authorization",
+      "description" : "${role_uma_authorization}",
+      "composite" : false,
       "clientRole" : false,
       "containerId" : "4cabc898-e09b-4f7b-8753-3667be71ab9e",
       "attributes" : { }
@@ -337,11 +354,19 @@
   "groups" : [ {
     "id" : "e59736ca-0417-4426-959b-8e2a9cd1a514",
     "name" : "admin",
-    "description" : "",
     "path" : "/admin",
     "subGroups" : [ ],
     "attributes" : { },
     "realmRoles" : [ "ROLE_ADMIN" ],
+    "clientRoles" : { }
+  }, {
+    "id" : "46d50fc5-994c-40b3-9725-1f436e0ad950",
+    "name" : "user",
+    "description" : "",
+    "path" : "/user",
+    "subGroups" : [ ],
+    "attributes" : { },
+    "realmRoles" : [ ],
     "clientRoles" : { }
   } ],
   "defaultRole" : {
@@ -384,6 +409,10 @@
   "webAuthnPolicyPasswordlessAvoidSameAuthenticatorRegister" : false,
   "webAuthnPolicyPasswordlessAcceptableAaguids" : [ ],
   "webAuthnPolicyPasswordlessExtraOrigins" : [ ],
+  "scopeMappings" : [ {
+    "clientScope" : "offline_access",
+    "roles" : [ "offline_access" ]
+  } ],
   "clientScopeMappings" : {
     "account" : [ {
       "client" : "account-console",
@@ -483,7 +512,8 @@
     "protocol" : "openid-connect",
     "attributes" : {
       "realm_client" : "false",
-      "client.use.lightweight.access.token.enabled" : "true"
+      "client.use.lightweight.access.token.enabled" : "true",
+      "post.logout.redirect.uris" : "+"
     },
     "authenticationFlowBindingOverrides" : { },
     "fullScopeAllowed" : true,
@@ -511,7 +541,8 @@
     "frontchannelLogout" : false,
     "protocol" : "openid-connect",
     "attributes" : {
-      "realm_client" : "true"
+      "realm_client" : "true",
+      "post.logout.redirect.uris" : "+"
     },
     "authenticationFlowBindingOverrides" : { },
     "fullScopeAllowed" : false,
@@ -523,7 +554,7 @@
     "clientId" : "opencast-dev",
     "name" : "Opencast Development",
     "description" : "",
-    "rootUrl" : "https://127.0.0.1:8081/",
+    "rootUrl" : "https://127.0.0.1:8090/",
     "adminUrl" : "",
     "baseUrl" : "",
     "surrogateAuthRequired" : false,
@@ -550,6 +581,7 @@
       "client.introspection.response.allow.jwt.claim.enabled" : "false",
       "standard.token.exchange.enabled" : "false",
       "frontchannel.logout.session.required" : "true",
+      "post.logout.redirect.uris" : "+",
       "oauth2.device.authorization.grant.enabled" : "false",
       "use.jwks.url" : "false",
       "backchannel.logout.revoke.offline.tokens" : "false",
@@ -594,7 +626,8 @@
     "frontchannelLogout" : false,
     "protocol" : "openid-connect",
     "attributes" : {
-      "realm_client" : "true"
+      "realm_client" : "true",
+      "post.logout.redirect.uris" : "+"
     },
     "authenticationFlowBindingOverrides" : { },
     "fullScopeAllowed" : false,
@@ -772,6 +805,15 @@
       }
     } ]
   }, {
+    "id" : "0c32dd65-6318-4999-9f96-04937afaee5c",
+    "name" : "offline_access",
+    "description" : "OpenID Connect built-in scope: offline_access",
+    "protocol" : "openid-connect",
+    "attributes" : {
+      "consent.screen.text" : "${offlineAccessScopeConsentText}",
+      "display.on.consent.screen" : "true"
+    }
+  }, {
     "id" : "eb5100ae-e0b2-4f32-9608-67d73dd31597",
     "name" : "roles",
     "description" : "OpenID Connect scope for add user roles to the access token",
@@ -801,7 +843,7 @@
     } ]
   } ],
   "defaultDefaultClientScopes" : [ "email", "sub", "name" ],
-  "defaultOptionalClientScopes" : [ "roles", "groups" ],
+  "defaultOptionalClientScopes" : [ "offline_access", "roles", "groups" ],
   "browserSecurityHeaders" : {
     "contentSecurityPolicyReportOnly" : "",
     "xContentTypeOptions" : "nosniff",
@@ -869,7 +911,7 @@
       "subType" : "anonymous",
       "subComponents" : { },
       "config" : {
-        "allowed-protocol-mapper-types" : [ "saml-role-list-mapper", "saml-user-property-mapper", "saml-user-attribute-mapper", "oidc-address-mapper", "oidc-usermodel-property-mapper", "oidc-full-name-mapper", "oidc-usermodel-attribute-mapper", "oidc-sha256-pairwise-sub-mapper" ]
+        "allowed-protocol-mapper-types" : [ "oidc-usermodel-property-mapper", "saml-role-list-mapper", "saml-user-attribute-mapper", "oidc-usermodel-attribute-mapper", "oidc-address-mapper", "oidc-sha256-pairwise-sub-mapper", "oidc-full-name-mapper", "saml-user-property-mapper" ]
       }
     }, {
       "id" : "e9f5ac70-f450-402c-a689-bb5815ce854e",
@@ -878,7 +920,7 @@
       "subType" : "authenticated",
       "subComponents" : { },
       "config" : {
-        "allowed-protocol-mapper-types" : [ "saml-user-property-mapper", "oidc-address-mapper", "saml-user-attribute-mapper", "oidc-usermodel-property-mapper", "oidc-usermodel-attribute-mapper", "oidc-sha256-pairwise-sub-mapper", "saml-role-list-mapper", "oidc-full-name-mapper" ]
+        "allowed-protocol-mapper-types" : [ "oidc-usermodel-attribute-mapper", "saml-user-property-mapper", "oidc-sha256-pairwise-sub-mapper", "saml-role-list-mapper", "oidc-full-name-mapper", "oidc-address-mapper", "saml-user-attribute-mapper", "oidc-usermodel-property-mapper" ]
       }
     }, {
       "id" : "e521127f-0fef-4aac-bb2b-8d43b6498d7a",
@@ -1609,8 +1651,8 @@
     "cibaExpiresIn" : "120",
     "cibaAuthRequestedUserHint" : "login_hint",
     "oauth2DeviceCodeLifespan" : "600",
-    "oauth2DevicePollingInterval" : "5",
     "clientOfflineSessionMaxLifespan" : "0",
+    "oauth2DevicePollingInterval" : "5",
     "clientSessionIdleTimeout" : "0",
     "parRequestUriLifespan" : "60",
     "clientSessionMaxLifespan" : "0",

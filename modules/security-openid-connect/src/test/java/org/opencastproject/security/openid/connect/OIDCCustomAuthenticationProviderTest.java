@@ -23,12 +23,12 @@ package org.opencastproject.security.openid.connect;
 
 import static org.hamcrest.Matchers.instanceOf;
 
+import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.openid.connect.sdk.claims.UserInfo;
+
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-import org.mitre.openid.connect.model.DefaultUserInfo;
-import org.mitre.openid.connect.model.PendingOIDCAuthenticationToken;
-import org.mitre.openid.connect.model.UserInfo;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -52,7 +52,7 @@ public class OIDCCustomAuthenticationProviderTest {
     Collection<GrantedAuthority> authorities = new HashSet<>();
     authorities.add((GrantedAuthority) () -> "test_authority");
 
-    UserInfo userInfo = new DefaultUserInfo();
+    UserInfo userInfo = new UserInfo(JWTClaimsSet.parse("test_subject"));
 
     Authentication authentication = customAuthenticationProvider
             .createAuthenticationToken(pendingOIDCAuthenticationToken, authorities, userInfo);

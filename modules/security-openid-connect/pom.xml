@@ -31,40 +31,18 @@
       <artifactId>slf4j-api</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.mitre</groupId>
-      <artifactId>openid-connect-common</artifactId>
-      <version>1.2.6</version>
-      <type>jar</type>
-    </dependency>
-    <dependency>
-      <groupId>org.mitre</groupId>
-      <artifactId>openid-connect-client</artifactId>
-      <version>1.2.6</version>
-      <type>jar</type>
+      <groupId>com.nimbusds</groupId>
+      <artifactId>oauth2-oidc-sdk</artifactId>
+      <version>11.28</version>
     </dependency>
     <dependency>
       <groupId>com.nimbusds</groupId>
       <artifactId>nimbus-jose-jwt</artifactId>
-      <version>4.3</version>
+      <version>10.5</version>
     </dependency>
     <dependency>
       <groupId>com.google.guava</groupId>
       <artifactId>guava</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>net.minidev</groupId>
-      <artifactId>json-smart</artifactId>
-      <version>1.1.1</version>
-    </dependency>
-    <dependency>
-      <groupId>net.jcip</groupId>
-      <artifactId>jcip-annotations</artifactId>
-      <version>1.0</version>
-    </dependency>
-    <dependency>
-      <groupId>org.springframework.security.oauth</groupId>
-      <artifactId>spring-security-oauth2</artifactId>
-      <version>1.0.5.RELEASE</version>
     </dependency>
     <dependency>
       <groupId>org.springframework.security</groupId>

@@ -21,7 +21,8 @@
 
 package org.opencastproject.security.openid.connect;
 
-import org.mitre.openid.connect.model.UserInfo;
+import com.nimbusds.openid.connect.sdk.claims.UserInfo;
+
 import org.springframework.security.core.GrantedAuthority;
 
 import java.util.Collection;

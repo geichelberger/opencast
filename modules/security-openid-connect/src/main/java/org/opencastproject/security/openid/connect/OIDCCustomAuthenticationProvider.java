@@ -21,29 +21,81 @@
 
 package org.opencastproject.security.openid.connect;
 
-import org.mitre.openid.connect.client.OIDCAuthenticationProvider;
-import org.mitre.openid.connect.model.PendingOIDCAuthenticationToken;
-import org.mitre.openid.connect.model.UserInfo;
+import com.google.common.base.Strings;
+import com.nimbusds.jwt.JWT;
+import com.nimbusds.openid.connect.sdk.claims.UserInfo;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.userdetails.User;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.web.authentication.preauth.PreAuthenticatedAuthenticationToken;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
 import java.util.Collection;
 
-public class OIDCCustomAuthenticationProvider extends OIDCAuthenticationProvider {
+public class OIDCCustomAuthenticationProvider implements AuthenticationProvider {
 
   /** The logging facility */
   private static final Logger logger = LoggerFactory.getLogger(OIDCCustomAuthenticationProvider.class);
 
-  @Override
-  protected Authentication createAuthenticationToken(PendingOIDCAuthenticationToken token,
-          Collection<? extends GrantedAuthority> authorities, UserInfo userInfo) {
-    UserDetails userDetails = new User(token.getSub(), "", true, true, true, true, authorities);
-    return new PreAuthenticatedAuthenticationToken(userDetails, token.getAccessTokenValue(), authorities);
+  private final UserInfoFetcher userInfoFetcher = new UserInfoFetcher();
+
+  public OidcAuthoritiesMapper getAuthoritiesMapper() {
+    return authoritiesMapper;
   }
 
+  public void setAuthoritiesMapper(OidcAuthoritiesMapper authoritiesMapper) {
+    this.authoritiesMapper = authoritiesMapper;
+  }
+
+  private OidcAuthoritiesMapper authoritiesMapper;
+
+  @Override
+  public Authentication authenticate(Authentication authentication) throws AuthenticationException {
+    if (!supports(authentication.getClass())) {
+      return null;
+    }
+
+    if (authentication instanceof PendingOIDCAuthenticationToken) {
+
+      PendingOIDCAuthenticationToken token = (PendingOIDCAuthenticationToken) authentication;
+
+      // get the ID Token value out
+      JWT idToken = token.getIdToken();
+
+      // load the user info if we can
+      UserInfo userInfo = userInfoFetcher.loadUserInfo(token);
+
+      if (userInfo == null) {
+        // user info not found -- could be an error, could be fine
+      } else {
+        // if we found userinfo, double check it
+        if (!Strings.isNullOrEmpty(userInfo.getSubject().toString()) && !userInfo.getSubject().getValue()
+            .equals(token.getSub())) {
+          // the userinfo came back and the user_id fields don't match what was in the id_token
+          throw new UsernameNotFoundException("user_id mismatch between id_token and user_info call: "
+              + token.getSub() + " / " + userInfo.getSubject());
+        }
+      }
+
+      return createAuthenticationToken(token, authoritiesMapper.mapAuthorities(idToken, userInfo), userInfo);
+    }
+
+    return null;
+  }
+
+  protected Authentication createAuthenticationToken(PendingOIDCAuthenticationToken token,
+      Collection<? extends GrantedAuthority> authorities, UserInfo userInfo) {
+    return new OIDCAuthenticationToken(token.getSub(),
+        token.getIssuer(),
+        userInfo, authorities,
+        token.getIdToken(), token.getAccessTokenValue(), token.getRefreshTokenValue());
+  }
+
+  @Override
+  public boolean supports(Class<?> aClass) {
+    return false;
+  }
 }

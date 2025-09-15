@@ -1,4 +1,8 @@
 <beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+                           http://www.springframework.org/schema/beans/spring-beans.xsd">
+<beans xmlns="http://www.springframework.org/schema/beans"
        xmlns:sec="http://www.springframework.org/schema/security"
        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
        xmlns:osgi="http://www.springframework.org/schema/osgi"
@@ -471,24 +475,6 @@
     </property>
   </bean>
 
-  <!-- ################################ -->
-  <!-- # Pre-Aauthentication Filters    # -->
-  <!-- ################################ -->
-
-  <bean id="preAuthenticationFilters" class="org.springframework.web.filter.CompositeFilter">
-    <property name="filters">
-      <list>
-        <!-- Uncomment the line below to support Shibboleth. -->
-        <!-- <ref bean="shibbolethHeaderFilter" /> -->
-
-        <!-- Uncomment the line below to support JWT.
-        <ref bean="jwtHeaderFilter" /> -->
-        <!-- Additionally/alternatively uncomment this to support passing a JWT in a URL parameter.
-        <ref bean="jwtRequestParameterFilter" /> -->
-      </list>
-    </property>
-  </bean>
-
   <!-- ########################################### -->
   <!-- # Custom ajax timeout Filter Definition   # -->
   <!-- ########################################### -->
@@ -523,11 +509,6 @@
     <property name="basicAuthenticationEntryPoint" ref="basicEntryPoint" />
   </bean>
 
-  <!-- Redirects unauthenticated requests to the login form -->
-  <bean id="userEntryPoint" class="org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint">
-    <property name="loginFormUrl" value="/login.html" />
-  </bean>
-
   <!-- Redirect unauthenticated requests to custom login url with configurable redirect query parameter
        Example: http://localhost/Shibboleth.sso/Login?target=<RELATIVE_REQUEST_URL> -->
   <!--bean id="userEntryPoint" class="org.opencastproject.kernel.security.RedirectQueryParamAuthenticationEntryPoint">
@@ -555,13 +536,6 @@
         <entry key="*" value="/engage/ui/index.html" /> <!-- Any role not listed explicitly will redirect here -->
       </map>
     </property>
-  </bean>
-
-  <bean id="logoutSuccessHandler" class="org.opencastproject.kernel.security.LogoutSuccessHandler">
-    <property name="userDirectoryService" ref="userDirectoryService" />
-    <!-- Shibboleth log out
-    <property name="defaultTargetUrl" value="/Shibboleth.sso/Logout?return=www.opencast.org"/>
-    -->
   </bean>
 
   <!-- ################# -->
@@ -656,77 +630,6 @@
     <property name="filterProcessesUrl" value="https://localhost/j_spring_security_logout"/>
   </bean>
   -->
-
-  <!-- ###################### -->
-  <!-- # Shibboleth Support # -->
-  <!-- ###################### -->
-
-  <!-- General Shibboleth header extration filter
-  <bean id="shibbolethHeaderFilter"
-        class="org.opencastproject.security.shibboleth.ShibbolethRequestHeaderAuthenticationFilter">
-    <property name="principalRequestHeader" value="<this need to be configured>"/>
-    <property name="authenticationManager" ref="authenticationManager" />
-    <property name="userDetailsService" ref="userDetailsService" />
-    <property name="userDirectoryService" ref="userDirectoryService" />
-    <property name="shibbolethLoginHandler" ref="aaiLoginHandler" />
-    <property name="exceptionIfHeaderMissing" value="false" />
-  </bean>-->
-
-  <!-- AAI header extractor and user generator
-  <bean id="aaiLoginHandler" class="org.opencastproject.security.aai.ConfigurableLoginHandler">
-    <property name="securityService" ref="securityService" />
-    <property name="userReferenceProvider" ref="userReferenceProvider" />
-  </bean>-->
-
-  <!-- Dynamic AAI Loginhandler
-  <bean id="aaiLoginHandler" class="org.opencastproject.security.aai.DynamicLoginHandler">
-    <property name="securityService" ref="securityService" />
-    <property name="userReferenceProvider" ref="userReferenceProvider" />
-    <property name="attributeMapper" ref="attributeMapper" />
-  </bean>
-
-  <bean id="attributeMapper" class="org.opencastproject.security.aai.api.AttributeMapper">
-    <property name="useHeader" value="true" />
-    <property name="multiValueDelimiter" value=";" />
-    <property name="attributeMap" ref="attributeMap" />
-    <property name="aaiAttributes" ref="aaiAttributes" />
-  </bean>
-
-  <util:list id="aaiAttributes" value-type="java.lang.String">
-    <value>sn</value>
-    <value>givenName</value>
-    <value>mail</value>
-    <value>homeOrganization</value>
-    <value>eduPersonEntitlement</value>
-    <value>eduPersonPrincipalName</value>
-    <value>homeOrganization</value>
-  </util:list>
-
-  <util:map id="attributeMap" map-class="java.util.HashMap">
-    <entry key="roles" value-ref="roleMapping" />
-    <entry key="displayName" value-ref="displayNameMapping" />
-    <entry key="mail" value-ref="mailMapping" />
-  </util:map>
-
-  <util:list id="displayNameMapping" value-type="java.lang.String">
-    <value>['givenName'][0] + ' ' + ['sn'][0]</value>
-  </util:list>
-
-  <util:list id="mailMapping" value-type="java.lang.String">
-    <value>['mail'][0]</value>
-  </util:list>
-
-  <util:list id="roleMapping" value-type="java.lang.String">
-    <value>'ROLE_AAI_USER'</value>
-    <value>'ROLE_AAI_USER_' + ['eduPersonPrincipalName']</value>
-    <value>('ROLE_AAI_OWNER_' + ['eduPersonPrincipalName']).replaceAll("[^a-zA-Z0-9]","_").toUpperCase()</value>
-    <value>['homeOrganization'] != null ? 'ROLE_AAI_ORG_' + ['homeOrganization'] + '_MEMBER' : null</value>
-    <value>['eduPersonEntitlement'].contains('urn:mace:opencast.org:permission:shibboleth:opencast_admin') ? 'ROLE_ADMIN' : null</value>
-    <value>['eduPersonPrincipalName'].contains('john.doe@example.org') ? 'ROLE_ADMIN' : null</value>
-    <value>['eduPersonScopedAffiliation'].contains('faculty@example.org') ? 'ROLE_GROUP_AAI_TRAINER' : null</value>
-  </util:list>
-
-   -->
 
   <bean id="preauthAuthProvider"
         class="org.springframework.security.web.authentication.preauth.PreAuthenticatedAuthenticationProvider">
@@ -870,100 +773,6 @@
   </bean>
   -->
 
-  <!-- ########################## -->
-  <!-- # OpenID Connect Support # -->
-  <!-- ########################## -->
-
-  <bean id="openIdConnectAuthenticationFilter" class="org.mitre.openid.connect.client.OIDCAuthenticationFilter">
-    <property name="authenticationManager" ref="authenticationManager" />
-    <property name="validationServices" ref="jwkCacheService"/>
-    <property name="issuerService" ref="staticIssuerService" />
-    <property name="serverConfigurationService" ref="dynamicServerConfigurationService" />
-    <property name="clientConfigurationService" ref="staticClientConfigurationService" />
-    <property name="authRequestOptionsService" ref="staticAuthRequestOptionsService" />
-    <property name="authRequestUrlBuilder" ref="plainAuthRequestUrlBuilder" />
-    <property name="authenticationSuccessHandler" ref="authSuccessHandler">
-      <!--bean class="org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler">
-        <property name="useReferer" value="true"/>
-      </bean-->
-    </property>
-  </bean>
-
-  <bean class="org.mitre.jwt.signer.service.impl.JWKSetCacheService" id="jwkCacheService">
-  </bean>
-
-  <bean class="org.mitre.openid.connect.client.service.impl.StaticSingleIssuerService" id="staticIssuerService">
-    <property name="issuer" value="http://localhost:8081" />
-  </bean>
-  <bean class="org.mitre.openid.connect.client.service.impl.DynamicServerConfigurationService" id="dynamicServerConfigurationService" />
-  <bean class="org.mitre.openid.connect.client.service.impl.StaticClientConfigurationService" id="staticClientConfigurationService">
-    <property name="clients">
-      <map>
-        <entry key="http://localhost:8081">
-          <bean class="org.mitre.oauth2.model.RegisteredClient">
-            <property name="clientName" value="opencast" />
-            <property name="clientId" value="opencast-dev" />
-            <property name="clientSecret" value="tkPuNaSpScMH2domaiHAltOTltZLKobP" />
-            <property name="scope">
-              <set value-type="java.lang.String">
-                <value>openid</value>
-                <value>email</value>
-                <value>profile</value>
-              </set>
-            </property>
-            <property name="tokenEndpointAuthMethod" value="SECRET_POST" />
-            <property name="redirectUris">
-              <set>
-                <value>http://localhost:8080/openid_connect_login</value>
-              </set>
-            </property>
-          </bean>
-        </entry>
-      </map>
-    </property>
-  </bean>
-
-  <bean id="requestSingleLogoutFilter" class="org.springframework.security.web.authentication.logout.LogoutFilter">
-    <constructor-arg value="https://auth.example.ac.at/endsession"/>
-    <constructor-arg>
-      <bean class= "org.springframework.security.web.authentication.logout.SecurityContextLogoutHandler"/>
-    </constructor-arg>
-    <property name="filterProcessesUrl" value="/openid_connect_logout"/>
-  </bean>
-
-
-  <bean class="org.mitre.openid.connect.client.service.impl.PlainAuthRequestUrlBuilder" id="plainAuthRequestUrlBuilder" />
-
-  <bean class="org.mitre.openid.connect.client.service.impl.StaticAuthRequestOptionsService" id="staticAuthRequestOptionsService">
-    <property name="options">
-      <map>
-      </map>
-    </property>
-  </bean>
-
-  <bean id="openIdConnectAuthenticationProvider" class="org.opencastproject.security.openid.connect.OIDCCustomAuthenticationProvider">
-    <property name="authoritiesMapper">
-      <bean class="org.opencastproject.security.openid.connect.DefaultAuthoritiesMapper">
-        <property name="admins" ref="namedAdmins" />
-        <property name="userInfoHandler" ref="customUserInfoHandler"/>
-      </bean>
-    </property>
-  </bean>
-
-  <util:set id="namedAdmins" value-type="org.mitre.openid.connect.client.SubjectIssuerGrantedAuthority">
-    <bean class="org.mitre.openid.connect.client.SubjectIssuerGrantedAuthority">
-      <constructor-arg name="subject" value="FIXME_ADMIN_USER_ID" />
-      <constructor-arg name="issuer" value="https://auth.example.ac.at/" />
-    </bean>
-  </util:set>
-
-  <bean id="customUserInfoHandler" class="org.opencastproject.security.openid.connect.CustomUserInfoHandler">
-    <property name="userDetailsService" ref="userDetailsService" />
-    <property name="userDirectoryService" ref="userDirectoryService" />
-    <property name="securityService" ref="securityService" />
-    <property name="userReferenceProvider" ref="userReferenceProvider" />
-  </bean>
-
   <!-- #################### -->
   <!-- # OSGI Integration # -->
   <!-- #################### -->
@@ -1003,25 +812,297 @@
 
   <bean id="passwordEncoder" class="org.opencastproject.kernel.security.CustomPasswordEncoder" />
 
-  <sec:authentication-manager alias="authenticationManager">
-    <sec:authentication-provider ref="rememberMeAuthenticationProvider"/>
-    <!-- CAS Auth: Uncomment this if using CAS authentication -->
-    <!-- <sec:authentication-provider ref="casAuthenticationProvider" /> -->
-    <!-- Uncomment this if using Shibboleth or JWT authentication -->
-    <!-- <sec:authentication-provider ref="preauthAuthProvider" /> -->
-    <!-- Uncomment the following line if using LDAP -->
-    <!-- <sec:authentication-provider ref="ldapAuthProvider" /> -->
-    <sec:authentication-provider ref="openIdConnectAuthenticationProvider"/>
-    <sec:authentication-provider user-service-ref="userDetailsService">
-      <!-- The JPA user directory stores bcrypt hashed passwords, but still works with legacy md5 hashes -->
-      <sec:password-encoder ref="passwordEncoder">
-        <!-- This salt is used only for decoding legacy MD5 hased passwords -->
-        <sec:salt-source user-property="username" />
-      </sec:password-encoder>
-    </sec:authentication-provider>
-  </sec:authentication-manager>
-
   <!-- Do not use a request cache -->
   <bean id="requestCache" class="org.springframework.security.web.savedrequest.NullRequestCache" />
 
+</beans>
+<beans profile="shibboleth" xmlns="http://www.springframework.org/schema/beans"
+       xmlns:sec="http://www.springframework.org/schema/security"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:osgi="http://www.springframework.org/schema/osgi"
+       xmlns:util="http://www.springframework.org/schema/util"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+                           http://www.springframework.org/schema/beans/spring-beans.xsd
+                           http://www.springframework.org/schema/util
+                           http://www.springframework.org/schema/util/spring-util-3.1.xsd
+                           http://www.springframework.org/schema/osgi
+                           http://www.springframework.org/schema/osgi/spring-osgi.xsd
+                           http://www.springframework.org/schema/security
+                           http://www.springframework.org/schema/security/spring-security-3.1.xsd">
+  <bean id="logoutSuccessHandler" class="org.opencastproject.kernel.security.LogoutSuccessHandler">
+    <property name="userDirectoryService" ref="userDirectoryService" />
+    <property name="defaultTargetUrl" value="/Shibboleth.sso/Logout?return=www.opencast.org"/>
+  </bean>
+
+  <!-- ###################### -->
+  <!-- # Shibboleth Support # -->
+  <!-- ###################### -->
+
+  <!-- General Shibboleth header extration filter
+  <bean id="shibbolethHeaderFilter"
+        class="org.opencastproject.security.shibboleth.ShibbolethRequestHeaderAuthenticationFilter">
+    <property name="principalRequestHeader" value="<this need to be configured>"/>
+    <property name="authenticationManager" ref="authenticationManager" />
+    <property name="userDetailsService" ref="userDetailsService" />
+    <property name="userDirectoryService" ref="userDirectoryService" />
+    <property name="shibbolethLoginHandler" ref="aaiLoginHandler" />
+    <property name="exceptionIfHeaderMissing" value="false" />
+  </bean>-->
+
+  <!-- AAI header extractor and user generator
+  <bean id="aaiLoginHandler" class="org.opencastproject.security.aai.ConfigurableLoginHandler">
+    <property name="securityService" ref="securityService" />
+    <property name="userReferenceProvider" ref="userReferenceProvider" />
+  </bean>-->
+
+  <!-- Dynamic AAI Loginhandler
+  <bean id="aaiLoginHandler" class="org.opencastproject.security.aai.DynamicLoginHandler">
+    <property name="securityService" ref="securityService" />
+    <property name="userReferenceProvider" ref="userReferenceProvider" />
+    <property name="attributeMapper" ref="attributeMapper" />
+  </bean>
+
+  <bean id="attributeMapper" class="org.opencastproject.security.aai.api.AttributeMapper">
+    <property name="useHeader" value="true" />
+    <property name="multiValueDelimiter" value=";" />
+    <property name="attributeMap" ref="attributeMap" />
+    <property name="aaiAttributes" ref="aaiAttributes" />
+  </bean>
+
+  <util:list id="aaiAttributes" value-type="java.lang.String">
+    <value>sn</value>
+    <value>givenName</value>
+    <value>mail</value>
+    <value>homeOrganization</value>
+    <value>eduPersonEntitlement</value>
+    <value>eduPersonPrincipalName</value>
+    <value>homeOrganization</value>
+  </util:list>
+
+  <util:map id="attributeMap" map-class="java.util.HashMap">
+    <entry key="roles" value-ref="roleMapping" />
+    <entry key="displayName" value-ref="displayNameMapping" />
+    <entry key="mail" value-ref="mailMapping" />
+  </util:map>
+
+  <util:list id="displayNameMapping" value-type="java.lang.String">
+    <value>['givenName'][0] + ' ' + ['sn'][0]</value>
+  </util:list>
+
+  <util:list id="mailMapping" value-type="java.lang.String">
+    <value>['mail'][0]</value>
+  </util:list>
+
+  <util:list id="roleMapping" value-type="java.lang.String">
+    <value>'ROLE_AAI_USER'</value>
+    <value>'ROLE_AAI_USER_' + ['eduPersonPrincipalName']</value>
+    <value>('ROLE_AAI_OWNER_' + ['eduPersonPrincipalName']).replaceAll("[^a-zA-Z0-9]","_").toUpperCase()</value>
+    <value>['homeOrganization'] != null ? 'ROLE_AAI_ORG_' + ['homeOrganization'] + '_MEMBER' : null</value>
+    <value>['eduPersonEntitlement'].contains('urn:mace:opencast.org:permission:shibboleth:opencast_admin') ? 'ROLE_ADMIN' : null</value>
+    <value>['eduPersonPrincipalName'].contains('john.doe@example.org') ? 'ROLE_ADMIN' : null</value>
+    <value>['eduPersonScopedAffiliation'].contains('faculty@example.org') ? 'ROLE_GROUP_AAI_TRAINER' : null</value>
+  </util:list>
+
+   -->
+</beans>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:sec="http://www.springframework.org/schema/security"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:osgi="http://www.springframework.org/schema/osgi"
+       xmlns:util="http://www.springframework.org/schema/util"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+                           http://www.springframework.org/schema/beans/spring-beans.xsd
+                           http://www.springframework.org/schema/util
+                           http://www.springframework.org/schema/util/spring-util-3.1.xsd
+                           http://www.springframework.org/schema/osgi
+                           http://www.springframework.org/schema/osgi/spring-osgi.xsd
+                           http://www.springframework.org/schema/security
+                           http://www.springframework.org/schema/security/spring-security-3.1.xsd">
+
+    <bean id="logoutSuccessHandler" class="org.opencastproject.kernel.security.LogoutSuccessHandler">
+      <property name="userDirectoryService" ref="userDirectoryService" />
+      <!-- Shibboleth log out
+      <property name="defaultTargetUrl" value="/Shibboleth.sso/Logout?return=www.opencast.org"/>
+      -->
+      <property name="defaultTargetUrl" value="/openid_connect_logout"/>
+    </bean>
+
+
+  <!-- ################################ -->
+    <!-- # Pre-Aauthentication Filters    # -->
+    <!-- ################################ -->
+
+    <bean id="preAuthenticationFilters" class="org.springframework.web.filter.CompositeFilter">
+      <property name="filters">
+        <list>
+          <ref bean="openIdConnectAuthenticationFilter" />
+          <ref bean="requestSingleLogoutFilter"/>
+        </list>
+      </property>
+    </bean>
+
+
+    <!-- Redirects unauthenticated requests to the login form -->
+    <bean id="userEntryPoint" class="org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint">
+      <property name="loginFormUrl" value="/openid_connect_login" />
+    </bean>
+
+    <!-- ########################## -->
+    <!-- # OpenID Connect Support # -->
+    <!-- ########################## -->
+    <bean id="openIdConnectAuthenticationFilter" class="org.mitre.openid.connect.client.OIDCAuthenticationFilter">
+      <property name="authenticationManager" ref="authenticationManager" />
+      <property name="validationServices" ref="jwkCacheService"/>
+      <property name="issuerService" ref="staticIssuerService" />
+      <property name="serverConfigurationService" ref="dynamicServerConfigurationService" />
+      <property name="clientConfigurationService" ref="staticClientConfigurationService" />
+      <property name="authRequestOptionsService" ref="staticAuthRequestOptionsService" />
+      <property name="authRequestUrlBuilder" ref="plainAuthRequestUrlBuilder" />
+      <property name="authenticationSuccessHandler" ref="authSuccessHandler">
+        <!--bean class="org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler">
+          <property name="useReferer" value="true"/>
+        </bean-->
+      </property>
+    </bean>
+
+    <osgi:reference id="userReferenceProvider" cardinality="1..1"
+                    interface="org.opencastproject.userdirectory.api.UserReferenceProvider"  />
+
+    <bean class="org.mitre.jwt.signer.service.impl.JWKSetCacheService" id="jwkCacheService">
+    </bean>
+
+    <bean class="org.mitre.openid.connect.client.service.impl.StaticSingleIssuerService" id="staticIssuerService">
+      <property name="issuer" value="http://localhost:8090/realms/opencast" />
+    </bean>
+
+    <bean class="org.mitre.openid.connect.client.service.impl.DynamicServerConfigurationService" id="dynamicServerConfigurationService" />
+
+    <bean class="org.mitre.openid.connect.client.service.impl.StaticClientConfigurationService" id="staticClientConfigurationService">
+      <property name="clients">
+        <map>
+          <entry key="http://localhost:8090/realms/opencast">
+            <bean class="org.mitre.oauth2.model.RegisteredClient">
+              <property name="clientName" value="Opencast Development" />
+              <property name="clientId" value="opencast-dev" />
+              <property name="clientSecret" value="HfhydAyQGZwSCfBXGfe98pdYZYDxxZJ2" />
+              <property name="scope">
+                <set value-type="java.lang.String">
+                  <value>openid</value>
+                  <value>sub</value>
+                  <value>name</value>
+                  <value>email</value>
+                  <value>roles</value>
+                  <value>groups</value>
+                </set>
+              </property>
+              <property name="tokenEndpointAuthMethod" value="SECRET_POST" />
+              <property name="redirectUris">
+                <set>
+                  <value>http://localhost:8080/openid_connect_login</value>
+                </set>
+              </property>
+            </bean>
+          </entry>
+        </map>
+      </property>
+    </bean>
+
+    <bean id="requestSingleLogoutFilter" class="org.springframework.security.web.authentication.logout.LogoutFilter">
+      <constructor-arg value="http://localhost:8090/realms/opencast/protocol/openid-connect/logout"/>
+      <constructor-arg>
+        <bean class= "org.springframework.security.web.authentication.logout.SecurityContextLogoutHandler"/>
+      </constructor-arg>
+      <property name="filterProcessesUrl" value="/openid_connect_logout"/>
+    </bean>
+
+
+    <bean class="org.mitre.openid.connect.client.service.impl.PlainAuthRequestUrlBuilder" id="plainAuthRequestUrlBuilder" />
+
+    <bean class="org.mitre.openid.connect.client.service.impl.StaticAuthRequestOptionsService" id="staticAuthRequestOptionsService">
+      <property name="options">
+        <map>
+        </map>
+      </property>
+    </bean>
+
+    <bean id="openIdConnectAuthenticationProvider" class="org.opencastproject.security.openid.connect.OIDCCustomAuthenticationProvider">
+      <property name="authoritiesMapper">
+        <bean class="org.opencastproject.security.openid.connect.DefaultAuthoritiesMapper">
+          <property name="admins" ref="namedAdmins" />
+          <property name="userInfoHandler" ref="customUserInfoHandler"/>
+        </bean>
+      </property>
+    </bean>
+
+    <util:set id="namedAdmins" value-type="org.mitre.openid.connect.client.SubjectIssuerGrantedAuthority">
+      <bean class="org.mitre.openid.connect.client.SubjectIssuerGrantedAuthority">
+        <constructor-arg name="subject" value="alice" />
+        <constructor-arg name="issuer" value="http://localhost:8090/realms/opencast" />
+      </bean>
+    </util:set>
+
+    <bean id="customUserInfoHandler" class="org.opencastproject.security.openid.connect.CustomUserInfoHandler">
+      <property name="userDetailsService" ref="userDetailsService" />
+      <property name="userDirectoryService" ref="userDirectoryService" />
+      <property name="securityService" ref="securityService" />
+      <property name="userReferenceProvider" ref="userReferenceProvider" />
+    </bean>
+
+    <sec:authentication-manager alias="authenticationManager">
+      <sec:authentication-provider ref="rememberMeAuthenticationProvider"/>
+      <sec:authentication-provider ref="openIdConnectAuthenticationProvider"/>
+      <sec:authentication-provider user-service-ref="userDetailsService">
+        <!-- The JPA user directory stores bcrypt hashed passwords, but still works with legacy md5 hashes -->
+        <sec:password-encoder ref="passwordEncoder">
+          <!-- This salt is used only for decoding legacy MD5 hased passwords -->
+          <sec:salt-source user-property="username" />
+        </sec:password-encoder>
+      </sec:authentication-provider>
+    </sec:authentication-manager>
+  </beans>
+
+  <beans profile="asdfasdfasdfasdfasdfasdf" xmlns="http://www.springframework.org/schema/beans"
+         xmlns:sec="http://www.springframework.org/schema/security"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xmlns:osgi="http://www.springframework.org/schema/osgi"
+         xmlns:util="http://www.springframework.org/schema/util"
+         xsi:schemaLocation="http://www.springframework.org/schema/beans
+                         http://www.springframework.org/schema/beans/spring-beans.xsd
+                         http://www.springframework.org/schema/util
+                         http://www.springframework.org/schema/util/spring-util-3.1.xsd
+                         http://www.springframework.org/schema/osgi
+                         http://www.springframework.org/schema/osgi/spring-osgi.xsd
+                         http://www.springframework.org/schema/security
+                         http://www.springframework.org/schema/security/spring-security-3.1.xsd">
+
+    <!-- ################################ -->
+    <!-- # Pre-Aauthentication Filters    # -->
+    <!-- ################################ -->
+
+    <bean id="preAuthenticationFilters" class="org.springframework.web.filter.CompositeFilter">
+      <property name="filters">
+        <list>
+          <ref bean="requestSingleLogoutFilter"/>
+        </list>
+      </property>
+    </bean>
+
+    <!-- Redirects unauthenticated requests to the login form -->
+    <bean id="userEntryPoint" class="org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint">
+      <property name="loginFormUrl" value="/login.html" />
+    </bean>
+
+    <bean id="logoutSuccessHandler" class="org.opencastproject.kernel.security.LogoutSuccessHandler">
+      <property name="userDirectoryService" ref="userDirectoryService" />
+    </bean>
+
+    <sec:authentication-manager alias="authenticationManager">
+      <sec:authentication-provider ref="rememberMeAuthenticationProvider"/>
+      <sec:authentication-provider user-service-ref="userDetailsService">
+        <sec:password-encoder ref="passwordEncoder">
+          <sec:salt-source user-property="username" />
+        </sec:password-encoder>
+      </sec:authentication-provider>
+    </sec:authentication-manager>
+  </beans>
 </beans>

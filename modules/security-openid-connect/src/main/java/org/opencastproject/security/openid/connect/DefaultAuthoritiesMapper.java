@@ -22,9 +22,8 @@
 package org.opencastproject.security.openid.connect;
 
 import com.nimbusds.jwt.JWT;
+import com.nimbusds.openid.connect.sdk.claims.UserInfo;
 
-import org.mitre.openid.connect.client.NamedAdminAuthoritiesMapper;
-import org.mitre.openid.connect.model.UserInfo;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 

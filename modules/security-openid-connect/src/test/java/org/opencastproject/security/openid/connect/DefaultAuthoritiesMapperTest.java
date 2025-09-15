@@ -24,13 +24,12 @@ package org.opencastproject.security.openid.connect;
 import com.nimbusds.jwt.JWT;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.PlainJWT;
+import com.nimbusds.openid.connect.sdk.claims.UserInfo;
 
 import org.easymock.EasyMock;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-import org.mitre.openid.connect.model.DefaultUserInfo;
-import org.mitre.openid.connect.model.UserInfo;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
@@ -52,7 +51,7 @@ public class DefaultAuthoritiesMapperTest {
     JWTClaimsSet jwtClaimsSet = (new JWTClaimsSet.Builder()).subject("test_subject").issuer("http://test_issuer")
         .build();
     JWT jwt = new PlainJWT(jwtClaimsSet);
-    UserInfo userInfo = new DefaultUserInfo();
+    UserInfo userInfo = new UserInfo(jwtClaimsSet);
 
     Collection<? extends GrantedAuthority> collection =  defaultAuthoritiesMapper.mapAuthorities(jwt, userInfo);
     Assert.assertNotNull(collection);

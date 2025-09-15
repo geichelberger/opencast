@@ -21,15 +21,38 @@
 
 package org.opencastproject.security.openid.connect;
 
-import com.nimbusds.openid.connect.sdk.claims.UserInfo;
+import com.google.common.base.Strings;
 
-import org.springframework.security.core.GrantedAuthority;
+import javax.servlet.http.HttpServletRequest;
 
-import java.util.Collection;
+public class StaticSingleIssuerService {
 
-public class NullUserInfoHandler implements UserInfoHandler {
-  @Override
-  public void handle(UserInfo userInfo, Collection<? extends GrantedAuthority> authorities) {
+  private String issuer;
 
+  /**
+   * @return the issuer
+   */
+  public String getIssuer() {
+    return issuer;
   }
+
+  /**
+   * @param issuer the issuer to set
+   */
+  public void setIssuer(String issuer) {
+    if (Strings.isNullOrEmpty(issuer)) {
+      throw new IllegalArgumentException("Issuer must not be null or empty.");
+    }
+    this.issuer = issuer;
+  }
+
+  /**
+   * Always returns the configured issuer URL
+   *
+   * @see org.mitre.openid.connect.client.service.IssuerService#getIssuer(javax.servlet.http.HttpServletRequest)
+   */
+  public IssuerServiceResponse getIssuer(HttpServletRequest request) {
+    return new IssuerServiceResponse(getIssuer(), null, null);
+  }
+
 }

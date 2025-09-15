@@ -21,15 +21,20 @@
 
 package org.opencastproject.security.openid.connect;
 
+import com.nimbusds.jwt.JWT;
 import com.nimbusds.openid.connect.sdk.claims.UserInfo;
 
 import org.springframework.security.core.GrantedAuthority;
 
 import java.util.Collection;
 
-public class NullUserInfoHandler implements UserInfoHandler {
-  @Override
-  public void handle(UserInfo userInfo, Collection<? extends GrantedAuthority> authorities) {
+public interface OidcAuthoritiesMapper {
 
-  }
+  /**
+   * @param idToken the ID Token (parsed as a JWT, cannot be @null)
+   * @param userInfo userInfo of the current user (could be @null)
+   * @return the set of authorities to map to this user
+   */
+  Collection<? extends GrantedAuthority> mapAuthorities(JWT idToken, UserInfo userInfo);
+
 }

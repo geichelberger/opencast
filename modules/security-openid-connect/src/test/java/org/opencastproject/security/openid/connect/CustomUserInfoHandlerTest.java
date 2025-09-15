@@ -30,11 +30,12 @@ import org.opencastproject.security.api.UserDirectoryService;
 import org.opencastproject.security.impl.jpa.JpaUserReference;
 import org.opencastproject.userdirectory.api.UserReferenceProvider;
 
+import com.nimbusds.oauth2.sdk.id.Subject;
+import com.nimbusds.openid.connect.sdk.claims.UserInfo;
+
 import org.easymock.EasyMock;
 import org.junit.Before;
 import org.junit.Test;
-import org.mitre.openid.connect.model.DefaultUserInfo;
-import org.mitre.openid.connect.model.UserInfo;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -59,19 +60,18 @@ public class CustomUserInfoHandlerTest {
   public void setUp() throws Exception {
     customUserInfoHandler = new CustomUserInfoHandler();
 
-    noUser = new DefaultUserInfo();
-    noUser.setSub("test-nouser");
+    noUser = new UserInfo(new Subject("test-nouser"));
 
-    testUser = new DefaultUserInfo();
-    testUser.setSub("test-subject");
+    testUser = new UserInfo(new Subject("test-subject"));
 
     userReferenceProvider = EasyMock.createMock(UserReferenceProvider.class);
 
     userDetailsService = EasyMock.createNiceMock(UserDetailsService.class);
 
-    UserDetails userDetails = new User(testUser.getSub(), "", new HashSet<GrantedAuthority>());
-    EasyMock.expect(userDetailsService.loadUserByUsername(testUser.getSub())).andReturn(userDetails).anyTimes();
-    EasyMock.expect(userDetailsService.loadUserByUsername(noUser.getSub()))
+    UserDetails userDetails = new User(testUser.getSubject().getValue(), "", new HashSet<>());
+    EasyMock.expect(userDetailsService.loadUserByUsername(testUser.getSubject().getValue()))
+        .andReturn(userDetails).anyTimes();
+    EasyMock.expect(userDetailsService.loadUserByUsername(noUser.getSubject().getValue()))
             .andThrow(new UsernameNotFoundException("test-nouser")).anyTimes();
     EasyMock.replay(userDetailsService);
 
@@ -93,7 +93,7 @@ public class CustomUserInfoHandlerTest {
   @Test
   public void handleUpdateUser() throws Exception {
 
-    EasyMock.expect(userReferenceProvider.findUserReference(testUser.getSub(), organization.getId()))
+    EasyMock.expect(userReferenceProvider.findUserReference(testUser.getSubject().getValue(), organization.getId()))
             .andReturn(new JpaUserReference());
     userReferenceProvider.updateUserReference(anyObject());
     EasyMock.expectLastCall();

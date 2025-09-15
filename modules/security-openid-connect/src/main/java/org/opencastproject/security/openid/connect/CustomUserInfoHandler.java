@@ -29,7 +29,8 @@ import org.opencastproject.security.impl.jpa.JpaRole;
 import org.opencastproject.security.impl.jpa.JpaUserReference;
 import org.opencastproject.userdirectory.api.UserReferenceProvider;
 
-import org.mitre.openid.connect.model.UserInfo;
+import com.nimbusds.openid.connect.sdk.claims.UserInfo;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.core.GrantedAuthority;
@@ -64,12 +65,12 @@ public class CustomUserInfoHandler implements UserInfoHandler {
    */
   public void handle(UserInfo userInfo, Collection<? extends GrantedAuthority> authorities) {
     try {
-      if (userDetailsService.loadUserByUsername(userInfo.getSub()) != null) {
+      if (userDetailsService.loadUserByUsername(userInfo.getSubject().getValue()) != null) {
         updateUserReference(userInfo);
       }
     } catch (UsernameNotFoundException e) {
       newUser(userInfo, authorities);
-      userDirectoryService.invalidate(userInfo.getSub());
+      userDirectoryService.invalidate(userInfo.getSubject().getValue());
     }
   }
 
@@ -81,13 +82,14 @@ public class CustomUserInfoHandler implements UserInfoHandler {
   protected void updateUserReference(UserInfo userInfo) {
     Organization organization = securityService.getOrganization();
 
-    JpaUserReference userReference = userReferenceProvider.findUserReference(userInfo.getSub(),organization.getId());
+    JpaUserReference userReference = userReferenceProvider
+        .findUserReference(userInfo.getSubject().getValue(),organization.getId());
     if (userReference == null) {
-      throw new IllegalStateException("User reference '" + userInfo.getSub() + "' was not found");
+      throw new IllegalStateException("User reference '" + userInfo.getSubject().getValue() + "' was not found");
     }
 
     userReference.setName(userInfo.getName());
-    userReference.setEmail(userInfo.getEmail());
+    userReference.setEmail(userInfo.getEmailAddress());
     userReference.setLastLogin(new Date());
 
     userReferenceProvider.updateUserReference(userReference);
@@ -103,10 +105,10 @@ public class CustomUserInfoHandler implements UserInfoHandler {
     JpaOrganization organization = fromOrganization(securityService.getOrganization());
     Set<JpaRole> roles = extractRoles(userInfo, authorities);
 
-    JpaUserReference userReference = new JpaUserReference(userInfo.getSub(), userInfo.getName(),
-            userInfo.getEmail(), "openid-connect", new Date(), organization, roles);
+    JpaUserReference userReference = new JpaUserReference(userInfo.getSubject().getValue(), userInfo.getName(),
+            userInfo.getEmailAddress(), "openid-connect", new Date(), organization, roles);
 
-    logger.debug("OpenID Connect user '{}' logged in for the first time", userInfo.getSub());
+    logger.debug("OpenID Connect user '{}' logged in for the first time", userInfo.getSubject().getValue());
     userReferenceProvider.addUserReference(userReference, "openid-connect");
   }
 
@@ -143,7 +145,7 @@ public class CustomUserInfoHandler implements UserInfoHandler {
   private Set<JpaRole> extractRoles(UserInfo userInfo,Collection<? extends GrantedAuthority> authorities) {
     JpaOrganization organization = fromOrganization(securityService.getOrganization());
     Set<JpaRole> roles = new HashSet<>();
-    roles.add(new JpaRole(roleUserPrefix + userInfo.getSub().toUpperCase(), organization));
+    roles.add(new JpaRole(roleUserPrefix + userInfo.getSubject().getValue().toUpperCase(), organization));
     return roles;
   }
 

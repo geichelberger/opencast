@@ -21,15 +21,12 @@
 
 package org.opencastproject.security.openid.connect;
 
-import com.nimbusds.openid.connect.sdk.claims.UserInfo;
-
-import org.springframework.security.core.GrantedAuthority;
-
-import java.util.Collection;
-
-public class NullUserInfoHandler implements UserInfoHandler {
-  @Override
-  public void handle(UserInfo userInfo, Collection<? extends GrantedAuthority> authorities) {
-
-  }
+public interface TargetLinkURIChecker {
+  /**
+   * Check the parameter to make sure that it's a valid deep-link into this application.
+   *
+   * @param target
+   * @return
+   */
+  String filter(String target);
 }
