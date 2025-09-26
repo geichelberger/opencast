@@ -14,7 +14,7 @@
     <section class="login-container">
       <div class="login-form">
         <div class="form-container">
-          <form name="runtimeLogin" action="/j_spring_security_check" method="POST">
+          <form name="runtimeLogin" method="POST">
             <div class="row">
               <p>
               <span>Welcome to Opencast</span><br/>
@@ -24,15 +24,15 @@
               Incorrect username and / or password
             </div>
             <div class="row">
-              <input name="j_username" type="text" id="username"
+              <input name="username" type="text" id="username"
                      placeholder=Username class="login-input" autofocus>
             </div>
             <div class="row">
-              <input name="j_password" type="password" id="password"
+              <input name="password" type="password" id="password"
                      placeholder=Password class="login-input">
             </div>
             <div class="row remember-me">
-              <input type="checkbox" id="remember" name="_spring_security_remember_me" checked/>
+              <input type="checkbox" id="remember" name="rememberMe" checked/>
               <label for="remember">Remember me</label>
             </div>
             <div class="row">

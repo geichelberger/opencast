@@ -26,10 +26,6 @@ import org.opencastproject.security.api.SecurityService;
 
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
-import org.osgi.service.component.propertytypes.ServiceRanking;
-import org.osgi.service.http.whiteboard.propertytypes.HttpWhiteboardContextSelect;
-import org.osgi.service.http.whiteboard.propertytypes.HttpWhiteboardFilterName;
-import org.osgi.service.http.whiteboard.propertytypes.HttpWhiteboardFilterPattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,16 +45,11 @@ import javax.servlet.http.HttpServletResponse;
  * A servlet filter that delegates to the appropriate spring filter chain
  */
 @Component(
-    service = { Filter.class, SecurityFilter.class },
     property = {
         "service.description=Security Filter",
     }
 )
-@ServiceRanking(970)
-@HttpWhiteboardFilterName("SecurityFilter")
-@HttpWhiteboardFilterPattern("/*")
-@HttpWhiteboardContextSelect("(osgi.http.whiteboard.context.name=opencast)")
-public final class SecurityFilter implements Filter {
+public final class SecurityFilter  {
 
   /** The logger */
   private static final Logger logger = LoggerFactory.getLogger(SecurityFilter.class);
@@ -83,7 +74,6 @@ public final class SecurityFilter implements Filter {
    *
    * @see javax.servlet.Filter#init(javax.servlet.FilterConfig)
    */
-  @Override
   public void init(FilterConfig filterConfig) throws ServletException {
     this.filterConfig = filterConfig;
   }
@@ -93,7 +83,6 @@ public final class SecurityFilter implements Filter {
    *
    * @see javax.servlet.Filter#destroy()
    */
-  @Override
   public void destroy() {
   }
 
@@ -121,7 +110,6 @@ public final class SecurityFilter implements Filter {
    * @see javax.servlet.Filter#doFilter(javax.servlet.ServletRequest, javax.servlet.ServletResponse,
    *      javax.servlet.FilterChain)
    */
-  @Override
   public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
           throws IOException, ServletException {
 

@@ -65,6 +65,7 @@
     <rest-assured.version>4.4.0</rest-assured.version>
     <spring.version>3.1.4.RELEASE</spring.version>
     <spring-security.version>3.1.7.RELEASE</spring-security.version>
+    <shiro.version>2.0.5</shiro.version>
     <xmlsec.version>2.2.6</xmlsec.version>
   </properties>
   <modules>
@@ -194,6 +195,7 @@
     <module>modules/schema</module>
     <module>modules/search-service-api</module>
     <module>modules/search-service-impl</module>
+    <module>modules/security</module>
     <module>modules/security-aai</module>
     <module>modules/security-cas-client-wrapper</module>
     <module>modules/security-cas</module>
@@ -827,6 +829,13 @@
   </profiles>
   <dependencyManagement>
     <dependencies>
+      <dependency>
+        <groupId>org.apache.shiro</groupId>
+        <artifactId>shiro-bom</artifactId>
+        <version>${shiro.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
       <dependency>
         <groupId>org.antlr</groupId>
         <artifactId>antlr4-runtime</artifactId>

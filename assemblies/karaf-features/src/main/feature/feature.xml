@@ -2,11 +2,17 @@
 <features name="opencast-${project.version}" xmlns="http://karaf.apache.org/xmlns/features/v1.3.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://karaf.apache.org/xmlns/features/v1.3.0">
 
   <repository>mvn:org.apache.aries.jax.rs/org.apache.aries.jax.rs.features/2.0.2/xml</repository>
+  <repository>mvn:org.apache.shiro/shiro-features/${shiro.version}/xml/features</repository>
 
   <feature name="opencast-jax-rs-whiteboard" description="Aries JAX-RS Whiteboard" version="${project.version}">
     <feature>cxf-rs-description-openapi-v3</feature>
     <bundle dependency="true">mvn:org.osgi/org.osgi.service.jaxrs/1.0.1</bundle>
     <bundle start-level="75">mvn:org.apache.servicemix.specs/org.apache.servicemix.specs.jaxws-api-2.3/2.3_2</bundle>
+  </feature>
+
+  <feature name="opencast-security" version="${project.version}">
+    <feature>shiro-web</feature>
+    <bundle start-level="79">mvn:org.opencastproject/opencast-security/${project.version}</bundle>
   </feature>
 
   <feature name="ext-core" version="${project.version}">
@@ -95,7 +101,7 @@
 
   <feature name="opencast-core" version="${project.version}">
     <feature>ext-core</feature>
-
+    <feature>opencast-security</feature>
     <!-- Opencast -->
     <bundle start-level="82">mvn:org.opencastproject/opencast-asset-manager-api/${project.version}</bundle>
     <bundle start-level="82">mvn:org.opencastproject/opencast-asset-manager-static-file-authorization/${project.version}</bundle>
