@@ -45,9 +45,6 @@ public class SearchMetadataImpl<T> implements SearchMetadata<T> {
   /** Localized values */
   protected Map<Language, List<T>> localizedValues = new HashMap<Language, List<T>>();
 
-  /** True to add the values to the fulltext index */
-  protected boolean addToText = false;
-
   /**
    * Creates a new metadata item with the given name.
    *
@@ -147,22 +144,6 @@ public class SearchMetadataImpl<T> implements SearchMetadata<T> {
       return null;
     }
     return values.get(0);
-  }
-
-  /**
-   * {@inheritDoc}
-   * 
-   * @see SearchMetadata#setAddToText(boolean)
-   */
-  public void setAddToText(boolean addToText) {
-    this.addToText = addToText;
-  }
-
-  /**
-   * {@inheritDoc}
-   */
-  public boolean addToText() {
-    return addToText;
   }
 
   /**
