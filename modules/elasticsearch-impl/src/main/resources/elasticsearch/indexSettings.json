@@ -21,6 +21,18 @@
           "autocomplete_filter"
         ]
       },
+      "autocomplete_reverse_analyzer": {
+        "type": "custom",
+        "tokenizer": "whitespace",
+        "char_filter":["html_strip", "camel_case_filter"],
+        "filter": [
+          "lowercase",
+          "icu_folding",
+          "reverse",
+          "autocomplete_filter",
+          "reverse"
+        ]
+      },
       "whitespace_analyzer": {
         "type": "custom",
         "tokenizer": "whitespace",

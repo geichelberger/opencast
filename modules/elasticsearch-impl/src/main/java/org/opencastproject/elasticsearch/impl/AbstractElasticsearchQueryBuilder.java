@@ -137,7 +137,11 @@ public abstract class AbstractElasticsearchQueryBuilder<T extends SearchQuery> i
     // Text
     if (text != null) {
       MultiMatchQueryBuilder queryBuilder = QueryBuilders.multiMatchQuery(text);
-      queryBuilder.field(TEXT, 1.2f);
+      queryBuilder.field(TEXT, 3f);
+      queryBuilder.field(TEXT.concat("._2gram"), 2f);
+      queryBuilder.field(TEXT.concat("._3gram"), 2f);
+      queryBuilder.field(TEXT.concat("._index_prefix"), 2f);
+      queryBuilder.field(TEXT.concat("_reverse"), 1.5f);
       additionalMultiQueryFields.forEach(field -> queryBuilder.field(field, 1.0f));
       queryBuilder.type(MultiMatchQueryBuilder.Type.BEST_FIELDS);
       queryBuilder.operator(Operator.AND);

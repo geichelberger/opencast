@@ -11,7 +11,7 @@
 
         "title": {
             "type" : "keyword",
-            "copy_to": "text",
+            "copy_to": ["text", "text_reverse"],
             "fields" : {
                 "sort": {
                     "type": "icu_collation_keyword",
@@ -32,7 +32,7 @@
 
         "contributor": {
             "type" : "keyword",
-            "copy_to": "text",
+            "copy_to": ["text", "text_reverse"],
             "fields" : {
                 "sort": {
                     "type": "icu_collation_keyword",
@@ -43,7 +43,7 @@
 
         "presenter": {
             "type" : "keyword",
-            "copy_to": "text",
+            "copy_to": ["text", "text_reverse"],
             "fields" : {
                 "sort": {
                     "type": "icu_collation_keyword",
@@ -56,7 +56,7 @@
 
         "subject": {
             "type" : "keyword",
-            "copy_to": "text",
+            "copy_to": ["text", "text_reverse"],
             "fields" : {
                 "sort": {
                     "type": "icu_collation_keyword",
@@ -67,7 +67,7 @@
 
         "description": {
             "type" : "keyword",
-            "copy_to": "text",
+            "copy_to": ["text", "text_reverse"],
             "fields" : {
                 "sort": {
                     "type": "icu_collation_keyword",
@@ -78,7 +78,7 @@
 
         "location": {
             "type" : "keyword",
-            "copy_to": "text",
+            "copy_to": ["text", "text_reverse"],
             "fields" : {
                 "sort": {
                     "type": "icu_collation_keyword",
@@ -97,7 +97,7 @@
 
         "series_name": {
             "type" : "keyword",
-            "copy_to": "text",
+            "copy_to": ["text", "text_reverse"],
             "fields" : {
                 "sort": {
                     "type": "icu_collation_keyword",
@@ -112,7 +112,7 @@
 
         "creator": {
             "type" : "keyword",
-            "copy_to": "text",
+            "copy_to": ["text", "text_reverse"],
             "fields" : {
                 "sort": {
                     "type": "icu_collation_keyword",
@@ -123,7 +123,7 @@
 
         "publisher": {
             "type" : "keyword",
-            "copy_to": "text",
+            "copy_to": ["text", "text_reverse"],
             "fields" : {
                 "sort": {
                     "type": "icu_collation_keyword",
@@ -136,7 +136,7 @@
 
         "rights": {
             "type" : "keyword",
-            "copy_to": "text"
+            "copy_to": ["text", "text_reverse"]
         },
 
         "access_policy": { "type" : "text" },
@@ -246,9 +246,22 @@
 
             }
         },
+
         "text": {
             "type" : "search_as_you_type",
             "analyzer": "autocomplete_analyzer",
+            "search_analyzer": "whitespace_analyzer",
+            "fields": {
+                "reverse": {
+                    "type": "text",
+                    "analyzer": "autocomplete_reverse_analyzer",
+                    "search_analyzer": "whitespace_analyzer"
+                }
+            }
+        },
+        "text_reverse": {
+            "type" : "text",
+            "analyzer": "autocomplete_reverse_analyzer",
             "search_analyzer": "whitespace_analyzer"
         }
     },
