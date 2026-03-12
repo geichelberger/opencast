@@ -660,6 +660,8 @@ public abstract class AbstractElasticsearchIndex implements SearchIndex {
     searchSource.size(limit);
 
     // Sort orders
+    searchSource.sort("_doc", SortOrder.ASC);
+    searchSource.sort("_score", SortOrder.DESC);
     final Map<String, SortCriterion.Order> sortCriteria = query.getSortOrders();
     for (Entry<String, SortCriterion.Order> sortCriterion : sortCriteria.entrySet()) {
       ScriptSortBuilder sortBuilder = null;
