@@ -251,6 +251,7 @@
             "type" : "search_as_you_type",
             "analyzer": "autocomplete_analyzer",
             "search_analyzer": "whitespace_analyzer",
+            "search_quote_analyzer": "whitespace_quote_analyzer",
             "fields": {
                 "reverse": {
                     "type": "text",
