@@ -6,14 +6,14 @@
     "analyzer": {
       "lowercase_space_analyzer": {
         "type": "custom",
-        "tokenizer": "whitespace",
+        "tokenizer": "standard",
         "filter": [
           "lowercase"
         ]
       },
       "autocomplete_analyzer": {
         "type": "custom",
-        "tokenizer": "whitespace",
+        "tokenizer": "standard",
         "char_filter":["html_strip", "camel_case_filter"],
         "filter": [
           "lowercase",
@@ -23,7 +23,7 @@
       },
       "autocomplete_reverse_analyzer": {
         "type": "custom",
-        "tokenizer": "whitespace",
+        "tokenizer": "standard",
         "char_filter":["html_strip", "camel_case_filter"],
         "filter": [
           "lowercase",
@@ -33,9 +33,9 @@
           "reverse"
         ]
       },
-      "whitespace_analyzer": {
+      "standard_analyzer": {
         "type": "custom",
-        "tokenizer": "whitespace",
+        "tokenizer": "standard",
         "char_filter": [
           "camel_case_filter"
         ],
@@ -45,9 +45,9 @@
           "stop"
         ]
       },
-      "whitespace_quote_analyzer": {
+      "standard_quote_analyzer": {
         "type": "custom",
-        "tokenizer": "whitespace",
+        "tokenizer": "standard",
         "char_filter": [
           "camel_case_filter"
         ],

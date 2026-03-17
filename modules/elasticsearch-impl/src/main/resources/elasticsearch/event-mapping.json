@@ -250,20 +250,20 @@
         "text": {
             "type" : "search_as_you_type",
             "analyzer": "autocomplete_analyzer",
-            "search_analyzer": "whitespace_analyzer",
-            "search_quote_analyzer": "whitespace_quote_analyzer",
+            "search_analyzer": "standard_analyzer",
+            "search_quote_analyzer": "standard_quote_analyzer",
             "fields": {
                 "reverse": {
                     "type": "text",
                     "analyzer": "autocomplete_reverse_analyzer",
-                    "search_analyzer": "whitespace_analyzer"
+                    "search_analyzer": "standard_analyzer"
                 }
             }
         },
         "text_reverse": {
             "type" : "text",
             "analyzer": "autocomplete_reverse_analyzer",
-            "search_analyzer": "whitespace_analyzer"
+            "search_analyzer": "standard_analyzer"
         }
     },
     "dynamic_templates" : [

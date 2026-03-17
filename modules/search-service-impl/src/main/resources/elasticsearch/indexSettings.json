@@ -22,7 +22,7 @@
           "autocomplete_filter"
         ]
       },
-      "whitespace_analyzer": {
+      "standard_analyzer": {
         "type": "custom",
         "tokenizer": "whitespace",
         "char_filter": [
