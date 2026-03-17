@@ -660,8 +660,6 @@ public abstract class AbstractElasticsearchIndex implements SearchIndex {
     searchSource.size(limit);
 
     // Sort orders
-    searchSource.sort("_doc", SortOrder.ASC);
-    searchSource.sort("_score", SortOrder.DESC);
     final Map<String, SortCriterion.Order> sortCriteria = query.getSortOrders();
     for (Entry<String, SortCriterion.Order> sortCriterion : sortCriteria.entrySet()) {
       ScriptSortBuilder sortBuilder = null;
@@ -692,6 +690,8 @@ public abstract class AbstractElasticsearchIndex implements SearchIndex {
           break;
       }
     }
+    searchSource.sort("_score", SortOrder.DESC);
+    searchSource.sort("_doc", SortOrder.ASC);
     return new SearchRequest(Arrays.stream(query.getTypes()).map(this::getSubIndexIdentifier).toArray(String[]::new))
             .searchType(SearchType.QUERY_THEN_FETCH).preference("_local").source(searchSource);
   }
