@@ -31,11 +31,13 @@ import org.opencastproject.security.api.SecurityService;
 import org.opencastproject.security.api.UserDirectoryService;
 import org.opencastproject.serviceregistry.api.ServiceRegistry;
 import org.opencastproject.serviceregistry.api.ServiceRegistryException;
+import org.opencastproject.silencedetection.api.DetectionMode;
 import org.opencastproject.silencedetection.api.MediaSegment;
 import org.opencastproject.silencedetection.api.MediaSegments;
 import org.opencastproject.silencedetection.api.SilenceDetectionFailedException;
 import org.opencastproject.silencedetection.api.SilenceDetectionService;
 import org.opencastproject.silencedetection.ffmpeg.FFmpegSilenceDetector;
+import org.opencastproject.silencedetection.vad.SileroSilenceDetector;
 import org.opencastproject.smil.api.SmilException;
 import org.opencastproject.smil.api.SmilResponse;
 import org.opencastproject.smil.api.SmilService;
@@ -122,28 +124,41 @@ public class SilenceDetectionServiceImpl extends AbstractJobProducer implements 
    */
   @Override
   public Job detect(Track sourceTrack) throws SilenceDetectionFailedException {
-    return detect(sourceTrack, null);
+    return detect(sourceTrack, DetectionMode.SILENCE);
   }
 
   /**
    * {@inheritDoc}
    *
    * @see org.opencastproject.silencedetection.api.SilenceDetectionService#detect(
-   * org.opencastproject.mediapackage.Track, org.opencastproject.mediapackage.Track[])
+   * org.opencastproject.mediapackage.Track)
    */
   @Override
-  public Job detect(Track sourceTrack, Track[] referenceTracks) throws SilenceDetectionFailedException {
+  public Job detect(Track sourceTrack, DetectionMode type) throws SilenceDetectionFailedException {
+    return detect(sourceTrack, type, null);
+  }
+
+
+  /**
+   * {@inheritDoc}
+   * @see org.opencastproject.silencedetection.api.SilenceDetectionService#detect(
+   * org.opencastproject.mediapackage.Track,
+   * DetectionMode,
+   * org.opencastproject.mediapackage.Track[]
+   * )
+   */
+  @Override
+  public Job detect(Track sourceTrack, DetectionMode type, Track[] referenceTracks)
+          throws SilenceDetectionFailedException {
     try {
       if (sourceTrack == null) {
         throw new SilenceDetectionFailedException("Source track is null!");
       }
-      List<String> arguments = new LinkedList<String>();
-      // put source track as job argument
+      List<String> arguments = new LinkedList<>();
       arguments.add(0, MediaPackageElementParser.getAsXml(sourceTrack));
-
-      // put reference tracks as second argument
+      arguments.add(1, type.name());
       if (referenceTracks != null) {
-        arguments.add(1, MediaPackageElementParser.getArrayAsXml(Arrays.asList(referenceTracks)));
+        arguments.add(2, MediaPackageElementParser.getArrayAsXml(Arrays.asList(referenceTracks)));
       }
 
       return serviceRegistry.createJob(
@@ -163,19 +178,19 @@ public class SilenceDetectionServiceImpl extends AbstractJobProducer implements 
   protected String process(Job job) throws SilenceDetectionFailedException, SmilException, MediaPackageException {
     if (Operation.SILENCE_DETECTION.toString().equals(job.getOperation())) {
       // get source track
-      String sourceTrackXml = StringUtils.trimToNull(job.getArguments().get(0));
+      String sourceTrackXml = StringUtils.trimToNull(job.getArguments().getFirst());
       if (sourceTrackXml == null) {
         throw new SilenceDetectionFailedException("Track not set!");
       }
       Track sourceTrack = (Track) MediaPackageElementParser.getFromXml(sourceTrackXml);
-
+      DetectionMode mode = DetectionMode.valueOf(StringUtils.trimToNull(job.getArguments().get(1)).toUpperCase());
       // run detection on source track
-      MediaSegments segments = runDetection(sourceTrack);
+      MediaSegments segments = runDetection(job, sourceTrack, mode);
 
       // get reference tracks if any
       List<Track> referenceTracks = null;
-      if (job.getArguments().size() > 1) {
-        String referenceTracksXml = StringUtils.trimToNull(job.getArguments().get(1));
+      if (job.getArguments().size() > 2) {
+        String referenceTracksXml = StringUtils.trimToNull(job.getArguments().get(2));
         if (referenceTracksXml != null) {
           referenceTracks = (List<Track>) MediaPackageElementParser.getArrayFromXml(referenceTracksXml);
         }
@@ -207,10 +222,21 @@ public class SilenceDetectionServiceImpl extends AbstractJobProducer implements 
    * @return {@link MediaSegments} Xml as String
    * @throws SilenceDetectionFailedException if an error occures
    */
-  protected MediaSegments runDetection(Track track) throws SilenceDetectionFailedException {
+  protected MediaSegments runDetection(Job job, Track track, DetectionMode type)
+          throws SilenceDetectionFailedException {
     try {
-      FFmpegSilenceDetector silenceDetector = new FFmpegSilenceDetector(properties, track, workspace);
-      return silenceDetector.getMediaSegments();
+      if (type.equals(DetectionMode.SILENCE)) {
+        logger.debug("Running silence detection on track {}", track.getIdentifier());
+        FFmpegSilenceDetector silenceDetector = new FFmpegSilenceDetector(properties, track, workspace);
+        return silenceDetector.getMediaSegments();
+      } else if (type.equals(DetectionMode.VAD)) {
+        logger.debug("Running vad detection on track {}", track.getIdentifier());
+        SileroSilenceDetector silenceDetector = new SileroSilenceDetector(properties, track, workspace, job);
+        return silenceDetector.getMediaSegments();
+      } else {
+        throw new SilenceDetectionFailedException("Unsupported detection type: " + type);
+      }
+
     } catch (Exception ex) {
       throw new SilenceDetectionFailedException(ex.getMessage());
     }
@@ -270,6 +296,7 @@ public class SilenceDetectionServiceImpl extends AbstractJobProducer implements 
       return;
     }
     FFmpegSilenceDetector.init(bundleContext);
+    SileroSilenceDetector.init(bundleContext);
     Dictionary<String, Object> properties = context.getProperties();
     Enumeration<String> keys = properties.keys();
     while (keys.hasMoreElements()) {

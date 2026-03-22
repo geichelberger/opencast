@@ -36,7 +36,17 @@
               org.opencastproject.silencedetection.endpoint.*;version=${project.version},
               org.opencastproject.silencedetection.ffmpeg.*;version=${project.version},
             </Export-Package>
+            <Embed-Dependency>onnxruntime;scope=compile</Embed-Dependency>
           </instructions>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <configuration>
+          <excludes>
+            <exclude>**/model/*</exclude>
+          </excludes>
         </configuration>
       </plugin>
     </plugins>
@@ -90,6 +100,12 @@
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
     </dependency>
+    <dependency>
+      <groupId>com.microsoft.onnxruntime</groupId>
+      <artifactId>onnxruntime</artifactId>
+      <version>1.24.3</version>
+    </dependency>
+
     <!-- For testing -->
     <dependency>
       <groupId>junit</groupId>

@@ -28,6 +28,7 @@ import org.opencastproject.mediapackage.Track;
 import org.opencastproject.security.api.TrustedHttpClient;
 import org.opencastproject.serviceregistry.api.RemoteBase;
 import org.opencastproject.serviceregistry.api.ServiceRegistry;
+import org.opencastproject.silencedetection.api.DetectionMode;
 import org.opencastproject.silencedetection.api.SilenceDetectionFailedException;
 import org.opencastproject.silencedetection.api.SilenceDetectionService;
 
@@ -66,15 +67,22 @@ public class SilenceDetectionServiceRemote extends RemoteBase implements Silence
 
   @Override
   public Job detect(Track sourceTrack) throws SilenceDetectionFailedException {
-    return detect(sourceTrack, null);
+    return detect(sourceTrack, DetectionMode.SILENCE, null);
   }
 
   @Override
-  public Job detect(Track sourceTrack, Track[] referencedTracks) throws SilenceDetectionFailedException {
+  public Job detect(Track sourceTrack, DetectionMode mode) throws SilenceDetectionFailedException {
+    return detect(sourceTrack, mode, null);
+  }
+
+  @Override
+  public Job detect(Track sourceTrack, DetectionMode mode, Track[] referencedTracks)
+          throws SilenceDetectionFailedException {
     HttpPost post = new HttpPost("/detect");
     List<BasicNameValuePair> params = new ArrayList<BasicNameValuePair>();
     try {
       params.add(new BasicNameValuePair("track", MediaPackageElementParser.getAsXml(sourceTrack)));
+      params.add(new BasicNameValuePair("mode", mode.name()));
       if (referencedTracks != null && referencedTracks.length > 0) {
         String referencedTracksXml = MediaPackageElementParser.getArrayAsXml(Arrays.asList(referencedTracks));
         params.add(new BasicNameValuePair("referenceTracks", referencedTracksXml));

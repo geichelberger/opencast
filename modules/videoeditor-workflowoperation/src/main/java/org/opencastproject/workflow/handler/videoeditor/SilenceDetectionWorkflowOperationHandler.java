@@ -32,6 +32,7 @@ import org.opencastproject.mediapackage.MediaPackageElementFlavor;
 import org.opencastproject.mediapackage.Track;
 import org.opencastproject.mediapackage.selector.TrackSelector;
 import org.opencastproject.serviceregistry.api.ServiceRegistry;
+import org.opencastproject.silencedetection.api.DetectionMode;
 import org.opencastproject.silencedetection.api.SilenceDetectionFailedException;
 import org.opencastproject.silencedetection.api.SilenceDetectionService;
 import org.opencastproject.smil.api.SmilException;
@@ -51,6 +52,7 @@ import org.opencastproject.workspace.api.Workspace;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.BooleanUtils;
+import org.apache.commons.lang3.EnumUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.osgi.service.component.ComponentContext;
 import org.osgi.service.component.annotations.Component;
@@ -99,6 +101,9 @@ public class SilenceDetectionWorkflowOperationHandler extends AbstractWorkflowOp
   /** Name of the configuration option for track flavors to reference in generated smil. */
   private static final String REFERENCE_TRACKS_FLAVOR_PROPERTY = "reference-tracks-flavor";
 
+  /** Name of the configuration option for the detection mode. */
+  private static final String DETECTION_MODE_PROPERTY = "mode";
+
   /** Name of the configuration option whether to set workflow properties with sum of
    * segments duration in seconds and relation to the whole track length for each track.*/
   private static final String EXPORT_SEGMENTS_DURATION = "export-segments-duration";
@@ -131,6 +136,14 @@ public class SilenceDetectionWorkflowOperationHandler extends AbstractWorkflowOp
             SMIL_TARGET_FLAVOR_PROPERTY));
     String exportSegmentsDurationString = StringUtils.trimToNull(
         workflowInstance.getCurrentOperation().getConfiguration(EXPORT_SEGMENTS_DURATION));
+    String detectionModeString = StringUtils.trimToNull(workflowInstance.getCurrentOperation().getConfiguration(
+        DETECTION_MODE_PROPERTY));
+    if (EnumUtils.isValidEnumIgnoreCase(DetectionMode.class, detectionModeString)) {
+      detectionModeString = detectionModeString.toUpperCase();
+    } else {
+      throw new WorkflowOperationException(String.format("Invalid %s option value: %s", DETECTION_MODE_PROPERTY,
+          detectionModeString));
+    }
     boolean exportSegmentsDuration = false;
 
     if (StringUtils.isNotBlank(exportSegmentsDurationString)) {
@@ -208,8 +221,8 @@ public class SilenceDetectionWorkflowOperationHandler extends AbstractWorkflowOp
       }
       logger.info("Executing silence detection on track {}", sourceTrack.getIdentifier());
       try {
-        Job detectionJob = detetionService.detect(sourceTrack,
-                referenceTracks.toArray(new Track[referenceTracks.size()]));
+        DetectionMode mode = DetectionMode.valueOf(detectionModeString);
+        Job detectionJob = detetionService.detect(sourceTrack, mode, referenceTracks.toArray(new Track[0]));
         if (!waitForStatus(detectionJob).isSuccess()) {
           throw new WorkflowOperationException("Silence Detection failed");
         }
