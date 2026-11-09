@@ -25,6 +25,12 @@ import java.util.Set;
 
 import graphql.schema.GraphQLFieldDefinition;
 
+/**
+ * Adds fields to the Mutation type that are built with the graphql-java API instead of annotated classes.
+ *
+ * <p>Field definitions carry no data fetcher, so register them with a {@link GraphQLCodeRegistryProvider}. Fields
+ * whose name already exists on the Mutation type are ignored.
+ */
 public interface GraphQLMutationProvider extends GraphQLProvider {
 
   Set<GraphQLFieldDefinition> getMutations();

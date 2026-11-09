@@ -23,8 +23,20 @@ package org.opencastproject.graphql.provider;
 
 import graphql.schema.GraphQLCodeRegistry;
 
+/**
+ * Extends the code registry of the schema, e.g. with data fetchers for fields added by a {@link GraphQLQueryProvider}
+ * or {@link GraphQLMutationProvider}. Providers are applied in turn; each gets the registry built so far.
+ *
+ * <p>A provider can also replace data fetchers of existing fields, including the access checks added by
+ * {@code @RolesAllowed}, so only register trusted providers.
+ */
 public interface GraphQLCodeRegistryProvider extends GraphQLProvider {
 
+  /**
+   * @param codeRegistry the code registry built so far
+   * @return a builder for the extended registry, e.g. {@code GraphQLCodeRegistry.newCodeRegistry(codeRegistry)},
+   *     or {@code null} to leave it unchanged
+   */
   GraphQLCodeRegistry.Builder getCodeRegistry(GraphQLCodeRegistry codeRegistry);
 
 }

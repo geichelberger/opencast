@@ -36,7 +36,7 @@ import java.util.stream.Collectors;
 )
 public class GraphQLConfiguration {
 
-  private Config config;
+  private volatile Config config;
 
   private volatile Set<String> corsAllowedOrigins = Set.of();
 

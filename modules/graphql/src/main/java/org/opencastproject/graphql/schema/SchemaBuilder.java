@@ -31,8 +31,11 @@ import org.opencastproject.graphql.provider.GraphQLMutationProvider;
 import org.opencastproject.graphql.provider.GraphQLQueryProvider;
 import org.opencastproject.graphql.provider.GraphQLTypeFunctionProvider;
 import org.opencastproject.graphql.schema.builder.AdditionalTypeBuilder;
+import org.opencastproject.graphql.schema.builder.CodeRegistryBuilder;
 import org.opencastproject.graphql.schema.builder.DynamicTypeBuilder;
 import org.opencastproject.graphql.schema.builder.ExtensionBuilder;
+import org.opencastproject.graphql.schema.builder.FieldVisibilityBuilder;
+import org.opencastproject.graphql.schema.builder.QueryMutationBuilder;
 import org.opencastproject.graphql.schema.builder.TypeFunctionBuilder;
 import org.opencastproject.graphql.type.input.Mutation;
 import org.opencastproject.graphql.type.output.Query;
@@ -64,6 +67,12 @@ public class SchemaBuilder {
 
   private final TypeFunctionBuilder typeFunctionBuilder;
 
+  private final QueryMutationBuilder queryMutationBuilder;
+
+  private final CodeRegistryBuilder codeRegistryBuilder;
+
+  private final FieldVisibilityBuilder fieldVisibilityBuilder;
+
   public SchemaBuilder(Organization organization) {
     Objects.requireNonNull(organization, "organization cannot be null");
     this.organization = organization;
@@ -71,6 +80,9 @@ public class SchemaBuilder {
     this.extensionBuilder = new ExtensionBuilder();
     this.additionalTypeBuilder = new AdditionalTypeBuilder();
     this.typeFunctionBuilder = new TypeFunctionBuilder();
+    this.queryMutationBuilder = new QueryMutationBuilder();
+    this.codeRegistryBuilder = new CodeRegistryBuilder();
+    this.fieldVisibilityBuilder = new FieldVisibilityBuilder();
   }
 
   public GraphQLSchema build() {
@@ -89,13 +101,19 @@ public class SchemaBuilder {
     final var annotationsSchema = AnnotationsSchemaCreator.newAnnotationsSchema();
     additionalTypeBuilder.withAnnotationSchema(annotationsSchema).build();
 
-    return annotationsSchema
+    // The following steps work on the built schema: they need the types and the code registry, including the data
+    // fetchers and access checks, that graphql-annotations creates. Field visibility comes last, so a code registry
+    // provider cannot drop it.
+    GraphQLSchema schema = annotationsSchema
         .setGraphQLSchemaBuilder(builder)
         .query(Query.class)
         .mutation(Mutation.class)
         .setAnnotationsProcessor(this.annotations)
         .directive(RolesAllowed.class)
         .build();
+    schema = queryMutationBuilder.withSchema(schema).build();
+    schema = codeRegistryBuilder.withSchema(schema).build();
+    return fieldVisibilityBuilder.withSchema(schema).build();
   }
 
   public SchemaBuilder extensionProviders(List<GraphQLExtensionProvider> extensionProviders) {
@@ -109,14 +127,17 @@ public class SchemaBuilder {
   }
 
   public SchemaBuilder queryProviders(List<GraphQLQueryProvider> queryProviders) {
+    queryMutationBuilder.withQueryProviders(queryProviders);
     return this;
   }
 
   public SchemaBuilder mutationProviders(List<GraphQLMutationProvider> mutationProviders) {
+    queryMutationBuilder.withMutationProviders(mutationProviders);
     return this;
   }
 
   public SchemaBuilder codeRegistryProviders(List<GraphQLCodeRegistryProvider> codeRegistryProviders) {
+    codeRegistryBuilder.withCodeRegistryProviders(codeRegistryProviders);
     return this;
   }
 
@@ -126,6 +147,7 @@ public class SchemaBuilder {
   }
 
   public SchemaBuilder fieldVisibilityProviders(List<GraphQLFieldVisibilityProvider> fieldVisibilityProviders) {
+    fieldVisibilityBuilder.withFieldVisibilityProviders(fieldVisibilityProviders);
     return this;
   }
 

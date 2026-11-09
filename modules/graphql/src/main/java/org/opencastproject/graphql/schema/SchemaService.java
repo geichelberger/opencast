@@ -126,6 +126,7 @@ public class SchemaService implements OrganizationDirectoryListener {
     scheduledFutureMap.forEach((organization, scheduledFuture) -> {
       scheduledFuture.cancel(true);
     });
+    scheduledFutureMap.clear();
     schemaUpdateExecutor.shutdown();
   }
 
@@ -159,19 +160,25 @@ public class SchemaService implements OrganizationDirectoryListener {
   }
 
   private void triggerSchemaUpdate(Organization organization) {
-    ScheduledFuture<?> future = scheduledFutureMap.get(organization);
-    if (future != null) {
-      future.cancel(true);
-    }
-
-    scheduledFutureMap.put(organization,
-        schemaUpdateExecutor.schedule(() -> updateSchema(organization), schemaUpdateTriggerDelay,
-            TimeUnit.MILLISECONDS));
+    // Replace the pending update atomically so concurrent triggers cannot leave an uncancelled task behind
+    scheduledFutureMap.compute(organization, (org, previous) -> {
+      if (previous != null) {
+        previous.cancel(true);
+      }
+      return schemaUpdateExecutor.schedule(() -> updateSchema(org), schemaUpdateTriggerDelay,
+          TimeUnit.MILLISECONDS);
+    });
   }
 
-  public void updateSchema(Organization organization) {
+  private void updateSchema(Organization organization) {
     try {
-      schemas.put(organization.getId(), buildSchema(organization));
+      final GraphQLSchema schema = buildSchema(organization);
+      // Publish only while the organization is still registered. This runs under the same per-key lock as
+      // organizationUnregistered, so a build that was already running cannot resurrect a removed schema.
+      scheduledFutureMap.computeIfPresent(organization, (org, future) -> {
+        schemas.put(org.getId(), schema);
+        return future;
+      });
     } catch (Throwable t) {
       logger.error("Error building GraphQL schema for organization {}", organization.getId(), t);
     }
@@ -186,7 +193,13 @@ public class SchemaService implements OrganizationDirectoryListener {
   @Override
   public void organizationUnregistered(Organization organization) {
     logger.info("Removing GraphQL schema for organization {}", organization.getId());
-    schemas.remove(organization.getId());
+    scheduledFutureMap.compute(organization, (org, future) -> {
+      if (future != null) {
+        future.cancel(true);
+      }
+      schemas.remove(org.getId());
+      return null;
+    });
   }
 
   @Override
@@ -222,6 +235,21 @@ public class SchemaService implements OrganizationDirectoryListener {
 
   public void unbindMutationProvider(GraphQLMutationProvider provider) {
     mutationProviders.remove(provider);
+    triggerSchemaUpdate();
+  }
+
+  @Reference(
+      policy = ReferencePolicy.DYNAMIC,
+      policyOption = ReferencePolicyOption.GREEDY,
+      cardinality = ReferenceCardinality.MULTIPLE
+  )
+  public void bindCodeRegistryProvider(GraphQLCodeRegistryProvider provider) {
+    codeRegistryProviders.add(provider);
+    triggerSchemaUpdate();
+  }
+
+  public void unbindCodeRegistryProvider(GraphQLCodeRegistryProvider provider) {
+    codeRegistryProviders.remove(provider);
     triggerSchemaUpdate();
   }
 

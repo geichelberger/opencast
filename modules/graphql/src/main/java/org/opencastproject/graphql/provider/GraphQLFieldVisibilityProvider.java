@@ -23,7 +23,19 @@ package org.opencastproject.graphql.provider;
 
 import graphql.schema.visibility.GraphqlFieldVisibility;
 
+/**
+ * Hides fields from the GraphQL schema. A field is hidden if any registered provider hides it; it can then neither be
+ * queried nor seen through introspection.
+ *
+ * <p>The visibility is applied once per organization when the schema is built. It must not depend on the current
+ * request or user: validated queries are cached per schema, so a per-request decision would be reused for other
+ * users. To hide values from some users, check this in the data fetcher instead.
+ */
 public interface GraphQLFieldVisibilityProvider extends GraphQLProvider {
+
+  /**
+   * @return the visibility to apply, or {@code null} to not restrict any fields
+   */
   GraphqlFieldVisibility getFieldVisibility();
 
 }

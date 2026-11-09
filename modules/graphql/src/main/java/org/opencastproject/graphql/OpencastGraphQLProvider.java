@@ -113,11 +113,14 @@ public class OpencastGraphQLProvider implements GraphQLExtensionProvider, GraphQ
     var outputTypes = new HashMap<String, GraphQLOutputType>();
     var oldOrganization = securityService.getOrganization();
     securityService.setOrganization(organization);
-    commonEpisodeMetadata(outputTypes, graphQLAnnotations);
-    commonEpisodeMetadataV2(outputTypes, graphQLAnnotations);
-    commonSeriesMetadata(outputTypes, graphQLAnnotations);
-    commonSeriesMetadataV2(outputTypes, graphQLAnnotations);
-    securityService.setOrganization(oldOrganization);
+    try {
+      commonEpisodeMetadata(outputTypes, graphQLAnnotations);
+      commonEpisodeMetadataV2(outputTypes, graphQLAnnotations);
+      commonSeriesMetadata(outputTypes, graphQLAnnotations);
+      commonSeriesMetadataV2(outputTypes, graphQLAnnotations);
+    } finally {
+      securityService.setOrganization(oldOrganization);
+    }
     return outputTypes;
   }
 
@@ -127,9 +130,12 @@ public class OpencastGraphQLProvider implements GraphQLExtensionProvider, GraphQ
     var inputTypes = new HashMap<String, GraphQLInputType>();
     var oldOrganization = securityService.getOrganization();
     securityService.setOrganization(organization);
-    commonEpisodeMetadataInput(inputTypes, graphQLAnnotations);
-    commonSeriesMetadataInput(inputTypes, graphQLAnnotations);
-    securityService.setOrganization(oldOrganization);
+    try {
+      commonEpisodeMetadataInput(inputTypes, graphQLAnnotations);
+      commonSeriesMetadataInput(inputTypes, graphQLAnnotations);
+    } finally {
+      securityService.setOrganization(oldOrganization);
+    }
     return inputTypes;
   }
 

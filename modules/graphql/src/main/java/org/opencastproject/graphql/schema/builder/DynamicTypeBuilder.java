@@ -53,17 +53,16 @@ public class DynamicTypeBuilder {
   public void build() {
     if (dynamicTypeProviders != null && !dynamicTypeProviders.isEmpty()) {
       for (final GraphQLDynamicTypeProvider typeProvider : dynamicTypeProviders) {
-        if (typeProvider != null && typeProvider.getDynamicOutputTypes(organization, annotations) != null) {
-          typeProvider.getDynamicOutputTypes(organization, annotations)
-              .forEach((typeName, type) -> {
-                annotations.getContainer().getTypeRegistry().put(typeName, type);
-              });
+        if (typeProvider == null) {
+          continue;
         }
-        if (typeProvider != null && typeProvider.getDynamicInputTypes(organization, annotations) != null) {
-          typeProvider.getDynamicInputTypes(organization, annotations)
-              .forEach((typeName, type) -> {
-                annotations.getContainer().getTypeRegistry().put(typeName, type);
-              });
+        var outputTypes = typeProvider.getDynamicOutputTypes(organization, annotations);
+        if (outputTypes != null) {
+          outputTypes.forEach((typeName, type) -> annotations.getContainer().getTypeRegistry().put(typeName, type));
+        }
+        var inputTypes = typeProvider.getDynamicInputTypes(organization, annotations);
+        if (inputTypes != null) {
+          inputTypes.forEach((typeName, type) -> annotations.getContainer().getTypeRegistry().put(typeName, type));
         }
       }
     }

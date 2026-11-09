@@ -25,6 +25,12 @@ import java.util.Set;
 
 import graphql.schema.GraphQLFieldDefinition;
 
+/**
+ * Adds fields to the Query type that are built with the graphql-java API instead of annotated classes.
+ *
+ * <p>Field definitions carry no data fetcher, so register them with a {@link GraphQLCodeRegistryProvider}. Fields
+ * whose name already exists on the Query type are ignored.
+ */
 public interface GraphQLQueryProvider extends GraphQLProvider {
 
   Set<GraphQLFieldDefinition> getQueries();
