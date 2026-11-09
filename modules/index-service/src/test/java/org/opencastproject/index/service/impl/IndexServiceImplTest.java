@@ -64,6 +64,7 @@ import org.opencastproject.security.api.AccessControlList;
 import org.opencastproject.security.api.AclScope;
 import org.opencastproject.security.api.AuthorizationService;
 import org.opencastproject.security.api.Organization;
+import org.opencastproject.security.api.Permissions;
 import org.opencastproject.security.api.SecurityService;
 import org.opencastproject.security.api.UnauthorizedException;
 import org.opencastproject.security.api.User;
@@ -80,6 +81,7 @@ import org.opencastproject.util.data.Tuple;
 import org.opencastproject.util.data.VCell;
 import org.opencastproject.workflow.api.WorkflowDatabaseException;
 import org.opencastproject.workflow.api.WorkflowInstance;
+import org.opencastproject.workflow.api.WorkflowService;
 import org.opencastproject.workspace.api.Workspace;
 
 import net.fortuna.ical4j.model.DateTime;
@@ -877,6 +879,116 @@ public class IndexServiceImplTest {
     Assert.assertTrue(mpCapture.hasCaptured());
     Assert.assertEquals("series-1", mp.getSeries());
     Assert.assertEquals(1, mp.getCatalogs(MediaPackageElements.SERIES).length);
+  }
+
+  @Test
+  public void testUpdateMediaPackageMetadataUnauthorizedWhenUserHasNoWriteAccess() throws Exception {
+    // mock/initialize dependencies
+    String username = "user1";
+    String org = "mh_default_org";
+    String eventId = "event-1";
+
+    DublinCoreMetadataCollection metadataCollection = new DublinCoreMetadataCollection();
+    MetadataField titleField = new MetadataField(
+            "title",
+            "title",
+            "EVENTS.EVENTS.DETAILS.METADATA.TITLE",
+            false,
+            true,
+            "title",
+            null,
+            MetadataField.Type.TEXT,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
+    titleField.setValue("New Title");
+    metadataCollection.addField(titleField);
+    // CommonEventCatalogUIAdapter#storeFields always looks up the "isPartOf" (series) field
+    // on the collection it is given, so it must be present even though it is left unchanged here.
+    MetadataField seriesField = new MetadataField(
+            "isPartOf",
+            "isPartOf",
+            "EVENTS.EVENTS.DETAILS.METADATA.SERIES",
+            false,
+            false,
+            null,
+            null,
+            MetadataField.Type.TEXT,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
+    metadataCollection.addField(seriesField);
+    MetadataList metadataList = new MetadataList();
+    metadataList.getMetadataList().put("dublincore/episode",
+        new MetadataList.TitledMetadataCollection("EVENTS.EVENTS.DETAILS.CATALOG.EPISODE", metadataCollection));
+
+    // An event with an active workflow, so that IndexServiceImpl routes the metadata update
+    // through the WorkflowService, which is where the "write" action is actually authorized.
+    Event event = new Event(eventId, org);
+    event.setTitle("Test Event 1");
+    event.setWorkflowId(1L);
+    event.setWorkflowState(WorkflowInstance.WorkflowState.RUNNING);
+
+    SearchQuery query = EasyMock.createMock(SearchQuery.class);
+    EasyMock.expect(query.getLimit()).andReturn(100);
+    EasyMock.expect(query.getOffset()).andReturn(0);
+    EasyMock.replay(query);
+    SearchResultItemImpl<Event> searchResultItem = new SearchResultItemImpl<>(1.0, event);
+    SearchResultImpl<Event> searchResult = new SearchResultImpl<>(query, 0, 0);
+    searchResult.addResultItem(searchResultItem);
+    SecurityService securityService = setupSecurityService(username, org);
+    ElasticsearchIndex index = EasyMock.createMock(ElasticsearchIndex.class);
+    EasyMock.expect(index.getByQuery(EasyMock.anyObject(EventSearchQuery.class))).andReturn(searchResult);
+    EasyMock.replay(index);
+    Workspace workspace = EasyMock.createMock(Workspace.class);
+    EasyMock.expect(workspace.put(EasyMock.anyString(), EasyMock.anyString(), EasyMock.anyString(),
+            EasyMock.anyObject())).andReturn(getClass().getResource("/dublincore.xml").toURI()).anyTimes();
+    EasyMock.expect(workspace.read(EasyMock.anyObject())).andAnswer(
+            () -> getClass().getResourceAsStream("/dublincore.xml")).anyTimes();
+    EasyMock.replay(workspace);
+    CommonEventCatalogUIAdapter commonEventCatalogUIAdapter = setupCommonCatalogUIAdapter(workspace).getA();
+
+    MediaPackage mp = MediaPackageBuilderFactory.newInstance().newMediaPackageBuilder()
+            .loadFromXml(getClass().getResourceAsStream("/events/update-event-mp.xml"));
+    WorkflowInstance workflowInstance = EasyMock.createMock(WorkflowInstance.class);
+    EasyMock.expect(workflowInstance.getMediaPackage()).andReturn(mp);
+    EasyMock.replay(workflowInstance);
+
+    // The WorkflowService is mocked, so this does not exercise its permission check itself. It verifies that
+    // IndexServiceImpl asks for the "write" action (not just "read") when updating an event with a running
+    // workflow and that it passes the rejection on.
+    User user = EasyMock.createNiceMock(User.class);
+    WorkflowService workflowService = EasyMock.createMock(WorkflowService.class);
+    EasyMock.expect(workflowService.getRunningWorkflowInstanceByMediaPackage(
+            eventId, Permissions.Action.READ.toString()))
+        .andReturn(Optional.of(workflowInstance));
+    EasyMock.expect(workflowService.getRunningWorkflowInstanceByMediaPackage(
+            eventId, Permissions.Action.WRITE.toString()))
+        .andThrow(new UnauthorizedException(user, Permissions.Action.WRITE.toString()));
+    EasyMock.replay(workflowService);
+
+    // create service
+    IndexServiceImpl indexService = new IndexServiceImpl();
+    indexService.setSecurityService(securityService);
+    indexService.setWorkflowService(workflowService);
+    indexService.addCatalogUIAdapter(commonEventCatalogUIAdapter);
+
+    try {
+      indexService.updateEventMetadata(eventId, metadataList, index);
+      Assert.fail("Expected the update to be rejected with an UnauthorizedException");
+    } catch (UnauthorizedException e) {
+      // expected
+    }
+
+    EasyMock.verify(workflowService);
   }
 
   @Test
