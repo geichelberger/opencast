@@ -21,6 +21,7 @@
 
 package org.opencastproject.graphql.servlet;
 
+import org.opencastproject.graphql.execution.ExecutionService;
 import org.opencastproject.graphql.schema.SchemaService;
 import org.opencastproject.security.api.SecurityService;
 
@@ -91,8 +92,21 @@ public class SchemaServlet extends HttpServlet implements Servlet {
       return;
     }
 
+    // The schema is only of use to clients that can query the API, so do not hand it out to anonymous users
+    if (!ExecutionService.isAuthenticated(securityService.getUser())) {
+      resp.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Authentication required");
+      return;
+    }
+
+    // Use the schema that is served for the organization. Building a schema is expensive and the endpoint is open to
+    // all authenticated users.
+    GraphQLSchema schema = schemaService.get(securityService.getOrganization().getId());
+    if (schema == null) {
+      resp.sendError(HttpServletResponse.SC_NOT_FOUND, "No GraphQL schema found for the organization");
+      return;
+    }
+
     try (PrintWriter out = resp.getWriter()) {
-      GraphQLSchema schema = schemaService.buildSchema(securityService.getOrganization());
       out.print(schemaPrinter.print(schema));
       out.flush();
     }

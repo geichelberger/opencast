@@ -34,8 +34,15 @@ public class GraphQLRuntimeException extends RuntimeException implements GraphQL
   private final OpencastErrorType errorType;
   private Map<String,Object> extensions;
 
+  /** The message sent to clients for internal errors. Details are only logged. */
+  public static final String INTERNAL_ERROR_MESSAGE = "Internal server error";
+
+  /**
+   * Wrap an internal exception. The client only sees a generic message, as the cause's text may contain internal
+   * details. The cause is logged by the exception handler.
+   */
   public GraphQLRuntimeException(Throwable cause) {
-    super(cause);
+    super(INTERNAL_ERROR_MESSAGE, cause);
     this.errorType = OpencastErrorType.InternalError;
   }
 
@@ -45,12 +52,30 @@ public class GraphQLRuntimeException extends RuntimeException implements GraphQL
   }
 
   public GraphQLRuntimeException(OpencastErrorType errorType) {
+    super(defaultMessage(errorType));
     this.errorType = errorType;
   }
 
+  /**
+   * Wrap an exception with an error type. The client only sees a generic message for the type, as the cause's text
+   * may contain internal details.
+   */
   public GraphQLRuntimeException(OpencastErrorType errorType, Throwable cause) {
-    super(cause);
+    super(defaultMessage(errorType), cause);
     this.errorType = errorType;
+  }
+
+  private static String defaultMessage(OpencastErrorType errorType) {
+    switch (errorType) {
+      case BadRequest:
+        return "Bad request";
+      case NotFound:
+        return "Not found";
+      case Unauthorized:
+        return "Unauthorized";
+      default:
+        return INTERNAL_ERROR_MESSAGE;
+    }
   }
 
   public GraphQLRuntimeException(String message, OpencastErrorType errorType) {
