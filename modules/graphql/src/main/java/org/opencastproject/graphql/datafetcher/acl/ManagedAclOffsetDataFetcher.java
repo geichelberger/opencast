@@ -28,7 +28,9 @@ import org.opencastproject.graphql.acl.GqlManagedAclCatalogue;
 import org.opencastproject.graphql.datafetcher.ParameterDataFetcher;
 import org.opencastproject.graphql.execution.context.OpencastContext;
 import org.opencastproject.security.api.SecurityService;
+import org.opencastproject.util.SmartIterator;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import graphql.schema.DataFetchingEnvironment;
@@ -42,9 +44,14 @@ public class ManagedAclOffsetDataFetcher extends ParameterDataFetcher<GqlManaged
 
     AclService aclService = aclServiceFactory.serviceFor(securityService.getOrganization());
 
-    List<ManagedAcl> acls = aclService.getAcls();
+    int limit = parseLimit(MAX_PAGE_SIZE, dataFetchingEnvironment);
+    int offset = parseOffset(dataFetchingEnvironment);
 
-    return new GqlManagedAclCatalogue(acls);
+    List<ManagedAcl> acls = aclService.getAcls();
+    long total = acls.size();
+    List<ManagedAcl> page = new ArrayList<>(new SmartIterator<ManagedAcl>(limit, offset).applyLimitAndOffset(acls));
+
+    return new GqlManagedAclCatalogue(page, total, offset, limit);
   }
 
 }

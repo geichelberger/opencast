@@ -31,8 +31,8 @@ public abstract class ElasticsearchDataFetcher<T> extends ParameterDataFetcher<T
   public static final int DEFAULT_PAGE_SIZE = 20;
 
   protected <E extends SearchQuery> E addPaginationParams(E query, final DataFetchingEnvironment environment) {
-    query.withLimit(parseParam("limit", DEFAULT_PAGE_SIZE, environment))
-        .withOffset(parseParam("offset", 0, environment));
+    query.withLimit(parseLimit(DEFAULT_PAGE_SIZE, environment))
+        .withOffset(parseOffset(environment));
 
     return query;
   }

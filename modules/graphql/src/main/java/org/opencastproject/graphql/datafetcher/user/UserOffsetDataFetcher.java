@@ -49,8 +49,8 @@ public class UserOffsetDataFetcher extends ParameterDataFetcher<GqlUserList> {
   public GqlUserList get(OpencastContext opencastContext, DataFetchingEnvironment dataFetchingEnvironment) {
     UserDirectoryService userDirectoryService = opencastContext.getService(UserDirectoryService.class);
 
-    Integer limit = parseParam("limit", 1000, dataFetchingEnvironment);
-    Integer offset = parseParam("offset", 0, dataFetchingEnvironment);
+    int limit = parseLimit(MAX_PAGE_SIZE, dataFetchingEnvironment);
+    int offset = parseOffset(dataFetchingEnvironment);
 
     final boolean showPrivateDetails = UserPrivileges.isUserAdministrator(opencastContext.getUser(),
         opencastContext.getOrganization());
