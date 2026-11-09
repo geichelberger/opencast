@@ -21,26 +21,19 @@
 
 package org.opencastproject.graphql.command;
 
-import org.opencastproject.authorization.xacml.manager.api.AclService;
-import org.opencastproject.authorization.xacml.manager.api.AclServiceFactory;
 import org.opencastproject.elasticsearch.api.SearchIndexException;
 import org.opencastproject.elasticsearch.index.ElasticsearchIndex;
 import org.opencastproject.graphql.exception.GraphQLRuntimeException;
+import org.opencastproject.graphql.exception.OpencastErrorType;
 import org.opencastproject.graphql.execution.context.OpencastContext;
 import org.opencastproject.graphql.execution.context.OpencastContextManager;
 import org.opencastproject.graphql.series.GqlSeries;
 import org.opencastproject.graphql.type.input.AccessControlListInput;
 import org.opencastproject.graphql.type.input.GqlCommonSeriesMetadataInput;
 import org.opencastproject.index.service.api.IndexService;
-import org.opencastproject.index.service.catalog.adapter.series.CommonSeriesCatalogUIAdapter;
 import org.opencastproject.index.service.exception.IndexServiceException;
-import org.opencastproject.mediapackage.MediaPackageElementFlavor;
-import org.opencastproject.metadata.dublincore.DublinCoreMetadataCollection;
-import org.opencastproject.metadata.dublincore.MetadataField;
 import org.opencastproject.metadata.dublincore.MetadataList;
-import org.opencastproject.security.api.AccessControlEntry;
 import org.opencastproject.security.api.AccessControlList;
-import org.opencastproject.security.api.SecurityService;
 import org.opencastproject.series.api.SeriesService;
 
 import java.util.Map;
@@ -64,25 +57,13 @@ public class CreateSeriesCommand extends AbstractCommand<GqlSeries> {
 
     final Map<String, Object> seriesMetadata = environment.getArgument("metadata");
 
-    MetadataList metadataList = createMetadataList(seriesMetadata, indexService);
+    MetadataList metadataList = MetadataSupport.createSeriesMetadataList(seriesMetadata, indexService);
     Map<String, String> options = new TreeMap<>();
     Optional<Long> optThemeId = Optional.empty();
 
     final SeriesService seriesService = context.getService(SeriesService.class);
 
-    AccessControlList acl = new AccessControlList();
-    for (var entry : aclInput.getEntries()) {
-      for (var action : entry.getAction()) {
-        acl.getEntries().add(new AccessControlEntry(entry.getRole(), action, true));
-      }
-    }
-
-    if (aclInput.getManagedAclId() != null) {
-      AclService aclService = context.getService(AclServiceFactory.class)
-          .serviceFor(context.getService(SecurityService.class).getOrganization());
-      aclService.getAcl(aclInput.getManagedAclId())
-          .ifPresent(value -> acl.merge(value.getAcl()));
-    }
+    AccessControlList acl = AclSupport.createAccessControlList(aclInput, context);
     String seriesId;
     try {
       seriesId = indexService.createSeries(metadataList, options, Optional.of(acl), optThemeId);
@@ -92,31 +73,14 @@ public class CreateSeriesCommand extends AbstractCommand<GqlSeries> {
 
     try {
       return new GqlSeries(
-          index.getSeries(seriesId, context.getOrganization(), context.getUser()).get()
+          index.getSeries(seriesId, context.getOrganization(), context.getUser())
+              .orElseThrow(() -> new GraphQLRuntimeException(
+                  "Series " + seriesId + " was created but is not available in the index yet",
+                  OpencastErrorType.InternalError))
       );
     } catch (SearchIndexException e) {
       throw new GraphQLRuntimeException(e);
     }
-  }
-
-  private MetadataList createMetadataList(Map<String, Object> seriesMetadata, IndexService indexService) {
-    CommonSeriesCatalogUIAdapter adapter = (CommonSeriesCatalogUIAdapter) indexService
-        .getCommonSeriesCatalogUIAdapter();
-
-    MetadataList list = new MetadataList();
-    list.add(adapter, adapter.getRawFields());
-
-    final MediaPackageElementFlavor flavor = MediaPackageElementFlavor
-        .parseFlavor("dublincore/series");
-
-    final DublinCoreMetadataCollection collection = list.getMetadataByFlavor(flavor.toString());
-
-    seriesMetadata.keySet().forEach(k -> {
-      final MetadataField target = collection.getOutputFields().get(k);
-      target.setValue(seriesMetadata.get(k));
-    });
-
-    return list;
   }
 
   public static Builder create(

@@ -21,23 +21,19 @@
 
 package org.opencastproject.graphql.command;
 
-import org.opencastproject.authorization.xacml.manager.api.AclService;
-import org.opencastproject.authorization.xacml.manager.api.AclServiceFactory;
 import org.opencastproject.elasticsearch.api.SearchIndexException;
 import org.opencastproject.elasticsearch.index.ElasticsearchIndex;
 import org.opencastproject.graphql.event.GqlEvent;
 import org.opencastproject.graphql.exception.GraphQLNotFoundException;
 import org.opencastproject.graphql.exception.GraphQLRuntimeException;
 import org.opencastproject.graphql.exception.GraphQLUnauthorizedException;
+import org.opencastproject.graphql.exception.OpencastErrorType;
 import org.opencastproject.graphql.execution.context.OpencastContext;
 import org.opencastproject.graphql.execution.context.OpencastContextManager;
 import org.opencastproject.graphql.type.input.AccessControlListInput;
-import org.opencastproject.graphql.util.GraphQLObjectMapper;
 import org.opencastproject.index.service.api.IndexService;
 import org.opencastproject.index.service.exception.IndexServiceException;
-import org.opencastproject.security.api.AccessControlEntry;
 import org.opencastproject.security.api.AccessControlList;
-import org.opencastproject.security.api.SecurityService;
 import org.opencastproject.security.api.UnauthorizedException;
 import org.opencastproject.util.NotFoundException;
 
@@ -56,23 +52,14 @@ public class UpdateEventAclCommand extends AbstractCommand<GqlEvent> {
     final ElasticsearchIndex index = context.getService(ElasticsearchIndex.class);
     final IndexService indexService = context.getService(IndexService.class);
 
-    final AccessControlListInput aclInput = GraphQLObjectMapper.newInstance()
-        .convertValue(environment.getArgument("acl"), AccessControlListInput.class);
+    final AccessControlListInput aclInput = AclSupport.parseAclArgument(environment);
+
+    if (aclInput == null) {
+      throw new GraphQLRuntimeException("The 'acl' argument is required", OpencastErrorType.BadRequest);
+    }
 
     try {
-      AccessControlList acl = new AccessControlList();
-      for (var entry : aclInput.getEntries()) {
-        for (var action : entry.getAction()) {
-          acl.getEntries().add(new AccessControlEntry(entry.getRole(), action, true));
-        }
-      }
-
-      if (aclInput.getManagedAclId() != null) {
-        AclService aclService = context.getService(AclServiceFactory.class)
-                                       .serviceFor(context.getService(SecurityService.class).getOrganization());
-        aclService.getAcl(aclInput.getManagedAclId())
-                  .ifPresent(value -> acl.merge(value.getAcl()));
-      }
+      AccessControlList acl = AclSupport.createAccessControlList(aclInput, context);
       indexService.updateEventAcl(eventId, acl, index);
     } catch (IndexServiceException | SearchIndexException e) {
       throw new GraphQLRuntimeException(e);
@@ -83,7 +70,10 @@ public class UpdateEventAclCommand extends AbstractCommand<GqlEvent> {
     }
 
     try {
-      return new GqlEvent(indexService.getEvent(eventId, index).get());
+      return new GqlEvent(indexService.getEvent(eventId, index)
+          .orElseThrow(() -> new GraphQLRuntimeException(
+              "Event " + eventId + " was updated but is not available in the index yet",
+              OpencastErrorType.InternalError)));
     } catch (SearchIndexException e) {
       throw new GraphQLRuntimeException(e);
     }

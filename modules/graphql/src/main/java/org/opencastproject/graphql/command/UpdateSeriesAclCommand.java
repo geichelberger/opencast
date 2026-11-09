@@ -21,21 +21,17 @@
 
 package org.opencastproject.graphql.command;
 
-import org.opencastproject.authorization.xacml.manager.api.AclService;
-import org.opencastproject.authorization.xacml.manager.api.AclServiceFactory;
 import org.opencastproject.elasticsearch.api.SearchIndexException;
 import org.opencastproject.elasticsearch.index.ElasticsearchIndex;
 import org.opencastproject.graphql.exception.GraphQLNotFoundException;
 import org.opencastproject.graphql.exception.GraphQLRuntimeException;
 import org.opencastproject.graphql.exception.GraphQLUnauthorizedException;
+import org.opencastproject.graphql.exception.OpencastErrorType;
 import org.opencastproject.graphql.execution.context.OpencastContext;
 import org.opencastproject.graphql.execution.context.OpencastContextManager;
 import org.opencastproject.graphql.series.GqlSeries;
 import org.opencastproject.graphql.type.input.AccessControlListInput;
-import org.opencastproject.graphql.util.GraphQLObjectMapper;
-import org.opencastproject.security.api.AccessControlEntry;
 import org.opencastproject.security.api.AccessControlList;
-import org.opencastproject.security.api.SecurityService;
 import org.opencastproject.security.api.UnauthorizedException;
 import org.opencastproject.series.api.SeriesException;
 import org.opencastproject.series.api.SeriesService;
@@ -55,37 +51,29 @@ public class UpdateSeriesAclCommand extends AbstractCommand<GqlSeries> {
     OpencastContext context = OpencastContextManager.getCurrentContext();
     final SeriesService seriesService = context.getService(SeriesService.class);
 
-    final AccessControlListInput aclInput = GraphQLObjectMapper.newInstance()
-        .convertValue(environment.getArgument("acl"), AccessControlListInput.class);
-    if (aclInput != null) {
-      try {
-        AccessControlList acl = new AccessControlList();
-        for (var entry : aclInput.getEntries()) {
-          for (var action : entry.getAction()) {
-            acl.getEntries().add(new AccessControlEntry(entry.getRole(), action, true));
-          }
-        }
+    final AccessControlListInput aclInput = AclSupport.parseAclArgument(environment);
+    if (aclInput == null) {
+      throw new GraphQLRuntimeException("The 'acl' argument is required", OpencastErrorType.BadRequest);
+    }
 
-        if (aclInput.getManagedAclId() != null) {
-          AclService aclService = context.getService(AclServiceFactory.class)
-              .serviceFor(context.getService(SecurityService.class).getOrganization());
-          aclService.getAcl(aclInput.getManagedAclId())
-              .ifPresent(value -> acl.merge(value.getAcl()));
-        }
-        seriesService.updateAccessControl(seriesId, acl);
-      } catch (UnauthorizedException e) {
-        throw new GraphQLUnauthorizedException(e.getMessage());
-      } catch (NotFoundException e) {
-        throw new GraphQLNotFoundException(e.getMessage());
-      } catch (SeriesException e) {
-        throw new GraphQLRuntimeException(e);
-      }
+    try {
+      AccessControlList acl = AclSupport.createAccessControlList(aclInput, context);
+      seriesService.updateAccessControl(seriesId, acl);
+    } catch (UnauthorizedException e) {
+      throw new GraphQLUnauthorizedException(e.getMessage());
+    } catch (NotFoundException e) {
+      throw new GraphQLNotFoundException(e.getMessage());
+    } catch (SeriesException e) {
+      throw new GraphQLRuntimeException(e);
     }
 
     try {
       ElasticsearchIndex index = context.getService(ElasticsearchIndex.class);
       return new GqlSeries(
-          index.getSeries(seriesId, context.getOrganization(), context.getUser()).get()
+          index.getSeries(seriesId, context.getOrganization(), context.getUser())
+              .orElseThrow(() -> new GraphQLRuntimeException(
+                  "Series " + seriesId + " was updated but is not available in the index yet",
+                  OpencastErrorType.InternalError))
       );
     } catch (SearchIndexException e) {
       throw new GraphQLRuntimeException(e);

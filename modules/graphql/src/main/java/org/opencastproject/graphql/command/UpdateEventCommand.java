@@ -21,19 +21,17 @@
 
 package org.opencastproject.graphql.command;
 
-import org.opencastproject.authorization.xacml.manager.api.AclService;
-import org.opencastproject.authorization.xacml.manager.api.AclServiceFactory;
 import org.opencastproject.elasticsearch.api.SearchIndexException;
 import org.opencastproject.elasticsearch.index.ElasticsearchIndex;
 import org.opencastproject.graphql.event.GqlEvent;
 import org.opencastproject.graphql.exception.GraphQLNotFoundException;
 import org.opencastproject.graphql.exception.GraphQLRuntimeException;
 import org.opencastproject.graphql.exception.GraphQLUnauthorizedException;
+import org.opencastproject.graphql.exception.OpencastErrorType;
 import org.opencastproject.graphql.execution.context.OpencastContext;
 import org.opencastproject.graphql.execution.context.OpencastContextManager;
 import org.opencastproject.graphql.type.input.AccessControlListInput;
 import org.opencastproject.graphql.type.input.GqlCommonEventMetadataInput;
-import org.opencastproject.graphql.util.GraphQLObjectMapper;
 import org.opencastproject.graphql.util.MetadataFieldToGraphQLConverter;
 import org.opencastproject.index.service.api.IndexService;
 import org.opencastproject.index.service.catalog.adapter.events.CommonEventCatalogUIAdapter;
@@ -42,9 +40,7 @@ import org.opencastproject.mediapackage.MediaPackageElementFlavor;
 import org.opencastproject.metadata.dublincore.DublinCoreMetadataCollection;
 import org.opencastproject.metadata.dublincore.MetadataField;
 import org.opencastproject.metadata.dublincore.MetadataList;
-import org.opencastproject.security.api.AccessControlEntry;
 import org.opencastproject.security.api.AccessControlList;
-import org.opencastproject.security.api.SecurityService;
 import org.opencastproject.security.api.UnauthorizedException;
 import org.opencastproject.util.NotFoundException;
 
@@ -54,6 +50,7 @@ import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Map;
 
+import graphql.schema.CoercingParseValueException;
 import graphql.schema.GraphQLScalarType;
 import graphql.schema.GraphQLTypeUtil;
 
@@ -73,8 +70,18 @@ public class UpdateEventCommand extends AbstractCommand<GqlEvent> {
     final IndexService indexService = context.getService(IndexService.class);
 
     final Map<String, Object> eventMetadata = environment.getArgument("metadata");
+    final AccessControlListInput aclInput = AclSupport.parseAclArgument(environment);
+
+    // Prepare everything that can fail because of invalid input before the first write, so a bad request does not
+    // leave the event half updated.
+    final MetadataList metadata = createMetadataList(eventMetadata, indexService);
+    final AccessControlList acl = aclInput != null ? AclSupport.createAccessControlList(aclInput, context) : null;
+
     try {
-      indexService.updateEventMetadata(eventId, createMetadataList(eventMetadata, indexService), index);
+      indexService.updateEventMetadata(eventId, metadata, index);
+      if (acl != null) {
+        indexService.updateEventAcl(eventId, acl, index);
+      }
     } catch (IndexServiceException | SearchIndexException e) {
       throw new GraphQLRuntimeException(e);
     } catch (UnauthorizedException e) {
@@ -83,35 +90,11 @@ public class UpdateEventCommand extends AbstractCommand<GqlEvent> {
       throw new GraphQLNotFoundException(e.getMessage());
     }
 
-    final AccessControlListInput aclInput = GraphQLObjectMapper.newInstance()
-        .convertValue(environment.getArgument("acl"), AccessControlListInput.class);
-    if (aclInput != null) {
-      try {
-        AccessControlList acl = new AccessControlList();
-        for (var entry : aclInput.getEntries()) {
-          for (var action : entry.getAction()) {
-            acl.getEntries().add(new AccessControlEntry(entry.getRole(), action, true));
-          }
-        }
-
-        if (aclInput.getManagedAclId() != null) {
-          AclService aclService = context.getService(AclServiceFactory.class)
-                                         .serviceFor(context.getService(SecurityService.class).getOrganization());
-          aclService.getAcl(aclInput.getManagedAclId())
-                    .ifPresent(value -> acl.merge(value.getAcl()));
-        }
-        indexService.updateEventAcl(eventId, acl, index);
-      } catch (IndexServiceException | SearchIndexException e) {
-        throw new GraphQLRuntimeException(e);
-      } catch (UnauthorizedException e) {
-        throw new GraphQLUnauthorizedException(e.getMessage());
-      } catch (NotFoundException e) {
-        throw new GraphQLNotFoundException(e.getMessage());
-      }
-    }
-
     try {
-      return new GqlEvent(indexService.getEvent(eventId, index).get());
+      return new GqlEvent(indexService.getEvent(eventId, index)
+          .orElseThrow(() -> new GraphQLRuntimeException(
+              "Event " + eventId + " was updated but is not available in the index yet",
+              OpencastErrorType.InternalError)));
     } catch (SearchIndexException e) {
       throw new GraphQLRuntimeException(e);
     }
@@ -134,13 +117,18 @@ public class UpdateEventCommand extends AbstractCommand<GqlEvent> {
 
     for (Map.Entry<String, Object> entry: eventMetadata.entrySet()) {
       String key = entry.getKey();
-      final MetadataField target = collection.getOutputFields().get(key);
+      final MetadataField target = MetadataSupport.requireField(collection, key, "event");
       var type = GraphQLTypeUtil.unwrapNonNull(MetadataFieldToGraphQLConverter.convertType(target));
 
       Object value;
       if (type instanceof GraphQLScalarType) {
-        value = ((GraphQLScalarType)type).getCoercing()
-            .parseValue(eventMetadata.get(key), environment.getGraphQlContext(), environment.getLocale());
+        try {
+          value = ((GraphQLScalarType)type).getCoercing()
+              .parseValue(eventMetadata.get(key), environment.getGraphQlContext(), environment.getLocale());
+        } catch (CoercingParseValueException e) {
+          throw new GraphQLRuntimeException("Invalid value for metadata field '" + key + "': " + e.getMessage(),
+              OpencastErrorType.BadRequest, e);
+        }
       } else {
         value = eventMetadata.get(key);
       }

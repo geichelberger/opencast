@@ -24,6 +24,7 @@ package org.opencastproject.graphql.exception;
 import graphql.ErrorClassification;
 
 public enum OpencastErrorType implements ErrorClassification {
+  BadRequest,
   NotFound,
   Undefined,
   InternalError,
