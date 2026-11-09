@@ -1,0 +1,127 @@
+/*
+ * Licensed to The Apereo Foundation under one or more contributor license
+ * agreements. See the NOTICE file distributed with this work for additional
+ * information regarding copyright ownership.
+ *
+ *
+ * The Apereo Foundation licenses this file to you under the Educational
+ * Community License, Version 2.0 (the "License"); you may not use this file
+ * except in compliance with the License. You may obtain a copy of the License
+ * at:
+ *
+ *   http://opensource.org/licenses/ecl2.txt
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
+ * License for the specific language governing permissions and limitations under
+ * the License.
+ *
+ */
+
+package org.opencastproject.graphql.datafetcher.user;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import org.opencastproject.graphql.execution.context.OpencastContext;
+import org.opencastproject.graphql.execution.context.OpencastContextManager;
+import org.opencastproject.graphql.user.GqlUser;
+import org.opencastproject.graphql.user.GqlUserList;
+import org.opencastproject.graphql.user.UserPrivileges;
+import org.opencastproject.security.api.JaxbOrganization;
+import org.opencastproject.security.api.JaxbRole;
+import org.opencastproject.security.api.JaxbUser;
+import org.opencastproject.security.api.User;
+import org.opencastproject.security.api.UserDirectoryService;
+
+import org.easymock.EasyMock;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.osgi.framework.BundleContext;
+import org.osgi.framework.ServiceReference;
+
+import java.util.List;
+import java.util.Set;
+
+import graphql.schema.DataFetchingEnvironment;
+
+class UserOffsetDataFetcherTest {
+
+  private static final JaxbOrganization ORGANIZATION = new JaxbOrganization("mh_default_org", "Default", null,
+      "ROLE_ORG_ADMIN", "ROLE_ANONYMOUS", null);
+
+  private OpencastContext context;
+  private DataFetchingEnvironment environment;
+
+  @BeforeEach
+  @SuppressWarnings("unchecked")
+  void setUp() {
+    User alice = user("alice", "Alice Example", "alice@example.org", "ROLE_STUDENT");
+    User bob = user("bob", "Bob Example", "bob@example.org", "ROLE_TEACHER");
+
+    UserDirectoryService userDirectoryService = EasyMock.createMock(UserDirectoryService.class);
+    EasyMock.expect(userDirectoryService.getUsers()).andReturn(List.of(alice, bob)).anyTimes();
+
+    BundleContext bundleContext = EasyMock.createMock(BundleContext.class);
+    ServiceReference<UserDirectoryService> reference = EasyMock.createMock(ServiceReference.class);
+    EasyMock.expect(bundleContext.getServiceReference(UserDirectoryService.class)).andReturn(reference).anyTimes();
+    EasyMock.expect(bundleContext.getService(reference)).andReturn(userDirectoryService).anyTimes();
+
+    environment = EasyMock.createNiceMock(DataFetchingEnvironment.class);
+    EasyMock.replay(userDirectoryService, bundleContext, environment);
+
+    context = OpencastContextManager.initiateContext(bundleContext);
+    context.setOrganization(ORGANIZATION);
+  }
+
+  @AfterEach
+  void tearDown() {
+    OpencastContextManager.clearContext();
+  }
+
+  @Test
+  void hidesEmailAndRolesFromRegularUsers() {
+    context.setUser(user("carol", "Carol", "carol@example.org", "ROLE_USER"));
+
+    GqlUserList result = new UserOffsetDataFetcher().get(context, environment);
+
+    assertEquals(2, result.nodes().size());
+    for (GqlUser user : result.nodes()) {
+      assertNull(user.email());
+      assertTrue(user.roles().isEmpty());
+    }
+    assertEquals("Alice Example", result.nodes().get(0).name());
+  }
+
+  @Test
+  void doesNotMatchEmailAddressesForRegularUsers() {
+    context.setUser(user("carol", "Carol", "carol@example.org", "ROLE_USER"));
+
+    GqlUserList result = new UserOffsetDataFetcher().withFilter("alice@example").get(context, environment);
+
+    assertEquals(0L, result.totalCount());
+  }
+
+  @Test
+  void showsEmailAndRolesToUserAdministrators() {
+    for (String adminRole : List.of("ROLE_ADMIN", "ROLE_ORG_ADMIN", UserPrivileges.USERS_VIEW_ROLE)) {
+      context.setUser(user("admin", "Admin", "admin@example.org", adminRole));
+
+      GqlUserList result = new UserOffsetDataFetcher().withFilter("alice@example").get(context, environment);
+
+      assertEquals(1L, result.totalCount(), adminRole);
+      GqlUser alice = result.nodes().get(0);
+      assertEquals("alice@example.org", alice.email(), adminRole);
+      assertTrue(alice.roles().contains("ROLE_STUDENT"), adminRole);
+    }
+  }
+
+  private static User user(String username, String name, String email, String role) {
+    return new JaxbUser(username, null, name, email, "test", ORGANIZATION,
+        Set.of(new JaxbRole(role, ORGANIZATION)));
+  }
+
+}

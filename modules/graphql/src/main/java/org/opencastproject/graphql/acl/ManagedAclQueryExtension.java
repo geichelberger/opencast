@@ -22,6 +22,7 @@
 package org.opencastproject.graphql.acl;
 
 import org.opencastproject.graphql.datafetcher.acl.ManagedAclOffsetDataFetcher;
+import org.opencastproject.graphql.directive.RolesAllowed;
 import org.opencastproject.graphql.type.input.ManagedAclOrderByInput;
 import org.opencastproject.graphql.type.output.Query;
 
@@ -41,6 +42,7 @@ public final class ManagedAclQueryExtension {
   @GraphQLField
   @GraphQLNonNull
   @GraphQLDescription("A list of managed access control lists")
+  @RolesAllowed("ROLE_USER")
   public static GqlManagedAclCatalogue managedAcls(
       @GraphQLName("limit") Integer limit,
       @GraphQLName("offset") Integer offset,
