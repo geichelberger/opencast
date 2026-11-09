@@ -24,6 +24,7 @@ package org.opencastproject.graphql.event;
 import org.opencastproject.graphql.command.DeleteEventCommand;
 import org.opencastproject.graphql.command.UpdateEventAclCommand;
 import org.opencastproject.graphql.command.UpdateEventCommand;
+import org.opencastproject.graphql.directive.RolesAllowed;
 import org.opencastproject.graphql.type.input.AccessControlListInput;
 import org.opencastproject.graphql.type.input.GqlCommonEventMetadataInput;
 import org.opencastproject.graphql.type.input.Mutation;
@@ -44,6 +45,7 @@ public final class EventMutationExtension {
   @GraphQLField
   @GraphQLNonNull
   @GraphQLDescription("Update event metadata")
+  @RolesAllowed("ROLE_USER")
   public static GqlEvent updateEvent(
       @GraphQLName("id") @GraphQLNonNull String id,
       @GraphQLName("metadata") @GraphQLNonNull GqlCommonEventMetadataInput eventMetadataInput,
@@ -59,6 +61,7 @@ public final class EventMutationExtension {
   @GraphQLField
   @GraphQLNonNull
   @GraphQLDescription("Update event acl")
+  @RolesAllowed("ROLE_USER")
   public static GqlEvent updateEventAcl(
       @GraphQLName("id") @GraphQLNonNull String id,
       @GraphQLName("acl") @GraphQLNonNull AccessControlListInput aclInput,
@@ -72,6 +75,7 @@ public final class EventMutationExtension {
 
   @GraphQLField
   @GraphQLDescription("Delete event")
+  @RolesAllowed("ROLE_USER")
   public static GqlDeleteEventPayload deleteEvent(
       @GraphQLName("id") @GraphQLNonNull String id,
       final DataFetchingEnvironment environment) {
