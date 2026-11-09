@@ -61,6 +61,17 @@ public interface PlaylistDatabaseService {
   List<Playlist> getPlaylists(int limit, int offset, SortCriterion sortCriterion)
           throws PlaylistDatabaseException;
 
+  /**
+   * Get several playlists of one organization based on their order in the database
+   * @param limit Maximum amount of playlists to return
+   * @param offset The index of the first result to return
+   * @param orgId The id of the organization the playlists belong to, or null for the playlists of all organizations
+   * @return a list of {@link Playlist}s
+   * @throws PlaylistDatabaseException if there is a problem communicating with the underlying data store
+   */
+  List<Playlist> getPlaylists(int limit, int offset, SortCriterion sortCriterion, String orgId)
+          throws PlaylistDatabaseException;
+
   List<Playlist> getAllForAdministrativeRead(Date from, Date endDate, int limit)
           throws PlaylistDatabaseException;
 

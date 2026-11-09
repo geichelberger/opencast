@@ -20,6 +20,7 @@
  */
 package org.opencastproject.playlists.persistence;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.opencastproject.db.DBTestEnv.getDbSessionFactory;
 import static org.opencastproject.db.DBTestEnv.newEntityManagerFactory;
@@ -113,5 +114,24 @@ public class PlaylistDatabaseServiceTest {
     playlistDatabaseService.deletePlaylist(testPlaylist, securityService.getOrganization().getId());
     playlists = playlistDatabaseService.getPlaylists(100, 0, new SortCriterion("", SortCriterion.Order.None));
     assertTrue("Exactly zero playlists should be returned", playlists.isEmpty());
+  }
+
+  @Test
+  public void testRetrievingByOrganization() throws Exception {
+    playlistDatabaseService.updatePlaylist(testPlaylist, "mh_default_org");
+    Playlist otherOrgPlaylist = new Playlist();
+    otherOrgPlaylist.setId("43");
+    otherOrgPlaylist.setOrganization("other_org");
+    otherOrgPlaylist.setTitle("other title");
+    otherOrgPlaylist.setUpdated(new Date(1701361007521L));
+    playlistDatabaseService.updatePlaylist(otherOrgPlaylist, "other_org");
+
+    SortCriterion byId = new SortCriterion("id", SortCriterion.Order.Ascending);
+    assertEquals(2, playlistDatabaseService.getPlaylists(100, 0, byId, null).size());
+    List<Playlist> playlists = playlistDatabaseService.getPlaylists(100, 0, byId, "mh_default_org");
+    assertEquals(1, playlists.size());
+    assertEquals("42", playlists.get(0).getId());
+    assertEquals(1, playlistDatabaseService.getPlaylists(100, 0, byId, "other_org").size());
+    assertTrue(playlistDatabaseService.getPlaylists(100, 0, byId, "unknown_org").isEmpty());
   }
 }

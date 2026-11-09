@@ -47,6 +47,7 @@ import javax.persistence.EntityManagerFactory;
 import javax.persistence.TypedQuery;
 import javax.persistence.criteria.CriteriaBuilder;
 import javax.persistence.criteria.CriteriaQuery;
+import javax.persistence.criteria.Predicate;
 import javax.persistence.criteria.Root;
 
 @Component(
@@ -136,14 +137,28 @@ public class PlaylistDatabaseServiceImpl implements PlaylistDatabaseService {
   @Override
   public List<Playlist> getPlaylists(int limit, int offset, SortCriterion sortCriterion)
           throws PlaylistDatabaseException {
+    return getPlaylists(limit, offset, sortCriterion, null);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * @see PlaylistDatabaseService#getPlaylists(int, int, SortCriterion, String)
+   */
+  @Override
+  public List<Playlist> getPlaylists(int limit, int offset, SortCriterion sortCriterion, String orgId)
+          throws PlaylistDatabaseException {
 
     try {
       return db.exec(em -> {
         CriteriaBuilder criteriaBuilder = em.getCriteriaBuilder();
         CriteriaQuery<Playlist> criteriaQuery = criteriaBuilder.createQuery(Playlist.class);
         Root<Playlist> from = criteriaQuery.from(Playlist.class);
+        Predicate notDeleted = criteriaBuilder.isNull(from.get("deletionDate"));
         CriteriaQuery<Playlist> select = criteriaQuery.select(from)
-            .where(criteriaBuilder.isNull(from.get("deletionDate")));
+            .where(orgId == null
+                ? notDeleted
+                : criteriaBuilder.and(notDeleted, criteriaBuilder.equal(from.get("organization"), orgId)));
 
         if (sortCriterion.getOrder().equals(SortCriterion.Order.Ascending)) {
           criteriaQuery.orderBy(criteriaBuilder.asc(from.get(sortCriterion.getFieldName())));

@@ -39,6 +39,7 @@ import org.opencastproject.security.api.SecurityService;
 import org.opencastproject.security.api.User;
 import org.opencastproject.util.NotFoundException;
 import org.opencastproject.util.data.Tuple;
+import org.opencastproject.util.requests.SortCriterion;
 
 import org.easymock.EasyMock;
 import org.junit.Assert;
@@ -46,6 +47,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 
@@ -122,6 +124,29 @@ public class PlaylistServiceTest {
     } catch (NotFoundException e) {
       // expected
     }
+  }
+
+  @Test
+  public void streamReadablePlaylistsReadsAllBatches() throws Exception {
+    List<String> ids = new ArrayList<>();
+    for (int i = 0; i < 5; i++) {
+      Playlist newPlaylist = new Playlist();
+      newPlaylist.setOrganization("mh_default_org");
+      newPlaylist.setTitle("title " + i);
+      ids.add(service.update(newPlaylist).getId());
+    }
+    Collections.sort(ids);
+    SortCriterion byId = new SortCriterion("id", SortCriterion.Order.Ascending);
+
+    // 5 playlists in batches of 2: two full batches and a partial one
+    Assert.assertEquals(ids, service.streamReadablePlaylists(byId, 2).map(Playlist::getId).toList());
+    Assert.assertEquals(ids.subList(1, 4),
+        service.streamReadablePlaylists(byId, 2).skip(1).limit(3).map(Playlist::getId).toList());
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void streamReadablePlaylistsRejectsInvalidBatchSize() {
+    service.streamReadablePlaylists(new SortCriterion("id", SortCriterion.Order.Ascending), 0);
   }
 
   @Test
