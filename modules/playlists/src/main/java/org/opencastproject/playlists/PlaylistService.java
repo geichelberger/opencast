@@ -58,6 +58,8 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 @Component(
     property = {
@@ -164,6 +166,42 @@ public class PlaylistService {
       return playlists;
     } catch (PlaylistDatabaseException e) {
       throw new IllegalStateException("Could not get playlist from database with id ");
+    }
+  }
+
+  /**
+   * Get the playlists the current user may read, loaded lazily from the database in batches.
+   *
+   * <p>{@link #getPlaylists(int, int, SortCriterion)} applies limit and offset before the permission check, so its
+   * pages can be short. This stream allows paging through the readable playlists instead, e.g. with
+   * {@code skip(offset).limit(limit)}: only as many batches are loaded as the stream's consumer needs.
+   *
+   * <p>Only playlists of the current organization are loaded, except for global administrators, who may read the
+   * playlists of all organizations.
+   *
+   * @param sortCriterion the order of the playlists. Use a unique one such as the id, so batches do not overlap.
+   * @param batchSize the number of playlists loaded from the database at once
+   * @return the readable playlists
+   */
+  public Stream<Playlist> streamReadablePlaylists(SortCriterion sortCriterion, int batchSize) {
+    if (batchSize < 1) {
+      throw new IllegalArgumentException("batchSize must be positive");
+    }
+    final String orgId = securityService.getUser().hasRole(GLOBAL_ADMIN_ROLE)
+        ? null
+        : securityService.getOrganization().getId();
+    return IntStream.iterate(0, offset -> offset + batchSize)
+        .mapToObj(offset -> loadPlaylists(batchSize, offset, sortCriterion, orgId))
+        .takeWhile(batch -> !batch.isEmpty())
+        .flatMap(List::stream)
+        .filter(playlist -> checkPermission(playlist, Permissions.Action.READ));
+  }
+
+  private List<Playlist> loadPlaylists(int limit, int offset, SortCriterion sortCriterion, String orgId) {
+    try {
+      return persistence.getPlaylists(limit, offset, sortCriterion, orgId);
+    } catch (PlaylistDatabaseException e) {
+      throw new IllegalStateException("Could not get playlists from database", e);
     }
   }
 

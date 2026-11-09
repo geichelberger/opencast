@@ -26,6 +26,7 @@ import org.opencastproject.playlists.Playlist;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.function.LongSupplier;
 import java.util.stream.Collectors;
 
 import graphql.annotations.annotationTypes.GraphQLDescription;
@@ -41,13 +42,22 @@ public class GqlPlaylistList {
   public static final String TYPE_NAME = "PlaylistList";
 
   private final List<Playlist> playlists;
-  private final long totalCount;
+  private final LongSupplier totalCountSupplier;
   private final long limit;
   private final long offset;
 
-  public GqlPlaylistList(List<Playlist> playlists, int limit, int offset) {
+  private Long totalCount;
+
+  /**
+   * @param playlists the playlists of the page
+   * @param totalCount counts all playlists of the list. It is only called if the client asks for the total count or
+   *     the page info, as counting can be expensive, and at most once.
+   * @param limit the page size
+   * @param offset the offset of the page
+   */
+  public GqlPlaylistList(List<Playlist> playlists, LongSupplier totalCount, int limit, int offset) {
     this.playlists = playlists;
-    this.totalCount = playlists == null ? 0L : playlists.size();
+    this.totalCountSupplier = totalCount;
     this.limit = limit;
     this.offset = offset;
   }
@@ -55,13 +65,17 @@ public class GqlPlaylistList {
   @GraphQLField
   @GraphQLNonNull
   public Long totalCount() {
+    if (totalCount == null) {
+      totalCount = totalCountSupplier.getAsLong();
+    }
     return totalCount;
   }
 
   @GraphQLField
   @GraphQLNonNull
   public OffsetPageInfo pageInfo() {
-    long pageCount = limit > 0 ? (totalCount + limit - 1) / limit : 0L;
+    long total = totalCount();
+    long pageCount = limit > 0 ? (total + limit - 1) / limit : 0L;
     return new OffsetPageInfo(pageCount, limit, offset);
   }
 

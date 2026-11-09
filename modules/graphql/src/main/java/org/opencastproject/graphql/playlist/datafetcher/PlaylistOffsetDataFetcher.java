@@ -32,12 +32,18 @@ import org.opencastproject.security.api.AccessControlList;
 import org.opencastproject.security.api.AuthorizationService;
 import org.opencastproject.security.api.Permissions;
 import org.opencastproject.security.api.User;
+import org.opencastproject.util.requests.SortCriterion;
 
 import java.util.List;
+import java.util.function.Supplier;
+import java.util.stream.Stream;
 
 import graphql.schema.DataFetchingEnvironment;
 
 public class PlaylistOffsetDataFetcher extends ElasticsearchDataFetcher<GqlPlaylistList> {
+
+  /** The number of playlists loaded from the database at once. */
+  static final int BATCH_SIZE = 100;
 
   private User user;
   private boolean writeOnly;
@@ -57,16 +63,24 @@ public class PlaylistOffsetDataFetcher extends ElasticsearchDataFetcher<GqlPlayl
     PlaylistService playlistService = opencastContext.getService(PlaylistService.class);
     AuthorizationService authorizationService = opencastContext.getService(AuthorizationService.class);
 
-    int limit = parseParam("limit", DEFAULT_PAGE_SIZE, dataFetchingEnvironment);
-    int offset = parseParam("offset", 0, dataFetchingEnvironment);
+    int limit = Math.max(0, parseParam("limit", DEFAULT_PAGE_SIZE, dataFetchingEnvironment));
+    int offset = Math.max(0, parseParam("offset", 0, dataFetchingEnvironment));
 
-    List<Playlist> playlists = playlistService.getPlaylists(limit, offset).stream()
-        .filter(p -> !writeOnly || hasWritePermission(p, authorizationService))
+    // Permissions are checked after loading, so the readable playlists are read lazily in batches: a page only loads
+    // what it needs. Sort by id to keep paging stable.
+    Supplier<Stream<Playlist>> accessiblePlaylists = () -> playlistService
+        .streamReadablePlaylists(new SortCriterion("id", SortCriterion.Order.Ascending), BATCH_SIZE)
+        .filter(p -> !writeOnly || hasWritePermission(p, authorizationService));
+
+    List<Playlist> playlists = accessiblePlaylists.get()
+        .skip(offset)
+        .limit(limit)
         .map(playlistService::enrich)
         .map(JaxbPlaylist::toPlaylist)
         .toList();
 
-    return new GqlPlaylistList(playlists, limit, offset);
+    // Counting reads all playlists, so it only happens if the client asks for the total
+    return new GqlPlaylistList(playlists, () -> accessiblePlaylists.get().count(), limit, offset);
   }
 
   private boolean hasWritePermission(Playlist playlist, AuthorizationService authorizationService) {
