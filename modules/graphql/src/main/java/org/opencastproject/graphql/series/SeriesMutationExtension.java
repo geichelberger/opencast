@@ -59,6 +59,7 @@ public final class SeriesMutationExtension {
   @GraphQLField
   @GraphQLNonNull
   @GraphQLDescription("Update series metadata and optional the acl")
+  @RolesAllowed("ROLE_USER")
   public static GqlSeries updateSeries(
       @GraphQLName("id") @GraphQLNonNull String id,
       @GraphQLName("metadata") @GraphQLNonNull GqlCommonSeriesMetadataInput seriesMetadataInput,
@@ -73,6 +74,7 @@ public final class SeriesMutationExtension {
   @GraphQLField
   @GraphQLNonNull
   @GraphQLDescription("Update series acl")
+  @RolesAllowed("ROLE_USER")
   public static GqlSeries updateSeriesAcl(
       @GraphQLName("id") @GraphQLNonNull String id,
       @GraphQLName("acl") @GraphQLNonNull AccessControlListInput aclInput,

@@ -52,6 +52,9 @@ public class UpdateEventAclCommand extends AbstractCommand<GqlEvent> {
     final ElasticsearchIndex index = context.getService(ElasticsearchIndex.class);
     final IndexService indexService = context.getService(IndexService.class);
 
+    // Before anything else: the index service does not check write access for every kind of event
+    EventSupport.requireWritableEvent(eventId, context);
+
     final AccessControlListInput aclInput = AclSupport.parseAclArgument(environment);
 
     if (aclInput == null) {

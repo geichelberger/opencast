@@ -21,8 +21,7 @@
 
 package org.opencastproject.graphql.command;
 
-import org.opencastproject.elasticsearch.api.SearchIndexException;
-import org.opencastproject.elasticsearch.index.ElasticsearchIndex;
+import org.opencastproject.elasticsearch.index.objects.event.Event;
 import org.opencastproject.graphql.event.GqlDeleteEventPayload;
 import org.opencastproject.graphql.exception.GraphQLNotFoundException;
 import org.opencastproject.graphql.exception.GraphQLRuntimeException;
@@ -47,21 +46,17 @@ public class DeleteEventCommand extends AbstractCommand<GqlDeleteEventPayload> {
   public GqlDeleteEventPayload execute() {
     OpencastContext context = OpencastContextManager.getCurrentContext();
     final IndexService indexService = context.getService(IndexService.class);
-    final ElasticsearchIndex index = context.getService(ElasticsearchIndex.class);
 
     IndexService.EventRemovalResult result;
     try {
-      var event = indexService.getEvent(this.id, index);
-      if (event.isPresent()) {
-        result = indexService.removeEvent(event.get(), context.getConfiguration().eventRetractWorkflowId());
-      } else {
-        throw new GraphQLNotFoundException("Event with id " + this.id + " not found.");
-      }
+      // Removing an event only requires read access in the index service, so check write access first
+      final Event event = EventSupport.requireWritableEvent(this.id, context);
+      result = indexService.removeEvent(event, context.getConfiguration().eventRetractWorkflowId());
     } catch (UnauthorizedException e) {
       throw new GraphQLUnauthorizedException(e.getMessage());
     } catch (NotFoundException e) {
       throw new GraphQLNotFoundException(e.getMessage());
-    } catch (SearchIndexException | WorkflowDatabaseException e) {
+    } catch (WorkflowDatabaseException e) {
       throw new GraphQLRuntimeException(e);
     }
 
