@@ -52,6 +52,7 @@ class GraphQLServletTest {
     HttpServletResponse response = EasyMock.createMock(HttpServletResponse.class);
     StringWriter body = new StringWriter();
     expectNoCors(request, response);
+    EasyMock.expect(request.getContentType()).andReturn("application/json; charset=utf-8");
 
     final var bytes = new ByteArrayInputStream("{not json".getBytes(StandardCharsets.UTF_8));
     EasyMock.expect(request.getInputStream()).andReturn(new ServletInputStream() {
@@ -178,6 +179,50 @@ class GraphQLServletTest {
 
     // the CORS header is also present on error responses
     EasyMock.verify(request, response, executionService, configuration);
+  }
+
+  @Test
+  void rejectsMutationOverGet() throws Exception {
+    HttpServletRequest request = EasyMock.createMock(HttpServletRequest.class);
+    HttpServletResponse response = EasyMock.createMock(HttpServletResponse.class);
+    StringWriter body = new StringWriter();
+    expectNoCors(request, response);
+    EasyMock.expect(request.getParameter("query")).andReturn("query A { __typename } mutation B { x }");
+    EasyMock.expect(request.getParameter("operationName")).andReturn("A");
+    EasyMock.expect(request.getParameter("variables")).andReturn(null);
+    EasyMock.expect(request.getParameter("extensions")).andReturn(null);
+    response.setStatus(HttpServletResponse.SC_METHOD_NOT_ALLOWED);
+    response.setCharacterEncoding("UTF-8");
+    response.setContentType("application/graphql-response+json");
+    EasyMock.expect(response.getWriter()).andReturn(new PrintWriter(body));
+    // executionService has no expectations, so executing the query would fail the test
+    EasyMock.replay(request, response, executionService, configuration);
+
+    servlet.doGet(request, response);
+
+    EasyMock.verify(request, response, executionService, configuration);
+    assertTrue(body.toString().contains("Mutations are only allowed with POST"), body.toString());
+  }
+
+  @Test
+  void rejectsPostWithoutJsonContentType() throws Exception {
+    HttpServletRequest request = EasyMock.createMock(HttpServletRequest.class);
+    HttpServletResponse response = EasyMock.createMock(HttpServletResponse.class);
+    StringWriter body = new StringWriter();
+    expectNoCors(request, response);
+    // what a cross-site <form enctype="text/plain"> sends
+    EasyMock.expect(request.getContentType()).andReturn("text/plain");
+    response.setStatus(HttpServletResponse.SC_UNSUPPORTED_MEDIA_TYPE);
+    response.setCharacterEncoding("UTF-8");
+    response.setContentType("application/graphql-response+json");
+    EasyMock.expect(response.getWriter()).andReturn(new PrintWriter(body));
+    // getInputStream has no expectation, so reading the body would fail the test
+    EasyMock.replay(request, response, executionService, configuration);
+
+    servlet.doPost(request, response);
+
+    EasyMock.verify(request, response, executionService, configuration);
+    assertTrue(body.toString().contains("Content-Type must be application/json"), body.toString());
   }
 
 }
