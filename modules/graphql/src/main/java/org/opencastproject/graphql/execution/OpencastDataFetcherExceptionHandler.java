@@ -22,12 +22,16 @@
 package org.opencastproject.graphql.execution;
 
 import org.opencastproject.graphql.exception.GraphQLRuntimeException;
+import org.opencastproject.graphql.exception.OpencastErrorType;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.concurrent.CompletableFuture;
 
-import graphql.ExceptionWhileDataFetching;
 import graphql.GraphQLError;
+import graphql.GraphqlErrorBuilder;
 import graphql.execution.DataFetcherExceptionHandler;
 import graphql.execution.DataFetcherExceptionHandlerParameters;
 import graphql.execution.DataFetcherExceptionHandlerResult;
@@ -35,6 +39,8 @@ import graphql.execution.ResultPath;
 import graphql.language.SourceLocation;
 
 public class OpencastDataFetcherExceptionHandler implements DataFetcherExceptionHandler {
+
+  private static final Logger logger = LoggerFactory.getLogger(OpencastDataFetcherExceptionHandler.class);
 
   @Override
   public CompletableFuture<DataFetcherExceptionHandlerResult> handleException(
@@ -50,9 +56,20 @@ public class OpencastDataFetcherExceptionHandler implements DataFetcherException
 
     GraphQLError error;
     if (exception instanceof GraphQLRuntimeException) {
-      error = (GraphQLError) exception;
+      GraphQLRuntimeException graphQLException = (GraphQLRuntimeException) exception;
+      if (graphQLException.getErrorType() == OpencastErrorType.InternalError) {
+        logger.error("Error while fetching {}", path, exception);
+      }
+      error = graphQLException;
     } else {
-      error = new ExceptionWhileDataFetching(path, exception, sourceLocation);
+      // Unexpected exception: its message may contain internal details, so only log it
+      logger.error("Unexpected error while fetching {}", path, exception);
+      error = GraphqlErrorBuilder.newError()
+          .message(GraphQLRuntimeException.INTERNAL_ERROR_MESSAGE)
+          .path(path)
+          .location(sourceLocation)
+          .errorType(OpencastErrorType.InternalError)
+          .build();
     }
     return DataFetcherExceptionHandlerResult.newResult().error(error).build();
   }

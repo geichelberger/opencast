@@ -25,6 +25,7 @@ import org.opencastproject.graphql.exception.GraphQLNotFoundException;
 import org.opencastproject.graphql.execution.context.OpencastContextManager;
 import org.opencastproject.graphql.schema.SchemaService;
 import org.opencastproject.security.api.SecurityService;
+import org.opencastproject.security.api.User;
 
 import org.osgi.framework.BundleContext;
 import org.osgi.service.component.annotations.Activate;
@@ -51,6 +52,7 @@ import graphql.execution.AsyncSerialExecutionStrategy;
 import graphql.execution.instrumentation.ChainedInstrumentation;
 import graphql.execution.instrumentation.Instrumentation;
 import graphql.execution.instrumentation.tracing.TracingInstrumentation;
+import graphql.introspection.Introspection;
 import graphql.schema.GraphQLSchema;
 
 @Component(
@@ -59,6 +61,9 @@ import graphql.schema.GraphQLSchema;
 public class ExecutionService {
 
   private static final Logger logger = LoggerFactory.getLogger(ExecutionService.class);
+
+  /** The role every logged-in user has. */
+  public static final String AUTHENTICATED_ROLE = "ROLE_USER";
 
   private final SecurityService securityService;
   private final SchemaService schemaService;
@@ -125,6 +130,11 @@ public class ExecutionService {
       context.setUser(securityService.getUser());
 
       executionInput.getGraphQLContext().put(OpencastContextManager.CONTEXT, context);
+      // Do not expose the schema to unauthenticated users. graphql-java checks this per request during execution,
+      // so cached query documents are not affected.
+      if (!isAuthenticated(securityService.getUser())) {
+        executionInput.getGraphQLContext().put(Introspection.INTROSPECTION_DISABLED, true);
+      }
 
       var graphQL = getGraphQL(securityService.getOrganization().getId());
 
@@ -139,6 +149,14 @@ public class ExecutionService {
     } finally {
       OpencastContextManager.clearContext();
     }
+  }
+
+  /**
+   * @return whether the user is logged in. Authenticated users have {@link #AUTHENTICATED_ROLE}, the anonymous user
+   *     does not.
+   */
+  public static boolean isAuthenticated(User user) {
+    return user != null && user.hasRole(AUTHENTICATED_ROLE);
   }
 
   private GraphQL getGraphQL(String organizationId) {
