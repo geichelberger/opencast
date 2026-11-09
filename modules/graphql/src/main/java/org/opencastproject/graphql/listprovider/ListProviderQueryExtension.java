@@ -21,6 +21,7 @@
 
 package org.opencastproject.graphql.listprovider;
 
+import org.opencastproject.graphql.datafetcher.ParameterDataFetcher;
 import org.opencastproject.graphql.defaultvalue.DefaultFalse;
 import org.opencastproject.graphql.directive.RolesAllowed;
 import org.opencastproject.graphql.exception.GraphQLNotFoundException;
@@ -62,8 +63,10 @@ public final class ListProviderQueryExtension {
 
     var listProvider = context.getService(ListProvidersService.class);
     var resourceListQuery = new DefaultResourceListQuery();
-    resourceListQuery.setLimit(limit);
-    resourceListQuery.setOffset(offset);
+    // Without a limit the whole list is returned, as clients usually need all values, e.g. for a selection. An explicit
+    // page is validated like everywhere else.
+    resourceListQuery.setLimit(limit == null ? null : ParameterDataFetcher.validateLimit(limit));
+    resourceListQuery.setOffset(offset == null ? null : ParameterDataFetcher.validateOffset(offset));
     addRequestFiltersToQuery(filter, resourceListQuery);
 
     try {

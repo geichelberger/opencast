@@ -41,20 +41,33 @@ public class GqlManagedAclCatalogue {
 
   private final List<ManagedAcl> acls;
 
-  public GqlManagedAclCatalogue(List<ManagedAcl> acls) {
+  private final long totalCount;
+
+  private final long offset;
+
+  private final long limit;
+
+  /**
+   * @param acls the ACLs of the requested page
+   * @param totalCount the number of ACLs over all pages
+   */
+  public GqlManagedAclCatalogue(List<ManagedAcl> acls, long totalCount, long offset, long limit) {
     this.acls = acls;
+    this.totalCount = totalCount;
+    this.offset = offset;
+    this.limit = limit;
   }
 
   @GraphQLField
   @GraphQLNonNull
   public Long totalCount() {
-    return (long) acls.size();
+    return totalCount;
   }
 
   @GraphQLField
   @GraphQLNonNull
   public OffsetPageInfo pageInfo() {
-    return new OffsetPageInfo(1L, Long.MAX_VALUE, 0L);
+    return new OffsetPageInfo((totalCount + limit - 1) / limit, limit, offset);
   }
 
   @GraphQLField

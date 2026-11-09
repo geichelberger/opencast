@@ -63,8 +63,8 @@ public class PlaylistOffsetDataFetcher extends ElasticsearchDataFetcher<GqlPlayl
     PlaylistService playlistService = opencastContext.getService(PlaylistService.class);
     AuthorizationService authorizationService = opencastContext.getService(AuthorizationService.class);
 
-    int limit = Math.max(0, parseParam("limit", DEFAULT_PAGE_SIZE, dataFetchingEnvironment));
-    int offset = Math.max(0, parseParam("offset", 0, dataFetchingEnvironment));
+    int limit = parseLimit(DEFAULT_PAGE_SIZE, dataFetchingEnvironment);
+    int offset = parseOffset(dataFetchingEnvironment);
 
     // Permissions are checked after loading, so the readable playlists are read lazily in batches: a page only loads
     // what it needs. Sort by id to keep paging stable.
