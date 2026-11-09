@@ -26,6 +26,7 @@ import static org.opencastproject.userdirectory.UserIdRoleProvider.getUserIdRole
 import org.opencastproject.security.api.Role;
 import org.opencastproject.security.api.User;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -56,8 +57,9 @@ public class GqlUser {
   }
 
   @GraphQLField
+  @GraphQLDescription("The email address of the user. Only visible to user administrators.")
   public String email() {
-    return user.getEmail();
+    return UserPrivileges.canSeePrivateDetails() ? user.getEmail() : null;
   }
 
   @GraphQLField
@@ -67,8 +69,11 @@ public class GqlUser {
 
   @GraphQLField
   @GraphQLNonNull
-  @GraphQLDescription("A list of roles assigned to the user.")
+  @GraphQLDescription("A list of roles assigned to the user. Only visible to user administrators, empty otherwise.")
   public List<String> roles() {
+    if (!UserPrivileges.canSeePrivateDetails()) {
+      return Collections.emptyList();
+    }
     return user.getRoles().stream().map(Role::getName).collect(Collectors.toList());
   }
 

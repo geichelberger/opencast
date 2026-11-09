@@ -47,10 +47,6 @@ public class GqlUserList {
 
   private final Long limit;
 
-  public GqlUserList(List<User> searchResult) {
-    this(searchResult, null, 0L, 1000L);
-  }
-
   public GqlUserList(List<User> searchResult, Long totalCount, Long offset, Long limit) {
     this.searchResult = searchResult;
     this.totalCount = totalCount;

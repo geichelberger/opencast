@@ -24,6 +24,7 @@ package org.opencastproject.graphql.datafetcher.user;
 import org.opencastproject.graphql.datafetcher.ParameterDataFetcher;
 import org.opencastproject.graphql.execution.context.OpencastContext;
 import org.opencastproject.graphql.user.GqlUserList;
+import org.opencastproject.graphql.user.UserPrivileges;
 import org.opencastproject.security.api.User;
 import org.opencastproject.security.api.UserDirectoryService;
 import org.opencastproject.util.SmartIterator;
@@ -51,12 +52,20 @@ public class UserOffsetDataFetcher extends ParameterDataFetcher<GqlUserList> {
     Integer limit = parseParam("limit", 1000, dataFetchingEnvironment);
     Integer offset = parseParam("offset", 0, dataFetchingEnvironment);
 
-    // Filter users by filter criteria
+    final boolean showPrivateDetails = UserPrivileges.isUserAdministrator(opencastContext.getUser(),
+        opencastContext.getOrganization());
+
+    // Filter users by filter criteria. Only match email addresses for user administrators, otherwise the search could
+    // be used to probe for addresses.
     List<User> filteredUsers = new ArrayList<>();
     for (User user : userDirectoryService.getUsers()) {
-      // Filter list
-      if (filter != null && !match(filter, user.getUsername(), user.getName(), user.getEmail(), user.getProvider())) {
-        continue;
+      if (filter != null) {
+        boolean matches = showPrivateDetails
+            ? match(filter, user.getUsername(), user.getName(), user.getEmail(), user.getProvider())
+            : match(filter, user.getUsername(), user.getName(), user.getProvider());
+        if (!matches) {
+          continue;
+        }
       }
       filteredUsers.add(user);
     }
