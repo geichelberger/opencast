@@ -42,6 +42,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -55,6 +56,10 @@ import javax.ws.rs.core.Response;
 
 import graphql.ExecutionResult;
 import graphql.GraphqlErrorBuilder;
+import graphql.language.Document;
+import graphql.language.OperationDefinition;
+import graphql.parser.InvalidSyntaxException;
+import graphql.parser.Parser;
 
 @Component(
     service = { HttpServlet.class, Servlet.class },
@@ -79,6 +84,8 @@ public class GraphQLServlet extends HttpServlet implements Servlet {
 
   // APPLICATION_GRAPHQL is a constant that represents the "application/graphql" string
   private static final String APPLICATION_GRAPHQL = "application/graphql-response+json";
+
+  private static final String JSON_MEDIA_TYPE = "application/json";
 
   // GRAPHQL_ENDPOINT is a constant that represents the "/graphql" string
   static final String GRAPHQL_ENDPOINT = "/graphql";
@@ -110,6 +117,10 @@ public class GraphQLServlet extends HttpServlet implements Servlet {
 
       Map<String, Object> variables = deserializeMap(VARIABLES, variablesParameter);
       Map<String, Object> extensions = deserializeMap(EXTENSIONS, extensionsParameter);
+
+      if (containsNonQueryOperation(query)) {
+        throw new WebApplicationException("Mutations are only allowed with POST", Response.Status.METHOD_NOT_ALLOWED);
+      }
 
       execute(query, operationName, variables, extensions, resp);
     } catch (WebApplicationException e) {
@@ -165,6 +176,12 @@ public class GraphQLServlet extends HttpServlet implements Servlet {
   protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
     corsHeaders(req, resp);
     try {
+      // Only accept JSON. Other content types such as text/plain can be sent cross-site by a plain HTML form without
+      // a CORS preflight, which would allow cross-site request forgery.
+      if (!isJson(req.getContentType())) {
+        throw new WebApplicationException("Content-Type must be application/json",
+            Response.Status.UNSUPPORTED_MEDIA_TYPE);
+      }
       TypeReference<HashMap<String,Object>> typeRef = new TypeReference<>() { };
       Map<String, Object> body;
       try {
@@ -204,6 +221,37 @@ public class GraphQLServlet extends HttpServlet implements Servlet {
           Response.Status.BAD_REQUEST);
     }
     return (Map<String, Object>) value;
+  }
+
+  private static boolean isJson(String contentType) {
+    if (contentType == null) {
+      return false;
+    }
+    String mediaType = contentType.split(";", 2)[0].trim().toLowerCase(Locale.ROOT);
+    return JSON_MEDIA_TYPE.equals(mediaType);
+  }
+
+  /**
+   * @return {@code true} if the document contains a mutation or subscription. Unparsable queries return
+   *     {@code false} and are rejected with a syntax error during execution.
+   */
+  private static boolean containsNonQueryOperation(String query) {
+    if (query == null || query.isBlank()) {
+      return false;
+    }
+    // Operation types are case sensitive keywords. Skip parsing the query a second time for the usual case of a
+    // query without them.
+    if (!query.contains("mutation") && !query.contains("subscription")) {
+      return false;
+    }
+    final Document document;
+    try {
+      document = Parser.parse(query);
+    } catch (InvalidSyntaxException e) {
+      return false;
+    }
+    return document.getDefinitionsOfType(OperationDefinition.class).stream()
+        .anyMatch(operation -> operation.getOperation() != OperationDefinition.Operation.QUERY);
   }
 
   private void validateQuery(String query) {

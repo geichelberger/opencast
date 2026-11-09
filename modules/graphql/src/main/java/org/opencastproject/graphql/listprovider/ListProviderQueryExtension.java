@@ -22,6 +22,7 @@
 package org.opencastproject.graphql.listprovider;
 
 import org.opencastproject.graphql.defaultvalue.DefaultFalse;
+import org.opencastproject.graphql.directive.RolesAllowed;
 import org.opencastproject.graphql.exception.GraphQLNotFoundException;
 import org.opencastproject.graphql.exception.GraphQLRuntimeException;
 import org.opencastproject.graphql.execution.context.OpencastContext;
@@ -49,6 +50,7 @@ public final class ListProviderQueryExtension {
   @GraphQLField
   @GraphQLNonNull
   @GraphQLDescription("Returns list provider")
+  @RolesAllowed("ROLE_USER")
   public static GqlListProvider listProvider(
       @GraphQLName("name") @GraphQLNonNull String name,
       @GraphQLName("limit") Integer limit,
