@@ -15,3 +15,14 @@ External API starting with `https://<hostname>/graphql`, where the hostname is d
 
 ### GraphQL UI
 The Opencast-Admin node comes with a built-in UI that allows you to explore the schema and execute queries. The UI is available at `https://<hostname>/graphql-ui`.
+
+### Cross-origin requests (CORS)
+By default the API only answers requests from the same origin. To call it from a browser application hosted on another
+origin, list the allowed origins in `etc/org.opencastproject.graphql.cfg`:
+
+```properties
+# Comma separated list of allowed origins, or * to allow any origin. Empty (default) disables CORS.
+cors.allowed.origins=https://app.example.org
+```
+
+Credentials (cookies or HTTP authentication) are not sent on cross-origin requests.

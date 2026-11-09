@@ -25,6 +25,10 @@ import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Modified;
 
+import java.util.Arrays;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 @Component(
     immediate = true,
     service = GraphQLConfiguration.class,
@@ -34,9 +38,14 @@ public class GraphQLConfiguration {
 
   private Config config;
 
+  private volatile Set<String> corsAllowedOrigins = Set.of();
+
   public @interface Config {
     String event_preview_subtype() default "preview";
     String event_retract_workflow_id() default "delete";
+
+    /** Comma separated list of origins that may call the API from a browser. Empty disables CORS. */
+    String cors_allowed_origins() default "";
 
   }
 
@@ -44,6 +53,10 @@ public class GraphQLConfiguration {
   @Modified
   protected void activate(final Config config) {
     this.config = config;
+    this.corsAllowedOrigins = Arrays.stream(config.cors_allowed_origins().split(","))
+        .map(String::trim)
+        .filter(origin -> !origin.isEmpty())
+        .collect(Collectors.toUnmodifiableSet());
   }
 
   public String eventPreviewSubtype() {
@@ -52,6 +65,13 @@ public class GraphQLConfiguration {
 
   public String eventRetractWorkflowId() {
     return config.event_retract_workflow_id();
+  }
+
+  /**
+   * @return The origins allowed to make cross-origin browser requests, or {@code *} to allow any origin.
+   */
+  public Set<String> corsAllowedOrigins() {
+    return corsAllowedOrigins;
   }
 
 }

@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import graphql.ExecutionResult;
 import graphql.GraphQLError;
@@ -40,7 +41,7 @@ public class ExecutionErrorResult implements ExecutionResult {
   }
 
   public ExecutionErrorResult(List<GraphQLError> errors, Map<Object, Object> extensions) {
-    this.errors = errors;
+    this.errors = errors != null ? errors : new ArrayList<>();
     this.extensions = extensions;
   }
 
@@ -67,7 +68,12 @@ public class ExecutionErrorResult implements ExecutionResult {
 
   @Override
   public Map<String, Object> toSpecification() {
-    return null;
+    Map<String, Object> result = new LinkedHashMap<>();
+    result.put("errors", errors.stream().map(GraphQLError::toSpecification).collect(Collectors.toList()));
+    if (extensions != null) {
+      result.put("extensions", extensions);
+    }
+    return result;
   }
 
   public static ExecutionErrorResult.Builder newExecutionResult() {
@@ -93,7 +99,7 @@ public class ExecutionErrorResult implements ExecutionResult {
 
     @Override
     public ExecutionErrorResult.Builder errors(List<GraphQLError> errors) {
-      this.errors = errors;
+      this.errors = errors != null ? new ArrayList<>(errors) : new ArrayList<>();
       return this;
     }
 

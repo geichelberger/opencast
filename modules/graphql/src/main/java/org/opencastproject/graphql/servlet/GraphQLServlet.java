@@ -21,6 +21,8 @@
 
 package org.opencastproject.graphql.servlet;
 
+import org.opencastproject.graphql.config.GraphQLConfiguration;
+import org.opencastproject.graphql.execution.ExecutionErrorResult;
 import org.opencastproject.graphql.execution.ExecutionService;
 import org.opencastproject.graphql.util.GraphQLObjectMapper;
 
@@ -41,6 +43,7 @@ import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 import javax.servlet.Servlet;
 import javax.servlet.ServletException;
@@ -51,6 +54,7 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response;
 
 import graphql.ExecutionResult;
+import graphql.GraphqlErrorBuilder;
 
 @Component(
     service = { HttpServlet.class, Servlet.class },
@@ -81,43 +85,77 @@ public class GraphQLServlet extends HttpServlet implements Servlet {
 
   private final ExecutionService executionService;
 
+  private final GraphQLConfiguration configuration;
+
   private final ObjectMapper objectMapper;
 
   @Activate
   public GraphQLServlet(
-      @Reference ExecutionService executionService
+      @Reference ExecutionService executionService,
+      @Reference GraphQLConfiguration configuration
   ) {
     this.executionService = executionService;
+    this.configuration = configuration;
     this.objectMapper = GraphQLObjectMapper.newInstance();
   }
 
   @Override
   protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-    String query = req.getParameter(QUERY);
-    String operationName = req.getParameter(OPERATION_NAME);
-    String variablesParameter = req.getParameter(VARIABLES);
-    String extensionsParameter = req.getParameter(EXTENSIONS);
+    corsHeaders(req, resp);
+    try {
+      String query = req.getParameter(QUERY);
+      String operationName = req.getParameter(OPERATION_NAME);
+      String variablesParameter = req.getParameter(VARIABLES);
+      String extensionsParameter = req.getParameter(EXTENSIONS);
 
-    Map<String, Object> variables = deserializeMap(variablesParameter);
-    Map<String, Object> extensions = deserializeMap(extensionsParameter);
+      Map<String, Object> variables = deserializeMap(VARIABLES, variablesParameter);
+      Map<String, Object> extensions = deserializeMap(EXTENSIONS, extensionsParameter);
 
+      execute(query, operationName, variables, extensions, resp);
+    } catch (WebApplicationException e) {
+      sendError(resp, e);
+    }
+  }
+
+  private void execute(
+      String query,
+      String operationName,
+      Map<String, Object> variables,
+      Map<String, Object> extensions,
+      HttpServletResponse resp
+  ) throws IOException {
     validateQuery(query);
     ExecutionResult result = executionService.execute(query, operationName, variables, extensions);
     resp.setCharacterEncoding(StandardCharsets.UTF_8.name());
     resp.setContentType(APPLICATION_GRAPHQL);
     try (PrintWriter out = resp.getWriter()) {
-      objectMapper.writeValue(out, result);
+      objectMapper.writeValue(out, result.toSpecification());
     }
   }
 
-  private Map<String, Object> deserializeMap(String parameter) {
+  /**
+   * Answer a rejected request with a GraphQL error body instead of the container's HTML error page.
+   */
+  private void sendError(HttpServletResponse resp, WebApplicationException e) throws IOException {
+    ExecutionResult result = ExecutionErrorResult.newExecutionResult()
+        .addError(GraphqlErrorBuilder.newError().message(e.getMessage()).build())
+        .build();
+    resp.setStatus(e.getResponse().getStatus());
+    resp.setCharacterEncoding(StandardCharsets.UTF_8.name());
+    resp.setContentType(APPLICATION_GRAPHQL);
+    try (PrintWriter out = resp.getWriter()) {
+      objectMapper.writeValue(out, result.toSpecification());
+    }
+  }
+
+  private Map<String, Object> deserializeMap(String name, String parameter) {
     Map<String, Object> variables = new HashMap<>();
     if ((parameter != null) && (!parameter.isBlank())) {
       TypeReference<Map<String, Object>> typeRef = new TypeReference<>() { };
       try {
         variables = objectMapper.readValue(parameter, typeRef);
       } catch (JsonProcessingException e) {
-        throw new WebApplicationException(e, Response.Status.BAD_REQUEST);
+        throw new WebApplicationException("Invalid JSON in parameter '" + name + "'", e, Response.Status.BAD_REQUEST);
       }
     }
     return variables;
@@ -125,20 +163,27 @@ public class GraphQLServlet extends HttpServlet implements Servlet {
 
   @Override
   protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-    TypeReference<HashMap<String,Object>> typeRef = new TypeReference<>() { };
-    Map<String, Object> body =  objectMapper.readValue(req.getInputStream(), typeRef);
+    corsHeaders(req, resp);
+    try {
+      TypeReference<HashMap<String,Object>> typeRef = new TypeReference<>() { };
+      Map<String, Object> body;
+      try {
+        body = objectMapper.readValue(req.getInputStream(), typeRef);
+      } catch (JsonProcessingException e) {
+        throw new WebApplicationException("Invalid JSON request body", e, Response.Status.BAD_REQUEST);
+      }
+      if (body == null) {
+        throw new WebApplicationException("Missing request body", Response.Status.BAD_REQUEST);
+      }
 
-    String query = getAsString(QUERY, body);
-    String operationName = getAsString(OPERATION_NAME, body);
-    Map<String, Object> variables = getAsMap(VARIABLES, body);
-    Map<String, Object> extensions = getAsMap(EXTENSIONS, body);
+      String query = getAsString(QUERY, body);
+      String operationName = getAsString(OPERATION_NAME, body);
+      Map<String, Object> variables = getAsMap(VARIABLES, body);
+      Map<String, Object> extensions = getAsMap(EXTENSIONS, body);
 
-    validateQuery(query);
-    ExecutionResult result = executionService.execute(query, operationName, variables, extensions);
-    resp.setCharacterEncoding(StandardCharsets.UTF_8.name());
-    resp.setContentType(APPLICATION_GRAPHQL);
-    try (PrintWriter out = resp.getWriter()) {
-      objectMapper.writeValue(out, result.toSpecification());
+      execute(query, operationName, variables, extensions, resp);
+    } catch (WebApplicationException e) {
+      sendError(resp, e);
     }
   }
 
@@ -169,20 +214,37 @@ public class GraphQLServlet extends HttpServlet implements Servlet {
 
   @Override
   protected void doOptions(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-    corsHeaders(req, resp);
+    if (corsHeaders(req, resp)) {
+      resp.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+      resp.setHeader("Access-Control-Allow-Headers", "Accept, Authorization, Content-Type, Origin");
+    }
     resp.flushBuffer();
   }
 
-  private void corsHeaders(HttpServletRequest req,HttpServletResponse resp) {
-    resp.setHeader("Access-Control-Allow-Origin", originHeaderFromRequest(req));
-    resp.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    resp.setHeader("Access-Control-Allow-Headers", "Accept, Content-Type, Origin");
-  }
-
-  private String originHeaderFromRequest(final HttpServletRequest req) {
-    return req != null && req.getHeader("Origin") != null
-        ? req.getHeader("Origin")
-        : "*";
+  /**
+   * Allow cross-origin browser access for configured origins only. The header is added to every response, including
+   * errors, because browsers check it on the actual request as well as on the preflight.
+   *
+   * @return {@code true} if the request origin is allowed
+   */
+  private boolean corsHeaders(HttpServletRequest req, HttpServletResponse resp) {
+    resp.addHeader("Vary", "Origin");
+    final String origin = req.getHeader("Origin");
+    if (origin == null) {
+      return false;
+    }
+    final Set<String> allowedOrigins = configuration.corsAllowedOrigins();
+    if (allowedOrigins.contains("*")) {
+      resp.setHeader("Access-Control-Allow-Origin", "*");
+      return true;
+    }
+    if (allowedOrigins.contains(origin)) {
+      resp.setHeader("Access-Control-Allow-Origin", origin);
+      // Only for explicitly configured origins. Browsers refuse credentials together with a wildcard origin.
+      resp.setHeader("Access-Control-Allow-Credentials", "true");
+      return true;
+    }
+    return false;
   }
 
 }
