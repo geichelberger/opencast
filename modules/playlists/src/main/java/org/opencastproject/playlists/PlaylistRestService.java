@@ -72,6 +72,7 @@ import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.GenericEntity;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -210,7 +211,7 @@ public class PlaylistRestService {
       })
   public Response getPlaylistAsJson(
       @PathParam("id") String id,
-      @FormParam("withPublications") boolean withPublications)
+      @QueryParam("withPublications") boolean withPublications)
           throws NotFoundException, UnauthorizedException {
     Playlist playlist = service.getPlaylistById(id);
 
@@ -251,7 +252,7 @@ public class PlaylistRestService {
       })
   public Response getPlaylistAsXml(
       @PathParam("id") String id,
-      @FormParam("withPublications") boolean withPublications)
+      @QueryParam("withPublications") boolean withPublications)
           throws NotFoundException, UnauthorizedException {
     return getPlaylistAsJson(id, withPublications);
   }
@@ -293,9 +294,9 @@ public class PlaylistRestService {
           @RestResponse(responseCode = SC_BAD_REQUEST, description = "A request parameter was illegal."),
       })
   public Response getPlaylistsAsJson(
-      @FormParam("limit") int limit,
-      @FormParam("offset") int offset,
-      @FormParam("sort") String sort)
+      @QueryParam("limit") int limit,
+      @QueryParam("offset") int offset,
+      @QueryParam("sort") String sort)
           throws NotFoundException {
     if (offset < 0) {
       return Response.status(SC_BAD_REQUEST).build();
@@ -370,9 +371,9 @@ public class PlaylistRestService {
           @RestResponse(responseCode = SC_OK, description = "A playlist as XML."),
       })
   public Response getPlaylistsAsXml(
-      @FormParam("limit") int limit,
-      @FormParam("offset") int offset,
-      @FormParam("sort") String sort)
+      @QueryParam("limit") int limit,
+      @QueryParam("offset") int offset,
+      @QueryParam("sort") String sort)
           throws NotFoundException {
     return getPlaylistsAsJson(limit, offset, sort);
   }

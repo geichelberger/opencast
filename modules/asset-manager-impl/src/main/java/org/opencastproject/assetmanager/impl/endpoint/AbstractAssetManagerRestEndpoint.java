@@ -74,6 +74,7 @@ import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -410,7 +411,7 @@ public abstract class AbstractAssetManagerRestEndpoint extends AbstractJobProduc
           @RestResponse(responseCode = SC_INTERNAL_SERVER_ERROR, description = "There has been an internal error.")
       })
   public Response getProperties(@PathParam("mediaPackageID") final String mediaPackageId,
-          @FormParam("namespace") final String namespace) {
+          @QueryParam("namespace") final String namespace) {
     try {
       getAssetManager().selectProperties(mediaPackageId, namespace);
 
