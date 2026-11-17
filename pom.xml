@@ -75,6 +75,7 @@
     <spring-security-servicemix.version>5.7.12_4</spring-security-servicemix.version>
     <nimbus-jose-jwt.version>10.10</nimbus-jose-jwt.version>
     <tink.version>1.24.0</tink.version>
+    <swagger.version>2.2.52</swagger.version>
   </properties>
   <modules>
     <module>modules/admin-service</module>
@@ -1278,7 +1279,22 @@
       <dependency>
         <groupId>io.swagger.core.v3</groupId>
         <artifactId>swagger-annotations</artifactId>
-        <version>2.2.52</version>
+        <version>${swagger.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.swagger.core.v3</groupId>
+        <artifactId>swagger-integration</artifactId>
+        <version>${swagger.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.swagger.core.v3</groupId>
+        <artifactId>swagger-jaxrs2</artifactId>
+        <version>${swagger.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.swagger.core.v3</groupId>
+        <artifactId>swagger-models</artifactId>
+        <version>${swagger.version}</version>
       </dependency>
       <!-- influx -->
       <dependency>

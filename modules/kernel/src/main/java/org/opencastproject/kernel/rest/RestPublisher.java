@@ -315,7 +315,7 @@ public class RestPublisher implements RestConstants {
     // This is a workaround to turn off class scanning as the classgraph dependency has a bug.
     // The defined class acts as a dummy, is available to the classloader, and has no Jax-rs annotations.
     openApiFeature.setResourceClasses(Collections.singleton("io.swagger.v3.jaxrs2.Reader"));
-    OpenApiCustomizer customizer = new OpenApiCustomizer();
+    OpenApiCustomizer customizer = new OpencastOpenApiCustomizer();
     customizer.setDynamicBasePath(false);
     openApiFeature.setCustomizer(customizer);
     openApiFeature.setSupportSwaggerUi(false);
