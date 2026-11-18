@@ -21,17 +21,11 @@
 package org.opencastproject.external.endpoint;
 
 import static org.opencastproject.external.util.CaptureAgentUtils.generateJsonAgent;
-import static org.opencastproject.util.doc.rest.RestParameter.Type.STRING;
 
 import org.opencastproject.capture.admin.api.Agent;
 import org.opencastproject.capture.admin.api.CaptureAgentStateService;
 import org.opencastproject.external.common.ApiMediaType;
 import org.opencastproject.external.common.ApiResponseBuilder;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestParameter.Type;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 
 import com.google.gson.JsonArray;
 
@@ -46,7 +40,6 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.GET;
 import javax.ws.rs.HeaderParam;
 import javax.ws.rs.Path;
@@ -55,16 +48,21 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Response;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 @Path("/api/agents")
 @Produces({ ApiMediaType.JSON, ApiMediaType.VERSION_1_1_0, ApiMediaType.VERSION_1_2_0, ApiMediaType.VERSION_1_3_0,
             ApiMediaType.VERSION_1_4_0, ApiMediaType.VERSION_1_5_0, ApiMediaType.VERSION_1_6_0,
             ApiMediaType.VERSION_1_7_0, ApiMediaType.VERSION_1_8_0, ApiMediaType.VERSION_1_9_0,
             ApiMediaType.VERSION_1_10_0, ApiMediaType.VERSION_1_11_0, ApiMediaType.VERSION_1_12_0 })
-@RestService(
-    name = "externalapicaptureagents",
-    title = "External API Capture Agents Service",
-    notes = {},
-    abstractText = "Provides resources and operations related to the capture agents"
+@Tag(name = "External API")
+@Tag(
+    name = "External API - Capture Agents",
+    description = "Provides resources and operations related to the capture agents"
 )
 @Component(
     immediate = true,
@@ -104,22 +102,19 @@ public class CaptureAgentsEndpoint {
 
   @GET
   @Path("{agentId}")
-  @RestQuery(
-      name = "getagent",
-      description = "Returns a single capture agent.",
-      returnDescription = "",
-      pathParameters = {
-          @RestParameter(name = "agentId", description = "The agent id", isRequired = true, type = STRING)
-      },
-      responses = {
-          @RestResponse(description = "The agent is returned.", responseCode = HttpServletResponse.SC_OK),
-          @RestResponse(description = "The specified agent does not exist.",
-              responseCode = HttpServletResponse.SC_NOT_FOUND)
-      }
+  @Operation(
+      summary = "Get a capture agent",
+      description = "Returns a single capture agent."
   )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The agent is returned."),
+      @ApiResponse(responseCode = "404", description = "The specified agent does not exist.")
+  })
   public Response getAgent(
       @HeaderParam("Accept") String acceptHeader,
-      @PathParam("agentId") String id) throws Exception {
+      @Parameter(description = "The agent id", required = true)
+      @PathParam("agentId") String id
+  ) throws Exception {
     final Agent agent = agentStateService.getAgent(id);
 
     if (agent == null) {
@@ -131,25 +126,20 @@ public class CaptureAgentsEndpoint {
 
   @GET
   @Path("/")
-  @RestQuery(
-      name = "getagents",
-      description = "Returns a list of agents.",
-      returnDescription = "",
-      restParameters = {
-          @RestParameter(name = "limit", description = "The maximum number of results to return for a single request.",
-              isRequired = false, type = Type.INTEGER),
-          @RestParameter(name = "offset", description = "The index of the first result to return.",
-              isRequired = false, type = Type.INTEGER)
-      },
-      responses = {
-          @RestResponse(description = "A (potentially empty) list of agents is returned.",
-              responseCode = HttpServletResponse.SC_OK)
-      }
+  @Operation(
+      summary = "Get capture agents",
+      description = "Returns a list of agents."
   )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "A (potentially empty) list of agents is returned.")
+  })
   public Response getAgents(
       @HeaderParam("Accept") String acceptHeader,
+      @Parameter(description = "The index of the first result to return.")
       @QueryParam("offset") Integer offset,
-      @QueryParam("limit") Integer limit) {
+      @Parameter(description = "The maximum number of results to return for a single request.")
+      @QueryParam("limit") Integer limit
+  ) {
 
     List<Agent> agents = new ArrayList<>(agentStateService.getKnownAgents().values());
 

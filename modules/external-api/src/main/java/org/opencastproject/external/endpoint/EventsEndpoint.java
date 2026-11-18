@@ -32,7 +32,6 @@ import static org.opencastproject.index.service.util.JSONUtils.arrayToJsonArray;
 import static org.opencastproject.index.service.util.JSONUtils.collectionToJsonArray;
 import static org.opencastproject.index.service.util.JSONUtils.safeString;
 import static org.opencastproject.util.RestUtil.getEndpointUrl;
-import static org.opencastproject.util.doc.rest.RestParameter.Type.STRING;
 
 import org.opencastproject.assetmanager.api.AssetManager;
 import org.opencastproject.assetmanager.api.AssetManagerException;
@@ -103,11 +102,6 @@ import org.opencastproject.util.RestUtil;
 import org.opencastproject.util.RestUtil.R;
 import org.opencastproject.util.UrlSupport;
 import org.opencastproject.util.data.Tuple;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestParameter.Type;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 import org.opencastproject.util.requests.SortCriterion;
 import org.opencastproject.workflow.api.WorkflowDatabaseException;
 import org.opencastproject.workflow.api.WorkflowInstance;
@@ -163,7 +157,6 @@ import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
@@ -184,8 +177,10 @@ import javax.ws.rs.core.Response.Status;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.Parameters;
-import io.swagger.v3.oas.annotations.enums.ParameterIn;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.media.SchemaProperty;
+import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -196,8 +191,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
             ApiMediaType.VERSION_1_6_0, ApiMediaType.VERSION_1_7_0, ApiMediaType.VERSION_1_8_0,
             ApiMediaType.VERSION_1_9_0, ApiMediaType.VERSION_1_10_0, ApiMediaType.VERSION_1_11_0,
             ApiMediaType.VERSION_1_12_0 })
-@RestService(name = "externalapievents", title = "External API Events Service", notes = {},
-             abstractText = "Provides resources and operations related to the events")
 @Tag(name = "External API")
 @Tag(name = "External API - Events",
     description = "The events endpoint provides resources and operations related to the events")
@@ -419,34 +412,10 @@ public class EventsEndpoint {
 
   @GET
   @Path("{eventId}")
-  @RestQuery(
-      name = "getevent",
-      description = "Returns a single event. By setting the optional sign parameter to true, the method will pre-sign "
-          + "distribution urls if signing is turned on in Opencast. Remember to consider the maximum validity of "
-          + "signed URLs when caching this response.",
-      returnDescription = "",
-      pathParameters = {
-          @RestParameter(name = "eventId", description = "The event id", isRequired = true, type = STRING)
-      },
-      restParameters = {
-          @RestParameter(name = "sign", isRequired = false, description = "Whether public distribution urls should be "
-              + "signed.", type = Type.BOOLEAN),
-          @RestParameter(name = "withacl", isRequired = false, description = "Whether the acl metadata should be "
-              + "included in the response.", type = Type.BOOLEAN),
-          @RestParameter(name = "withmetadata", isRequired = false, description = "Whether the metadata catalogs "
-              + "should be included in the response.", type = Type.BOOLEAN),
-          @RestParameter(name = "withscheduling", isRequired = false, description = "Whether the scheduling "
-              + "information should be included in the response.", type = Type.BOOLEAN),
-          @RestParameter(name = "withpublications", isRequired = false, description = "Whether the publication ids and "
-              + "urls should be included in the response.", type = Type.BOOLEAN),
-          @RestParameter(name = "includeInternalPublication", isRequired = false, description = "Whether internal "
-              + "publications should be included.", type = Type.BOOLEAN)
-      },
-      responses = {
-          @RestResponse(description = "The event is returned.", responseCode = HttpServletResponse.SC_OK),
-          @RestResponse(description = "The specified event does not exist.",
-              responseCode = HttpServletResponse.SC_NOT_FOUND)
-      })
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The event is returned."),
+      @ApiResponse(responseCode = "404", description = "The specified event does not exist.")
+  })
   @Operation(
       summary = "Get a single event",
       description = "Returns a single event. By setting the optional sign parameter to true, the method will pre-sign "
@@ -468,8 +437,8 @@ public class EventsEndpoint {
       @Parameter(description = "Whether the publication ids and urls should be included in the response.")
       @QueryParam("withpublications") Boolean withPublications,
       @Parameter(description = "Whether internal publications should be included.")
-      @QueryParam("includeInternalPublication") Boolean includeInternalPublication)
-          throws Exception {
+      @QueryParam("includeInternalPublication") Boolean includeInternalPublication
+  ) throws Exception {
     final ApiVersion requestedVersion = ApiMediaType.parse(acceptHeader).getVersion();
     if (requestedVersion.isSmallerThan(VERSION_1_1_0)) {
       // withScheduling was added in version 1.1.0 and should be ignored for smaller versions
@@ -488,32 +457,20 @@ public class EventsEndpoint {
 
   @GET
   @Path("{eventId}/media")
-  @RestQuery(
-      name = "geteventmedia",
-      description = "Returns media tracks of specific single event.",
-      returnDescription = "",
-      pathParameters = {
-          @RestParameter(name = "eventId", description = "The event id", isRequired = true, type = STRING)
-      },
-      responses = {
-          @RestResponse(description = "The event's media is returned.", responseCode = HttpServletResponse.SC_OK),
-          @RestResponse(description = "The specified event does not exist.",
-              responseCode = HttpServletResponse.SC_NOT_FOUND)
-      })
   @Operation(
       summary = "Get media tracks of a single event",
       description = "Returns media tracks of specific single event."
   )
-  @Parameters({
-      @Parameter(name = "eventId", description = "The event id", required = true, in = ParameterIn.PATH),
-      @Parameter(name = "Accept", description = "The accept header", required = true, in = ParameterIn.HEADER)
-  })
   @ApiResponses(value = {
       @ApiResponse(responseCode = "200", description = "The event's media is returned."),
       @ApiResponse(responseCode = "404", description = "The specified event does not exist.")
   })
-  public Response getEventMedia(@HeaderParam("Accept") String acceptHeader, @PathParam("eventId") String id)
-          throws Exception {
+  public Response getEventMedia(
+      @Parameter(description = "The accept header", required = true)
+      @HeaderParam("Accept") String acceptHeader,
+      @Parameter(description = "The event id", required = true)
+      @PathParam("eventId") String id
+  ) throws Exception {
     final ApiVersion requestedVersion = ApiMediaType.parse(acceptHeader).getVersion();
     List<TrackImpl> tracks = new ArrayList<>();
 
@@ -584,22 +541,20 @@ public class EventsEndpoint {
 
   @DELETE
   @Path("{eventId}")
-  @RestQuery(
-      name = "deleteevent",
-      description = "Deletes an event.",
-      returnDescription = "",
-      pathParameters = {
-          @RestParameter(name = "eventId", description = "The event id", isRequired = true, type = STRING)
-      },
-      responses = {
-          @RestResponse(description = "The event has been deleted.", responseCode = HttpServletResponse.SC_NO_CONTENT),
-          @RestResponse(description = "The retraction of publications has started.",
-              responseCode = HttpServletResponse.SC_ACCEPTED),
-          @RestResponse(description = "The specified event does not exist.",
-              responseCode = HttpServletResponse.SC_NOT_FOUND)
-      })
-  public Response deleteEvent(@HeaderParam("Accept") String acceptHeader, @PathParam("eventId") String id)
-          throws SearchIndexException {
+  @Operation(
+      summary = "Delete an event",
+      description = "Deletes an event."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "204", description = "The event has been deleted."),
+      @ApiResponse(responseCode = "202", description = "The retraction of publications has started."),
+      @ApiResponse(responseCode = "404", description = "The specified event does not exist.")
+  })
+  public Response deleteEvent(
+      @HeaderParam("Accept") String acceptHeader,
+      @Parameter(description = "The event id", required = true)
+      @PathParam("eventId") String id
+  ) throws SearchIndexException {
     final Optional<Event> event = indexService.getEvent(id, opensearchIndex);
     if (event.isEmpty()) {
       return RestUtil.R.notFound(id);
@@ -632,37 +587,80 @@ public class EventsEndpoint {
 
   @POST
   @Path("{eventId}")
-  @RestQuery(
-      name = "updateeventmetadata",
-      description = "Updates an event.",
-      returnDescription = "",
-      pathParameters = {
-          @RestParameter(name = "eventId", description = "The event id", isRequired = true, type = STRING)
-      },
-      restParameters = {
-          @RestParameter(name = "acl", isRequired = false, description = "A collection of roles with their possible "
-              + "action", type = Type.STRING),
-          @RestParameter(name = "metadata", isRequired = false, description = "Event metadata as Form param",
-              type = Type.STRING),
-          @RestParameter(name = "scheduling", isRequired = false, description = "Scheduling information as Form param",
-              type = Type.STRING),
-          @RestParameter(name = "presenter", isRequired = false, description = "Presenter movie track",
-              type = Type.FILE),
-          @RestParameter(name = "presentation", isRequired = false, description = "Presentation movie track",
-              type = Type.FILE),
-          @RestParameter(name = "audio", isRequired = false, description = "Audio track", type = Type.FILE),
-          @RestParameter(name = "processing", isRequired = false, description = "Processing instructions task "
-              + "configuration", type = Type.STRING),
-      },
-      responses = {
-          @RestResponse(description = "The event has been updated.", responseCode = HttpServletResponse.SC_NO_CONTENT),
-          @RestResponse(description = "The event could not be updated due to a scheduling conflict.",
-              responseCode = HttpServletResponse.SC_CONFLICT),
-          @RestResponse(description = "The specified event does not exist.",
-              responseCode = HttpServletResponse.SC_NOT_FOUND)
-      })
-  public Response updateEventMetadata(@HeaderParam("Accept") String acceptHeader, @Context HttpServletRequest request,
-          @PathParam("eventId") String eventId) {
+  @Operation(
+      summary = "Update an event",
+      description = "Updates an event."
+  )
+  @RequestBody(
+      content = {
+          @Content(
+              mediaType = MediaType.MULTIPART_FORM_DATA,
+              schema = @Schema(type = "object"),
+              schemaProperties = {
+                  @SchemaProperty(
+                      name = "acl",
+                      schema = @Schema(
+                          type = "string",
+                          description = "A collection of roles with their possible " + "action"
+                      )
+                  ),
+                  @SchemaProperty(
+                      name = "metadata",
+                      schema = @Schema(
+                          type = "string",
+                          description = "Event metadata as Form param"
+                      )
+                  ),
+                  @SchemaProperty(
+                      name = "scheduling",
+                      schema = @Schema(
+                          type = "string",
+                          description = "Scheduling information as Form param"
+                      )
+                  ),
+                  @SchemaProperty(
+                      name = "presenter",
+                      schema = @Schema(
+                          type = "string", format = "binary",
+                          description = "Presenter movie track"
+                      )
+                  ),
+                  @SchemaProperty(
+                      name = "presentation",
+                      schema = @Schema(
+                          type = "string", format = "binary",
+                          description = "Presentation movie track"
+                      )
+                  ),
+                  @SchemaProperty(
+                      name = "audio",
+                      schema = @Schema(
+                          type = "string", format = "binary",
+                          description = "Audio track"
+                      )
+                  ),
+                  @SchemaProperty(
+                      name = "processing",
+                      schema = @Schema(
+                          type = "string",
+                          description = "Processing instructions task " + "configuration"
+                      )
+                  )
+              }
+          )
+      }
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "204", description = "The event has been updated."),
+      @ApiResponse(responseCode = "409", description = "The event could not be updated due to a scheduling conflict."),
+      @ApiResponse(responseCode = "404", description = "The specified event does not exist.")
+  })
+  public Response updateEventMetadata(
+      @HeaderParam("Accept") String acceptHeader,
+      @Context HttpServletRequest request,
+      @Parameter(description = "The event id", required = true)
+      @PathParam("eventId") String eventId
+  ) {
     final ApiVersion requestedVersion = ApiMediaType.parse(acceptHeader).getVersion();
     try {
       String startDatePattern = configuredMetadataFields.containsKey("startDate")
@@ -756,35 +754,83 @@ public class EventsEndpoint {
   @POST
   @Path("/")
   @Consumes(MediaType.MULTIPART_FORM_DATA)
-  @RestQuery(
-      name = "createevent",
-      description = "Creates an event by sending metadata, access control list, processing instructions and files in a "
-          + "multipart request.",
-      returnDescription = "",
-      restParameters = {
-          @RestParameter(name = "acl", isRequired = false, description = "A collection of roles with their possible "
-              + "action", type = STRING),
-          @RestParameter(name = "metadata", description = "Event metadata as Form param", isRequired = false,
-              type = STRING),
-          @RestParameter(name = "scheduling", description = "Scheduling information as Form param", isRequired = false,
-              type = STRING),
-          @RestParameter(name = "presenter", description = "Presenter movie track", isRequired = false,
-              type = Type.FILE),
-          @RestParameter(name = "presentation", description = "Presentation movie track", isRequired = false,
-              type = Type.FILE),
-          @RestParameter(name = "audio", description = "Audio track", isRequired = false, type = Type.FILE),
-          @RestParameter(name = "processing", description = "Processing instructions task configuration",
-              isRequired = false, type = STRING)
-      },
-      responses = {
-          @RestResponse(description = "A new event is created and its identifier is returned in the Location header.",
-              responseCode = HttpServletResponse.SC_CREATED),
-          @RestResponse(description = "The event could not be created due to a scheduling conflict.",
-              responseCode = HttpServletResponse.SC_CONFLICT),
-          @RestResponse(description = "The request is invalid or inconsistent..",
-              responseCode = HttpServletResponse.SC_BAD_REQUEST)
-      })
-  public Response createNewEvent(@HeaderParam("Accept") String acceptHeader, @Context HttpServletRequest request) {
+  @Operation(
+      summary = "Create an event",
+      description = "Creates an event by sending metadata, access control list, processing instructions and files in "
+          + "a "
+          + "multipart request."
+  )
+  @RequestBody(
+      content = {
+          @Content(
+              mediaType = MediaType.MULTIPART_FORM_DATA,
+              schema = @Schema(type = "object"),
+              schemaProperties = {
+                  @SchemaProperty(
+                      name = "acl",
+                      schema = @Schema(
+                          type = "string",
+                          description = "A collection of roles with their possible " + "action"
+                      )
+                  ),
+                  @SchemaProperty(
+                      name = "metadata",
+                      schema = @Schema(
+                          type = "string",
+                          description = "Event metadata as Form param"
+                      )
+                  ),
+                  @SchemaProperty(
+                      name = "scheduling",
+                      schema = @Schema(
+                          type = "string",
+                          description = "Scheduling information as Form param"
+                      )
+                  ),
+                  @SchemaProperty(
+                      name = "presenter",
+                      schema = @Schema(
+                          type = "string", format = "binary",
+                          description = "Presenter movie track"
+                      )
+                  ),
+                  @SchemaProperty(
+                      name = "presentation",
+                      schema = @Schema(
+                          type = "string", format = "binary",
+                          description = "Presentation movie track"
+                      )
+                  ),
+                  @SchemaProperty(
+                      name = "audio",
+                      schema = @Schema(
+                          type = "string", format = "binary",
+                          description = "Audio track"
+                      )
+                  ),
+                  @SchemaProperty(
+                      name = "processing",
+                      schema = @Schema(
+                          type = "string",
+                          description = "Processing instructions task configuration"
+                      )
+                  )
+              }
+          )
+      }
+  )
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "201",
+          description = "A new event is created and its identifier is returned in the Location header."
+      ),
+      @ApiResponse(responseCode = "409", description = "The event could not be created due to a scheduling conflict."),
+      @ApiResponse(responseCode = "400", description = "The request is invalid or inconsistent..")
+  })
+  public Response createNewEvent(
+      @HeaderParam("Accept") String acceptHeader,
+      @Context HttpServletRequest request
+  ) {
     final ApiVersion requestedVersion = ApiMediaType.parse(acceptHeader).getVersion();
     try {
       String startDatePattern = configuredMetadataFields.containsKey("startDate")
@@ -877,54 +923,69 @@ public class EventsEndpoint {
 
   @GET
   @Path("/")
-  @RestQuery(
-      name = "getevents",
+  @Operation(
+      summary = "Get events",
       description = "Returns a list of events. By setting the optional sign parameter to true, the method will "
-          + "pre-sign distribution urls if signing is turned on in Opencast. Remember to consider the maximum validity "
-          + "of signed URLs when caching this response.",
-      returnDescription = "",
-      restParameters = {
-          @RestParameter(name = "sign", isRequired = false, description = "Whether public distribution urls should be "
-              + "signed.", type = Type.BOOLEAN),
-          @RestParameter(name = "withacl", isRequired = false, description = "Whether the acl metadata should be "
-              + "included in the response.", type = Type.BOOLEAN),
-          @RestParameter(name = "withmetadata", isRequired = false, description = "Whether the metadata catalogs "
-              + "should be included in the response.", type = Type.BOOLEAN),
-          @RestParameter(name = "withscheduling", isRequired = false, description = "Whether the scheduling "
-              + "information should be included in the response.", type = Type.BOOLEAN),
-          @RestParameter(name = "withpublications", isRequired = false, description = "Whether the publication ids and "
-              + "urls should be included in the response.", type = Type.BOOLEAN),
-          @RestParameter(name = "includeInternalPublication", description = "Whether internal publications should be "
-              + "included.", isRequired = false, type = Type.BOOLEAN),
-          @RestParameter(name = "onlyWithWriteAccess", isRequired = false, description = "Whether only to get the "
-              + "events to which we have write access.", type = Type.BOOLEAN),
-          @RestParameter(name = "filter", isRequired = false, description = "Usage [Filter Name]:[Value to Filter With]"
+          + "pre-sign distribution urls if signing is turned on in Opencast. Remember to consider the maximum "
+          + "validity "
+          + "of signed URLs when caching this response."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "A (potentially empty) list of events is returned.")
+  })
+  public Response getEvents(
+      @HeaderParam("Accept") String acceptHeader,
+      @QueryParam("id") String id,
+      @QueryParam("commentReason") String reasonFilter,
+      @QueryParam("commentResolution") String resolutionFilter,
+      @Parameter(
+          description = "Usage [Filter Name]:[Value to Filter With]"
               + ". Multiple filters can be used by combining them with commas \",\". Available Filters: presenters, "
               + "contributors, location, textFilter, series, subject. If API ver > 1.1.0 also: identifier, title, "
               + "description, series_name, language, created, license, rightsholder, is_part_of, source, status, "
-              + "agent_id, start, technical_start.", type = STRING),
-          @RestParameter(name = "sort", description = "Sort the results based upon a list of comma seperated sorting "
+              + "agent_id, start, technical_start."
+      )
+      @QueryParam("filter") List<String> filter,
+      @Parameter(
+          description = "Sort the results based upon a list of comma seperated sorting "
               + "criteria. In the comma seperated list each type of sorting is specified as a pair such as: "
               + "<Sort Name>:ASC or <Sort Name>:DESC. Adding the suffix ASC or DESC sets the order as ascending or "
-              + "descending order and is mandatory.", isRequired = false, type = STRING),
-          @RestParameter(name = "limit", description = "The maximum number of results to return for a single request.",
-              isRequired = false, type = RestParameter.Type.INTEGER),
-          @RestParameter(name = "offset", description = "The index of the first result to return.", isRequired = false,
-              type = RestParameter.Type.INTEGER)
-      },
-      responses = {
-          @RestResponse(description = "A (potentially empty) list of events is returned.",
-              responseCode = HttpServletResponse.SC_OK)
-      })
-  public Response getEvents(@HeaderParam("Accept") String acceptHeader, @QueryParam("id") String id,
-          @QueryParam("commentReason") String reasonFilter, @QueryParam("commentResolution") String resolutionFilter,
-          @QueryParam("filter") List<String> filter, @QueryParam("sort") String sort,
-          @QueryParam("offset") Integer offset, @QueryParam("limit") Integer limit, @QueryParam("sign") boolean sign,
-          @QueryParam("withacl") Boolean withAcl, @QueryParam("withmetadata") Boolean withMetadata,
-          @QueryParam("withscheduling") Boolean withScheduling,
-          @QueryParam("onlyWithWriteAccess") Boolean onlyWithWriteAccess,
-          @QueryParam("withpublications") Boolean withPublications,
-          @QueryParam("includeInternalPublication") Boolean includeInternalPublication) {
+              + "descending order and is mandatory."
+      )
+      @QueryParam("sort") String sort,
+      @Parameter(description = "The index of the first result to return.")
+      @QueryParam("offset") Integer offset,
+      @Parameter(description = "The maximum number of results to return for a single request.")
+      @QueryParam("limit") Integer limit,
+      @Parameter(
+          description = "Whether public distribution urls should be " + "signed."
+      )
+      @QueryParam("sign") boolean sign,
+      @Parameter(
+          description = "Whether the acl metadata should be " + "included in the response."
+      )
+      @QueryParam("withacl") Boolean withAcl,
+      @Parameter(
+          description = "Whether the metadata catalogs " + "should be included in the response."
+      )
+      @QueryParam("withmetadata") Boolean withMetadata,
+      @Parameter(
+          description = "Whether the scheduling " + "information should be included in the response."
+      )
+      @QueryParam("withscheduling") Boolean withScheduling,
+      @Parameter(
+          description = "Whether only to get the " + "events to which we have write access."
+      )
+      @QueryParam("onlyWithWriteAccess") Boolean onlyWithWriteAccess,
+      @Parameter(
+          description = "Whether the publication ids and " + "urls should be included in the response."
+      )
+      @QueryParam("withpublications") Boolean withPublications,
+      @Parameter(
+          description = "Whether internal publications should be " + "included."
+      )
+      @QueryParam("includeInternalPublication") Boolean includeInternalPublication
+  ) {
     final ApiVersion requestedVersion = ApiMediaType.parse(acceptHeader).getVersion();
     if (requestedVersion.isSmallerThan(VERSION_1_1_0)) {
       // withscheduling was added for version 1.1.0 and should be ignored for smaller versions.
@@ -1379,21 +1440,19 @@ public class EventsEndpoint {
 
   @GET
   @Path("{eventId}/acl")
-  @RestQuery(
-      name = "geteventacl",
-      description = "Returns an event's access policy.",
-      returnDescription = "",
-      pathParameters = {
-          @RestParameter(name = "eventId", description = "The event id", isRequired = true, type = STRING)
-      },
-      responses = {
-          @RestResponse(description = "The access control list for the specified event is returned.",
-              responseCode = HttpServletResponse.SC_OK),
-          @RestResponse(description = "The specified event does not exist.",
-              responseCode = HttpServletResponse.SC_NOT_FOUND)
-      })
-  public Response getEventAcl(@HeaderParam("Accept") String acceptHeader, @PathParam("eventId") String id)
-          throws Exception {
+  @Operation(
+      summary = "Get the ACL of an event",
+      description = "Returns an event's access policy."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The access control list for the specified event is returned."),
+      @ApiResponse(responseCode = "404", description = "The specified event does not exist.")
+  })
+  public Response getEventAcl(
+      @HeaderParam("Accept") String acceptHeader,
+      @Parameter(description = "The event id", required = true)
+      @PathParam("eventId") String id
+  ) throws Exception {
     Optional<Event> eventOpt = indexService.getEvent(id, opensearchIndex);
     if (eventOpt.isPresent()) {
       AccessControlList acl = getAclFromEvent(eventOpt.get());
@@ -1404,24 +1463,21 @@ public class EventsEndpoint {
 
   @PUT
   @Path("{eventId}/acl")
-  @RestQuery(
-      name = "updateeventacl",
-      description = "Update an event's access policy.",
-      returnDescription = "",
-      pathParameters = {
-          @RestParameter(name = "eventId", description = "The event id", isRequired = true, type = STRING)
-      },
-      restParameters = {
-          @RestParameter(name = "acl", isRequired = true, description = "Access policy", type = STRING)
-      },
-      responses = {
-          @RestResponse(description = "The access control list for the specified event is updated.",
-              responseCode = HttpServletResponse.SC_NO_CONTENT),
-          @RestResponse(description = "The specified event does not exist.",
-              responseCode = HttpServletResponse.SC_NOT_FOUND)
-      })
-  public Response updateEventAcl(@HeaderParam("Accept") String acceptHeader, @PathParam("eventId") String id,
-          @FormParam("acl") String acl) throws Exception {
+  @Operation(
+      summary = "Update the ACL of an event",
+      description = "Update an event's access policy."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "204", description = "The access control list for the specified event is updated."),
+      @ApiResponse(responseCode = "404", description = "The specified event does not exist.")
+  })
+  public Response updateEventAcl(
+      @HeaderParam("Accept") String acceptHeader,
+      @Parameter(description = "The event id", required = true)
+      @PathParam("eventId") String id,
+      @Parameter(description = "Access policy", required = true)
+      @FormParam("acl") String acl
+  ) throws Exception {
     if (indexService.getEvent(id, opensearchIndex).isPresent()) {
       AccessControlList accessControlList;
       try {
@@ -1447,28 +1503,27 @@ public class EventsEndpoint {
 
   @POST
   @Path("{eventId}/acl/{action}")
-  @RestQuery(
-      name = "addeventace",
+  @Operation(
+      summary = "Grant a permission on an event",
       description = "Grants permission to execute action on the specified event to any user with role role. Note that "
-          + "this is a convenience method to avoid having to build and post a complete access control list.",
-      returnDescription = "",
-      pathParameters = {
-          @RestParameter(name = "eventId", description = "The event id", isRequired = true, type = STRING),
-          @RestParameter(name = "action", description = "The action that is allowed to be executed", isRequired = true,
-              type = STRING)
-      },
-      restParameters = {
-          @RestParameter(name = "role", isRequired = true, description = "The role that is granted permission",
-              type = STRING)
-      },
-      responses = {
-          @RestResponse(description = "The permission has been created in the access control list of the specified "
-              + "event.", responseCode = HttpServletResponse.SC_NO_CONTENT),
-          @RestResponse(description = "The specified event does not exist.",
-              responseCode = HttpServletResponse.SC_NOT_FOUND)
-      })
-  public Response addEventAce(@HeaderParam("Accept") String acceptHeader, @PathParam("eventId") String id,
-          @PathParam("action") String action, @FormParam("role") String role) throws Exception {
+          + "this is a convenience method to avoid having to build and post a complete access control list."
+  )
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "204",
+          description = "The permission has been created in the access control list of the specified " + "event."
+      ),
+      @ApiResponse(responseCode = "404", description = "The specified event does not exist.")
+  })
+  public Response addEventAce(
+      @HeaderParam("Accept") String acceptHeader,
+      @Parameter(description = "The event id", required = true)
+      @PathParam("eventId") String id,
+      @Parameter(description = "The action that is allowed to be executed", required = true)
+      @PathParam("action") String action,
+      @Parameter(description = "The role that is granted permission", required = true)
+      @FormParam("role") String role
+  ) throws Exception {
     List<AccessControlEntry> entries = new ArrayList<>();
     Optional<Event> eventOpt = indexService.getEvent(id, opensearchIndex);
     if (eventOpt.isPresent()) {
@@ -1508,25 +1563,26 @@ public class EventsEndpoint {
 
   @DELETE
   @Path("{eventId}/acl/{action}/{role}")
-  @RestQuery(
-      name = "deleteeventace",
-      description = "Revokes permission to execute action on the specified event from any user with role role.",
-      returnDescription = "",
-      pathParameters = {
-          @RestParameter(name = "eventId", description = "The event id", isRequired = true, type = STRING),
-          @RestParameter(name = "action", description = "The action that is no longer allowed to be executed",
-              isRequired = true, type = STRING),
-          @RestParameter(name = "role", description = "The role that is no longer granted permission",
-              isRequired = true, type = STRING)
-      },
-      responses = {
-          @RestResponse(description = "The permission has been revoked from the access control list of the specified "
-              + "event.", responseCode = HttpServletResponse.SC_NO_CONTENT),
-          @RestResponse(description = "The specified event does not exist.",
-              responseCode = HttpServletResponse.SC_NOT_FOUND)
-      })
-  public Response deleteEventAce(@HeaderParam("Accept") String acceptHeader, @PathParam("eventId") String id,
-          @PathParam("action") String action, @PathParam("role") String role) throws Exception {
+  @Operation(
+      summary = "Revoke a permission on an event",
+      description = "Revokes permission to execute action on the specified event from any user with role role."
+  )
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "204",
+          description = "The permission has been revoked from the access control list of the specified " + "event."
+      ),
+      @ApiResponse(responseCode = "404", description = "The specified event does not exist.")
+  })
+  public Response deleteEventAce(
+      @HeaderParam("Accept") String acceptHeader,
+      @Parameter(description = "The event id", required = true)
+      @PathParam("eventId") String id,
+      @Parameter(description = "The action that is no longer allowed to be executed", required = true)
+      @PathParam("action") String action,
+      @Parameter(description = "The role that is no longer granted permission", required = true)
+      @PathParam("role") String role
+  ) throws Exception {
     List<AccessControlEntry> entries = new ArrayList<>();
     Optional<Event> eventOpt = indexService.getEvent(id, opensearchIndex);
     if (eventOpt.isPresent()) {
@@ -1559,24 +1615,22 @@ public class EventsEndpoint {
 
   @GET
   @Path("{eventId}/metadata")
-  @RestQuery(
-      name = "geteventmetadata",
+  @Operation(
+      summary = "Get the metadata of an event",
       description = "Returns the event's metadata of the specified type. For a metadata catalog there is the flavor "
-          + "such as 'dublincore/episode' and this is the unique type.",
-      returnDescription = "",
-      pathParameters = {
-          @RestParameter(name = "eventId", description = "The event id", isRequired = true, type = STRING)
-      },
-      restParameters = {
-          @RestParameter(name = "type", isRequired = false, description = "The type of metadata to get", type = STRING)
-      },
-      responses = {
-          @RestResponse(description = "The metadata collection is returned.", responseCode = HttpServletResponse.SC_OK),
-          @RestResponse(description = "The specified event does not exist.",
-              responseCode = HttpServletResponse.SC_NOT_FOUND)
-      })
-  public Response getAllEventMetadata(@HeaderParam("Accept") String acceptHeader, @PathParam("eventId") String id,
-          @QueryParam("type") String type) throws Exception {
+          + "such as 'dublincore/episode' and this is the unique type."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The metadata collection is returned."),
+      @ApiResponse(responseCode = "404", description = "The specified event does not exist.")
+  })
+  public Response getAllEventMetadata(
+      @HeaderParam("Accept") String acceptHeader,
+      @Parameter(description = "The event id", required = true)
+      @PathParam("eventId") String id,
+      @Parameter(description = "The type of metadata to get")
+      @QueryParam("type") String type
+  ) throws Exception {
     final ApiVersion requestedVersion = ApiMediaType.parse(acceptHeader).getVersion();
     if (StringUtils.trimToNull(type) == null) {
       Optional<MetadataList> metadataList = getEventMetadataById(id);
@@ -1740,33 +1794,30 @@ public class EventsEndpoint {
 
   @PUT
   @Path("{eventId}/metadata")
-  @RestQuery(
-      name = "updateeventmetadata",
+  @Operation(
+      summary = "Update the metadata of an event",
       description = "Update the metadata with the matching type of the specified event. For a metadata catalog there "
-          + "is the flavor such as 'dublincore/episode' and this is the unique type.",
-      returnDescription = "",
-      pathParameters = {
-          @RestParameter(name = "eventId", description = "The event id", isRequired = true, type = STRING)
-      },
-      restParameters = {
-          @RestParameter(name = "type", isRequired = true, description = "The type of metadata to update",
-              type = STRING),
-          @RestParameter(name = "metadata", description = "Metadata catalog in JSON format", isRequired = true,
-              type = STRING)
-      },
-      responses = {
-          @RestResponse(description = "The metadata of the given namespace has been updated.",
-              responseCode = HttpServletResponse.SC_NO_CONTENT),
-          @RestResponse(description = "The request is invalid or inconsistent.",
-              responseCode = HttpServletResponse.SC_BAD_REQUEST),
-          @RestResponse(description = "The specified event does not exist.",
-              responseCode = HttpServletResponse.SC_NOT_FOUND),
-          @RestResponse(description = "The metadata stored for the specified event is incomplete or invalid and needs "
-              + "to be fixed before it can be updated.",
-              responseCode = HttpServletResponse.SC_INTERNAL_SERVER_ERROR)
-      })
-  public Response updateEventMetadataByType(@HeaderParam("Accept") String acceptHeader, @PathParam("eventId") String id,
-          @QueryParam("type") String type, @FormParam("metadata") String metadataJSON) throws Exception {
+          + "is the flavor such as 'dublincore/episode' and this is the unique type."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "204", description = "The metadata of the given namespace has been updated."),
+      @ApiResponse(responseCode = "400", description = "The request is invalid or inconsistent."),
+      @ApiResponse(responseCode = "404", description = "The specified event does not exist."),
+      @ApiResponse(
+          responseCode = "500",
+          description = "The metadata stored for the specified event is incomplete or invalid and needs "
+              + "to be fixed before it can be updated."
+      )
+  })
+  public Response updateEventMetadataByType(
+      @HeaderParam("Accept") String acceptHeader,
+      @Parameter(description = "The event id", required = true)
+      @PathParam("eventId") String id,
+      @Parameter(description = "The type of metadata to update", required = true)
+      @QueryParam("type") String type,
+      @Parameter(description = "Metadata catalog in JSON format", required = true)
+      @FormParam("metadata") String metadataJSON
+  ) throws Exception {
     Map<String, String> updatedFields;
     try {
       updatedFields = RequestUtils.getKeyValueMap(metadataJSON);
@@ -2001,28 +2052,27 @@ public class EventsEndpoint {
 
   @DELETE
   @Path("{eventId}/metadata")
-  @RestQuery(
-      name = "deleteeventmetadata",
+  @Operation(
+      summary = "Delete the metadata of an event",
       description = "Delete the metadata namespace catalog of the specified event. This will remove all fields and "
-          + "values of the catalog.",
-      returnDescription = "",
-      pathParameters = {
-          @RestParameter(name = "eventId", description = "The event id", isRequired = true, type = STRING)
-      },
-      restParameters = {
-          @RestParameter(name = "type", isRequired = true, description = "The type of metadata to delete",
-              type = STRING)
-      },
-      responses = {
-          @RestResponse(description = "The metadata of the given namespace has been updated.",
-              responseCode = HttpServletResponse.SC_NO_CONTENT),
-          @RestResponse(description = "The main metadata catalog dublincore/episode cannot be deleted as it has "
-              + "mandatory fields.", responseCode = HttpServletResponse.SC_FORBIDDEN),
-          @RestResponse(description = "The specified event does not exist.",
-              responseCode = HttpServletResponse.SC_NOT_FOUND)
-      })
-  public Response deleteEventMetadataByType(@HeaderParam("Accept") String acceptHeader, @PathParam("eventId") String id,
-          @QueryParam("type") String type) throws SearchIndexException {
+          + "values of the catalog."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "204", description = "The metadata of the given namespace has been updated."),
+      @ApiResponse(
+          responseCode = "403",
+          description = "The main metadata catalog dublincore/episode cannot be deleted as it has "
+              + "mandatory fields."
+      ),
+      @ApiResponse(responseCode = "404", description = "The specified event does not exist.")
+  })
+  public Response deleteEventMetadataByType(
+      @HeaderParam("Accept") String acceptHeader,
+      @Parameter(description = "The event id", required = true)
+      @PathParam("eventId") String id,
+      @Parameter(description = "The type of metadata to delete", required = true)
+      @QueryParam("type") String type
+  ) throws SearchIndexException {
     Optional<Event> eventOpt = indexService.getEvent(id, opensearchIndex);
     if (eventOpt.isPresent()) {
       Optional<MediaPackageElementFlavor> flavor = getFlavor(type);
@@ -2057,29 +2107,26 @@ public class EventsEndpoint {
 
   @GET
   @Path("{eventId}/publications")
-  @RestQuery(
-      name = "geteventpublications",
-      description = "Returns an event's list of publications.",
-      returnDescription = "",
-      pathParameters = {
-          @RestParameter(name = "eventId", description = "The event id", isRequired = true, type = STRING)
-      },
-      restParameters = {
-          @RestParameter(name = "sign", description = "Whether public distribution urls should be signed.",
-              isRequired = false, type = Type.BOOLEAN),
-          @RestParameter(name = "includeInternalPublication", description = "Whether internal publications should be "
-              + "included.", isRequired = false, type = Type.BOOLEAN)
-      },
-      responses = {
-          @RestResponse(description = "The list of publications is returned.",
-              responseCode = HttpServletResponse.SC_OK),
-          @RestResponse(description = "The specified event does not exist.",
-              responseCode = HttpServletResponse.SC_NOT_FOUND)
-      })
+  @Operation(
+      summary = "Get the publications of an event",
+      description = "Returns an event's list of publications."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The list of publications is returned."),
+      @ApiResponse(responseCode = "404", description = "The specified event does not exist.")
+  })
 
-    public Response getEventPublications(@HeaderParam("Accept") String acceptHeader, @PathParam("eventId") String id,
-      @QueryParam("sign") boolean sign, @QueryParam("includeInternalPublication") boolean includeInternalPublication)
-            throws Exception {
+    public Response getEventPublications(
+      @HeaderParam("Accept") String acceptHeader,
+      @Parameter(description = "The event id", required = true)
+      @PathParam("eventId") String id,
+      @Parameter(description = "Whether public distribution urls should be signed.")
+      @QueryParam("sign") boolean sign,
+      @Parameter(
+          description = "Whether internal publications should be " + "included."
+      )
+      @QueryParam("includeInternalPublication") boolean includeInternalPublication
+  ) throws Exception {
     try {
       final ApiVersion requestedVersion = ApiMediaType.parse(acceptHeader).getVersion();
       final Optional<Event> event = indexService.getEvent(id, opensearchIndex);
@@ -2250,26 +2297,24 @@ public class EventsEndpoint {
 
   @GET
   @Path("{eventId}/publications/{publicationId}")
-  @RestQuery(
-      name = "geteventpublication",
-      description = "Returns a single publication.",
-      returnDescription = "",
-      pathParameters = {
-          @RestParameter(name = "eventId", description = "The event id", isRequired = true, type = STRING),
-          @RestParameter(name = "publicationId", description = "The publication id", isRequired = true, type = STRING)
-      },
-      restParameters = {
-          @RestParameter(name = "sign", description = "Whether public distribution urls should be signed.",
-              isRequired = false, type = Type.BOOLEAN)
-      },
-      responses = {
-          @RestResponse(description = "The track details are returned.", responseCode = HttpServletResponse.SC_OK),
-          @RestResponse(description = "The specified event or publication does not exist.",
-              responseCode = HttpServletResponse.SC_NOT_FOUND)
-      })
+  @Operation(
+      summary = "Get a publication of an event",
+      description = "Returns a single publication."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The track details are returned."),
+      @ApiResponse(responseCode = "404", description = "The specified event or publication does not exist.")
+  })
 
-  public Response getEventPublication(@HeaderParam("Accept") String acceptHeader, @PathParam("eventId") String eventId,
-          @PathParam("publicationId") String publicationId, @QueryParam("sign") boolean sign) throws Exception {
+  public Response getEventPublication(
+      @HeaderParam("Accept") String acceptHeader,
+      @Parameter(description = "The event id", required = true)
+      @PathParam("eventId") String eventId,
+      @Parameter(description = "The publication id", required = true)
+      @PathParam("publicationId") String publicationId,
+      @Parameter(description = "Whether public distribution urls should be signed.")
+      @QueryParam("sign") boolean sign
+  ) throws Exception {
     try {
       final ApiVersion requestedVersion = ApiMediaType.parse(acceptHeader).getVersion();
       return ApiResponseBuilder.Json.ok(acceptHeader, getPublication(eventId, publicationId, sign, requestedVersion));
@@ -2434,23 +2479,23 @@ public class EventsEndpoint {
               ApiMediaType.VERSION_1_4_0, ApiMediaType.VERSION_1_5_0, ApiMediaType.VERSION_1_6_0,
               ApiMediaType.VERSION_1_7_0, ApiMediaType.VERSION_1_8_0, ApiMediaType.VERSION_1_9_0,
               ApiMediaType.VERSION_1_10_0, ApiMediaType.VERSION_1_11_0, ApiMediaType.VERSION_1_12_0 })
-  @RestQuery(
-      name = "geteventscheduling",
-      description = "Returns an event's scheduling information.",
-      returnDescription = "",
-      pathParameters = {
-          @RestParameter(name = "eventId", description = "The event id", isRequired = true, type = STRING)
-      },
-      responses = {
-          @RestResponse(description = "The scheduling information for the specified event is returned.",
-              responseCode = HttpServletResponse.SC_OK),
-          @RestResponse(description = "The specified event has no scheduling information.",
-              responseCode = HttpServletResponse.SC_NO_CONTENT),
-          @RestResponse(description = "The specified event does not exist.",
-              responseCode = HttpServletResponse.SC_NOT_FOUND)
-      })
-  public Response getEventScheduling(@HeaderParam("Accept") String acceptHeader, @PathParam("eventId") String id)
-          throws Exception {
+  @Operation(
+      summary = "Get the scheduling information of an event",
+      description = "Returns an event's scheduling information."
+  )
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "200",
+          description = "The scheduling information for the specified event is returned."
+      ),
+      @ApiResponse(responseCode = "204", description = "The specified event has no scheduling information."),
+      @ApiResponse(responseCode = "404", description = "The specified event does not exist.")
+  })
+  public Response getEventScheduling(
+      @HeaderParam("Accept") String acceptHeader,
+      @Parameter(description = "The event id", required = true)
+      @PathParam("eventId") String id
+  ) throws Exception {
     try {
       final Optional<Event> event = indexService.getEvent(id, opensearchIndex);
 
@@ -2475,32 +2520,31 @@ public class EventsEndpoint {
               ApiMediaType.VERSION_1_4_0, ApiMediaType.VERSION_1_5_0, ApiMediaType.VERSION_1_6_0,
               ApiMediaType.VERSION_1_7_0, ApiMediaType.VERSION_1_8_0, ApiMediaType.VERSION_1_9_0,
               ApiMediaType.VERSION_1_10_0, ApiMediaType.VERSION_1_11_0, ApiMediaType.VERSION_1_12_0 })
-  @RestQuery(
-      name = "updateeventscheduling",
-      description = "Update an event's scheduling information.",
-      returnDescription = "",
-      pathParameters = {
-          @RestParameter(name = "eventId", description = "The event id", isRequired = true, type = Type.STRING)
-      },
-      restParameters = {
-          @RestParameter(name = "scheduling", isRequired = true, description = "Scheduling Information",
-              type = Type.STRING),
-          @RestParameter(name = "allowConflict", description = "Allow conflicts when updating scheduling",
-              isRequired = false, type = Type.BOOLEAN)
-      },
-      responses = {
-          @RestResponse(description = "The  scheduling information for the specified event is updated.",
-              responseCode = HttpServletResponse.SC_NO_CONTENT),
-          @RestResponse(description = "The specified event has no scheduling information to update.",
-              responseCode = HttpServletResponse.SC_NOT_ACCEPTABLE),
-          @RestResponse(description = "The scheduling information could not be updated due to a conflict.",
-              responseCode = HttpServletResponse.SC_CONFLICT),
-          @RestResponse(description = "The specified event does not exist.",
-              responseCode = HttpServletResponse.SC_NOT_FOUND)
-      })
-  public Response updateEventScheduling(@HeaderParam("Accept") String acceptHeader, @PathParam("eventId") String id,
+  @Operation(
+      summary = "Update the scheduling information of an event",
+      description = "Update an event's scheduling information."
+  )
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "204",
+          description = "The  scheduling information for the specified event is updated."
+      ),
+      @ApiResponse(responseCode = "406", description = "The specified event has no scheduling information to update."),
+      @ApiResponse(
+          responseCode = "409",
+          description = "The scheduling information could not be updated due to a conflict."
+      ),
+      @ApiResponse(responseCode = "404", description = "The specified event does not exist.")
+  })
+  public Response updateEventScheduling(
+      @HeaderParam("Accept") String acceptHeader,
+      @Parameter(description = "The event id", required = true)
+      @PathParam("eventId") String id,
+      @Parameter(description = "Scheduling Information", required = true)
       @FormParam("scheduling") String scheduling,
-      @FormParam("allowConflict") @DefaultValue("false") boolean allowConflict) throws Exception {
+      @Parameter(description = "Allow conflicts when updating scheduling")
+      @FormParam("allowConflict") @DefaultValue("false") boolean allowConflict
+  ) throws Exception {
     final ApiVersion requestedVersion = ApiMediaType.parse(acceptHeader).getVersion();
     final Optional<Event> event = indexService.getEvent(id, opensearchIndex);
 
@@ -2576,35 +2620,64 @@ public class EventsEndpoint {
   @POST
   @Path("{eventId}/track")
   @Consumes(MediaType.MULTIPART_FORM_DATA)
-  @RestQuery(
-      name = "updateFlavorWithTrack",
-      description = "Update an events track for a given flavor",
-      returnDescription = "",
-      pathParameters = {
-          @RestParameter(name = "eventId", description = "The event id", isRequired = true, type = STRING) },
-      restParameters = {
-          @RestParameter(description = "Flavor to add track to, e.g. captions/source",
-              isRequired = true, name = "flavor", type = RestParameter.Type.STRING),
-          @RestParameter(description = "Comma separated list of tags for the given track, e.g. archive,publish. "
-              + "If a 'lang:LANG-CODE' tag exists and overwriteExisting=true "
-              + "only tracks with same lang tag and flavor will be replaced. This behavior is used for captions.",
-              isRequired = false, name = "tags", type = RestParameter.Type.STRING),
-          @RestParameter(description = "If true, all other tracks in the specified flavor are REMOVED. "
-              + "If tags argument contains a lang:LANG-CODE tag, only elements with same tag would be removed.",
-              isRequired = true, name = "overwriteExisting", type = RestParameter.Type.BOOLEAN),
-          @RestParameter(description = "The track file", isRequired = true, name = "track",
-              type = RestParameter.Type.FILE),
-      },
-      responses = {
-          @RestResponse(description = "The specified event does not exist.",
-              responseCode = HttpServletResponse.SC_NOT_FOUND),
-          @RestResponse(description = "The track has been added to the event.",
-              responseCode = HttpServletResponse.SC_OK),
-          @RestResponse(description = "The request is invalid or inconsistent.",
-              responseCode = HttpServletResponse.SC_BAD_REQUEST),
-      })
-  public Response updateFlavorWithTrack(@HeaderParam("Accept") String acceptHeader, @PathParam("eventId") String id,
-          @Context HttpServletRequest request) {
+  @Operation(
+      summary = "Update a track of an event",
+      description = "Update an events track for a given flavor"
+  )
+  @RequestBody(
+      content = {
+          @Content(
+              mediaType = MediaType.MULTIPART_FORM_DATA,
+              schema = @Schema(type = "object", requiredProperties = {"flavor", "overwriteExisting", "track"}),
+              schemaProperties = {
+                  @SchemaProperty(
+                      name = "flavor",
+                      schema = @Schema(
+                          type = "string",
+                          description = "Flavor to add track to, e.g. captions/source"
+                      )
+                  ),
+                  @SchemaProperty(
+                      name = "tags",
+                      schema = @Schema(
+                          type = "string",
+                          description = "Comma separated list of tags for the given track, e.g. archive,publish. "
+                              + "If a 'lang:LANG-CODE' tag exists and overwriteExisting=true "
+                              + "only tracks with same lang tag and flavor will be replaced. This behavior is used "
+                              + "for captions."
+                      )
+                  ),
+                  @SchemaProperty(
+                      name = "overwriteExisting",
+                      schema = @Schema(
+                          type = "boolean",
+                          description = "If true, all other tracks in the specified flavor are REMOVED. "
+                              + "If tags argument contains a lang:LANG-CODE tag, only elements with same tag would be "
+                              + "removed."
+                      )
+                  ),
+                  @SchemaProperty(
+                      name = "track",
+                      schema = @Schema(
+                          type = "string", format = "binary",
+                          description = "The track file"
+                      )
+                  )
+              }
+          )
+      }
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "404", description = "The specified event does not exist."),
+      @ApiResponse(responseCode = "200", description = "The track has been added to the event."),
+      @ApiResponse(responseCode = "400", description = "The request is invalid or inconsistent.")
+  })
+  public Response updateFlavorWithTrack(
+      @HeaderParam("Accept") String acceptHeader,
+      @Parameter(description = "The event id", required = true)
+      @PathParam("eventId") String id,
+      @Context HttpServletRequest request
+  ) {
     logger.debug("updateFlavorWithTrack called");
     try {
       boolean overwriteExisting = false;

@@ -24,9 +24,6 @@ import static org.apache.commons.lang3.StringUtils.defaultString;
 import static org.apache.commons.lang3.exception.ExceptionUtils.getMessage;
 import static org.opencastproject.index.service.util.JSONUtils.arrayToJsonArray;
 import static org.opencastproject.index.service.util.JSONUtils.safeString;
-import static org.opencastproject.util.doc.rest.RestParameter.Type.BOOLEAN;
-import static org.opencastproject.util.doc.rest.RestParameter.Type.INTEGER;
-import static org.opencastproject.util.doc.rest.RestParameter.Type.STRING;
 import static org.opencastproject.util.requests.SortCriterion.Order.Descending;
 
 import org.opencastproject.external.common.ApiMediaType;
@@ -34,10 +31,6 @@ import org.opencastproject.external.common.ApiResponseBuilder;
 import org.opencastproject.index.service.util.RestUtils;
 import org.opencastproject.util.NotFoundException;
 import org.opencastproject.util.RestUtil;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 import org.opencastproject.util.requests.SortCriterion;
 import org.opencastproject.workflow.api.RetryStrategy;
 import org.opencastproject.workflow.api.WorkflowDatabaseException;
@@ -64,7 +57,6 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.GET;
 import javax.ws.rs.HeaderParam;
 import javax.ws.rs.Path;
@@ -73,17 +65,22 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Response;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 @Path("/api/workflow-definitions")
 @Produces({ ApiMediaType.JSON, ApiMediaType.VERSION_1_1_0, ApiMediaType.VERSION_1_2_0, ApiMediaType.VERSION_1_3_0,
             ApiMediaType.VERSION_1_4_0, ApiMediaType.VERSION_1_5_0, ApiMediaType.VERSION_1_6_0,
             ApiMediaType.VERSION_1_7_0, ApiMediaType.VERSION_1_8_0,
             ApiMediaType.VERSION_1_9_0, ApiMediaType.VERSION_1_10_0, ApiMediaType.VERSION_1_11_0,
             ApiMediaType.VERSION_1_12_0 })
-@RestService(
-    name = "externalapiworkflowdefinitions",
-    title = "External API Workflow Definitions Service",
-    notes = {},
-    abstractText = "Provides resources and operations related to the workflow definitions"
+@Tag(name = "External API")
+@Tag(
+    name = "External API - Workflow Definitions",
+    description = "Provides resources and operations related to the workflow definitions"
 )
 @Component(
     immediate = true,
@@ -132,39 +129,44 @@ public class WorkflowDefinitionsEndpoint {
 
   @GET
   @Path("/")
-  @RestQuery(
-      name = "getworkflowdefinitions",
-      description = "Returns a list of workflow definition.",
-      returnDescription = "",
-      restParameters = {
-          @RestParameter(name = "withoperations", description = "Whether the workflow operations should be included in "
-              + "the response", isRequired = false, type = BOOLEAN),
-          @RestParameter(name = "withconfigurationpanel", description = "Whether the workflow configuration panel "
-              + "should be included in the response", isRequired = false, type = BOOLEAN),
-          @RestParameter(name = "filter", description = "Usage [Filter Name]:[Value to Filter With]. Available filter: "
-              + "\"tag\"", isRequired = false, type = STRING),
-          @RestParameter(name = "sort", description = "Sort the results based upon a list of comma seperated sorting "
+  @Operation(
+      summary = "Get workflow definitions",
+      description = "Returns a list of workflow definition."
+  )
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "200",
+          description = "A (potentially empty) list of workflow definitions is returned."
+      ),
+      @ApiResponse(responseCode = "400", description = "The request is invalid or inconsistent.")
+  })
+  public Response getWorkflowDefinitions(
+      @HeaderParam("Accept") String acceptHeader,
+      @Parameter(
+          description = "Whether the workflow operations should be included in " + "the response"
+      )
+      @QueryParam("withoperations") boolean withOperations,
+      @Parameter(
+          description = "Whether the workflow configuration panel " + "should be included in the response"
+      )
+      @QueryParam("withconfigurationpanel") boolean withConfigurationPanel,
+      @QueryParam("withconfigurationpaneljson") boolean withConfigurationPanelJson,
+      @Parameter(
+          description = "Usage [Filter Name]:[Value to Filter With]. Available filter: " + "\"tag\""
+      )
+      @QueryParam("filter") String filter,
+      @Parameter(
+          description = "Sort the results based upon a list of comma seperated sorting "
               + "criteria. In the comma seperated list each type of sorting is specified as a pair such as: "
               + "<Sort Name>:ASC or <Sort Name>:DESC. Adding the suffix ASC or DESC sets the order as ascending or "
-              + "descending order and is mandatory.", isRequired = false, type = STRING),
-          @RestParameter(name = "limit", description = "The maximum number of results to return for a single request.",
-              isRequired = false, type = INTEGER),
-          @RestParameter(name = "offset", description = "The index of the first result to return.",
-              isRequired = false, type = INTEGER) },
-      responses = {
-          @RestResponse(description = "A (potentially empty) list of workflow definitions is returned.",
-              responseCode = HttpServletResponse.SC_OK),
-          @RestResponse(description = "The request is invalid or inconsistent.",
-              responseCode = HttpServletResponse.SC_BAD_REQUEST)
-      })
-  public Response getWorkflowDefinitions(@HeaderParam("Accept") String acceptHeader,
-          @QueryParam("withoperations") boolean withOperations,
-          @QueryParam("withconfigurationpanel") boolean withConfigurationPanel,
-          @QueryParam("withconfigurationpaneljson") boolean withConfigurationPanelJson,
-          @QueryParam("filter") String filter,
-          @QueryParam("sort") String sort,
-          @QueryParam("offset") Integer offset,
-          @QueryParam("limit") Integer limit) {
+              + "descending order and is mandatory."
+      )
+      @QueryParam("sort") String sort,
+      @Parameter(description = "The index of the first result to return.")
+      @QueryParam("offset") Integer offset,
+      @Parameter(description = "The maximum number of results to return for a single request.")
+      @QueryParam("limit") Integer limit
+  ) {
     Stream<WorkflowDefinition> workflowDefinitions;
     try {
       workflowDefinitions = workflowService.listAvailableWorkflowDefinitions().stream();
@@ -259,32 +261,31 @@ public class WorkflowDefinitionsEndpoint {
 
   @GET
   @Path("{workflowDefinitionId}")
-  @RestQuery(
-      name = "getworkflowdefinition",
-      description = "Returns a single workflow definition.",
-      returnDescription = "",
-      pathParameters = {
-          @RestParameter(name = "workflowDefinitionId", description = "The workflow definition id", isRequired = true,
-              type = STRING)
-      },
-      restParameters = {
-          @RestParameter(name = "withoperations", description = "Whether the workflow operations should be included in "
-              + "the response", isRequired = false, type = BOOLEAN),
-          @RestParameter(name = "withconfigurationpaneljson", description = "Whether the workflow configuration panel "
-              + "in JSON should be included in the response", isRequired = false, type = BOOLEAN),
-          @RestParameter(name = "withconfigurationpanel", description = "Whether the workflow configuration panel "
-              + "should be included in the response", isRequired = false, type = BOOLEAN)
-      },
-      responses = {
-          @RestResponse(description = "The workflow definition is returned.",
-              responseCode = HttpServletResponse.SC_OK),
-          @RestResponse(description = "The specified workflow definition does not exist.",
-              responseCode = HttpServletResponse.SC_NOT_FOUND)
-      })
-  public Response getWorkflowDefinition(@HeaderParam("Accept") String acceptHeader,
-          @PathParam("workflowDefinitionId") String id, @QueryParam("withoperations") boolean withOperations,
-          @QueryParam("withconfigurationpanel") boolean withConfigurationPanel,
-          @QueryParam("withconfigurationpaneljson") boolean withConfigurationPanelJson) throws Exception {
+  @Operation(
+      summary = "Get a workflow definition",
+      description = "Returns a single workflow definition."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The workflow definition is returned."),
+      @ApiResponse(responseCode = "404", description = "The specified workflow definition does not exist.")
+  })
+  public Response getWorkflowDefinition(
+      @HeaderParam("Accept") String acceptHeader,
+      @Parameter(description = "The workflow definition id", required = true)
+      @PathParam("workflowDefinitionId") String id,
+      @Parameter(
+          description = "Whether the workflow operations should be included in " + "the response"
+      )
+      @QueryParam("withoperations") boolean withOperations,
+      @Parameter(
+          description = "Whether the workflow configuration panel " + "should be included in the response"
+      )
+      @QueryParam("withconfigurationpanel") boolean withConfigurationPanel,
+      @Parameter(
+          description = "Whether the workflow configuration panel " + "in JSON should be included in the response"
+      )
+      @QueryParam("withconfigurationpaneljson") boolean withConfigurationPanelJson
+  ) throws Exception {
     WorkflowDefinition wd;
     try {
       wd = workflowService.getWorkflowDefinitionById(id);

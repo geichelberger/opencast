@@ -24,9 +24,6 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.isNoneBlank;
 import static org.opencastproject.index.service.util.JSONUtils.safeString;
 import static org.opencastproject.util.RestUtil.getEndpointUrl;
-import static org.opencastproject.util.doc.rest.RestParameter.Type.BOOLEAN;
-import static org.opencastproject.util.doc.rest.RestParameter.Type.INTEGER;
-import static org.opencastproject.util.doc.rest.RestParameter.Type.STRING;
 
 import org.opencastproject.external.common.ApiMediaType;
 import org.opencastproject.external.common.ApiResponseBuilder;
@@ -43,10 +40,6 @@ import org.opencastproject.util.NotFoundException;
 import org.opencastproject.util.RestUtil;
 import org.opencastproject.util.UrlSupport;
 import org.opencastproject.util.data.Tuple;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 import org.opencastproject.workflow.api.RetryStrategy;
 import org.opencastproject.workflow.api.WorkflowDefinition;
 import org.opencastproject.workflow.api.WorkflowInstance;
@@ -75,7 +68,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
-import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.FormParam;
 import javax.ws.rs.GET;
@@ -88,13 +80,22 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Response;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 @Path("/api/workflows")
 @Produces({ ApiMediaType.JSON, ApiMediaType.VERSION_1_1_0, ApiMediaType.VERSION_1_2_0, ApiMediaType.VERSION_1_3_0,
             ApiMediaType.VERSION_1_4_0, ApiMediaType.VERSION_1_5_0, ApiMediaType.VERSION_1_6_0,
             ApiMediaType.VERSION_1_7_0, ApiMediaType.VERSION_1_8_0, ApiMediaType.VERSION_1_9_0,
             ApiMediaType.VERSION_1_10_0, ApiMediaType.VERSION_1_11_0, ApiMediaType.VERSION_1_12_0 })
-@RestService(name = "externalapiworkflowinstances", title = "External API Workflow Instances Service", notes = {},
-             abstractText = "Provides resources and operations related to the workflow instances")
+@Tag(name = "External API")
+@Tag(
+    name = "External API - Workflows",
+    description = "Provides resources and operations related to the workflow instances"
+)
 @Component(
     immediate = true,
     service = WorkflowsEndpoint.class,
@@ -150,35 +151,41 @@ public class WorkflowsEndpoint {
 
   @POST
   @Path("")
-  @RestQuery(
-      name = "createworkflowinstance",
-      description = "Creates a workflow instance.",
-      returnDescription = "",
-      restParameters = {
-          @RestParameter(name = "event_identifier", description = "The event identifier this workflow should run "
-              + "against", isRequired = true, type = STRING),
-          @RestParameter(name = "workflow_definition_identifier", description = "The identifier of the workflow "
-              + "definition to use", isRequired = true, type = STRING),
-          @RestParameter(name = "configuration", description = "The optional configuration for this workflow",
-              isRequired = false, type = STRING),
-          @RestParameter(name = "withoperations", description = "Whether the workflow operations should be included in "
-              + "the response", isRequired = false, type = BOOLEAN),
-          @RestParameter(name = "withconfiguration", description = "Whether the workflow configuration should be "
-              + "included in the response", isRequired = false, type = BOOLEAN),
-      },
-      responses = {
-          @RestResponse(description = "A new workflow is created and its identifier is returned in the Location "
-              + "header.", responseCode = HttpServletResponse.SC_CREATED),
-          @RestResponse(description = "The request is invalid or inconsistent.",
-              responseCode = HttpServletResponse.SC_BAD_REQUEST),
-          @RestResponse(description = "The event or workflow definition could not be found.",
-              responseCode = HttpServletResponse.SC_NOT_FOUND)
-      })
-  public Response createWorkflowInstance(@HeaderParam("Accept") String acceptHeader,
-          @FormParam("event_identifier") String eventId,
-          @FormParam("workflow_definition_identifier") String workflowDefinitionIdentifier,
-          @FormParam("configuration") String configuration, @QueryParam("withoperations") boolean withOperations,
-          @QueryParam("withconfiguration") boolean withConfiguration) {
+  @Operation(
+      summary = "Create a workflow instance",
+      description = "Creates a workflow instance."
+  )
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "201",
+          description = "A new workflow is created and its identifier is returned in the Location " + "header."
+      ),
+      @ApiResponse(responseCode = "400", description = "The request is invalid or inconsistent."),
+      @ApiResponse(responseCode = "404", description = "The event or workflow definition could not be found.")
+  })
+  public Response createWorkflowInstance(
+      @HeaderParam("Accept") String acceptHeader,
+      @Parameter(
+          description = "The event identifier this workflow should run " + "against",
+          required = true
+      )
+      @FormParam("event_identifier") String eventId,
+      @Parameter(
+          description = "The identifier of the workflow " + "definition to use",
+          required = true
+      )
+      @FormParam("workflow_definition_identifier") String workflowDefinitionIdentifier,
+      @Parameter(description = "The optional configuration for this workflow")
+      @FormParam("configuration") String configuration,
+      @Parameter(
+          description = "Whether the workflow operations should be included in " + "the response"
+      )
+      @QueryParam("withoperations") boolean withOperations,
+      @Parameter(
+          description = "Whether the workflow configuration should be " + "included in the response"
+      )
+      @QueryParam("withconfiguration") boolean withConfiguration
+  ) {
     if (isBlank(eventId)) {
       return RestUtil.R.badRequest("Required parameter 'event_identifier' is missing or invalid");
     }
@@ -231,30 +238,28 @@ public class WorkflowsEndpoint {
 
   @GET
   @Path("{workflowInstanceId}")
-  @RestQuery(
-      name = "getworkflowinstance",
-      description = "Returns a single workflow instance.",
-      returnDescription = "",
-      pathParameters = {
-          @RestParameter(name = "workflowInstanceId", description = "The workflow instance id", isRequired = true,
-              type = INTEGER)
-      },
-      restParameters = {
-          @RestParameter(name = "withoperations", description = "Whether the workflow operations should be included in "
-              + "the response", isRequired = false, type = BOOLEAN),
-          @RestParameter(name = "withconfiguration", description = "Whether the workflow configuration should be "
-              + "included in the response", isRequired = false, type = BOOLEAN)
-      },
-      responses = {
-          @RestResponse(description = "The workflow instance is returned.", responseCode = HttpServletResponse.SC_OK),
-          @RestResponse(description = "The user doesn't have the rights to make this request.",
-              responseCode = HttpServletResponse.SC_FORBIDDEN),
-          @RestResponse(description = "The specified workflow instance does not exist.",
-              responseCode = HttpServletResponse.SC_NOT_FOUND)
-      })
-  public Response getWorkflowInstance(@HeaderParam("Accept") String acceptHeader,
-          @PathParam("workflowInstanceId") Long id, @QueryParam("withoperations") boolean withOperations,
-          @QueryParam("withconfiguration") boolean withConfiguration) {
+  @Operation(
+      summary = "Get a workflow instance",
+      description = "Returns a single workflow instance."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The workflow instance is returned."),
+      @ApiResponse(responseCode = "403", description = "The user doesn't have the rights to make this request."),
+      @ApiResponse(responseCode = "404", description = "The specified workflow instance does not exist.")
+  })
+  public Response getWorkflowInstance(
+      @HeaderParam("Accept") String acceptHeader,
+      @Parameter(description = "The workflow instance id", required = true)
+      @PathParam("workflowInstanceId") Long id,
+      @Parameter(
+          description = "Whether the workflow operations should be included in " + "the response"
+      )
+      @QueryParam("withoperations") boolean withOperations,
+      @Parameter(
+          description = "Whether the workflow configuration should be " + "included in the response"
+      )
+      @QueryParam("withconfiguration") boolean withConfiguration
+  ) {
     WorkflowInstance wi;
     try {
       wi = workflowService.getWorkflowById(id);
@@ -272,39 +277,34 @@ public class WorkflowsEndpoint {
 
   @PUT
   @Path("{workflowInstanceId}")
-  @RestQuery(
-      name = "updateworkflowinstance",
-      description = "Creates a workflow instance.",
-      returnDescription = "",
-      pathParameters = {
-          @RestParameter(name = "workflowInstanceId", description = "The workflow instance id", isRequired = true,
-              type = INTEGER)
-      },
-      restParameters = {
-          @RestParameter(name = "configuration", description = "The optional configuration for this workflow",
-              isRequired = false, type = STRING),
-          @RestParameter(name = "state", description = "The optional state transition for this workflow",
-              isRequired = false, type = STRING),
-          @RestParameter(name = "withoperations", description = "Whether the workflow operations should be included in "
-              + "the response", isRequired = false, type = BOOLEAN),
-          @RestParameter(name = "withconfiguration", description = "Whether the workflow configuration should be "
-              + "included in the response", isRequired = false, type = BOOLEAN),
-      },
-      responses = {
-          @RestResponse(description = "The workflow instance is updated.", responseCode = HttpServletResponse.SC_OK),
-          @RestResponse(description = "The request is invalid or inconsistent.",
-              responseCode = HttpServletResponse.SC_BAD_REQUEST),
-          @RestResponse(description = "The user doesn't have the rights to make this request.",
-              responseCode = HttpServletResponse.SC_FORBIDDEN),
-          @RestResponse(description = "The workflow instance could not be found.",
-              responseCode = HttpServletResponse.SC_NOT_FOUND),
-          @RestResponse(description = "The workflow instance cannot transition to this state.",
-              responseCode = HttpServletResponse.SC_CONFLICT)
-      })
-  public Response updateWorkflowInstance(@HeaderParam("Accept") String acceptHeader,
-          @PathParam("workflowInstanceId") Long id, @FormParam("configuration") String configuration,
-          @FormParam("state") String stateStr, @QueryParam("withoperations") boolean withOperations,
-          @QueryParam("withconfiguration") boolean withConfiguration) {
+  @Operation(
+      summary = "Update a workflow instance",
+      description = "Updates a workflow instance."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The workflow instance is updated."),
+      @ApiResponse(responseCode = "400", description = "The request is invalid or inconsistent."),
+      @ApiResponse(responseCode = "403", description = "The user doesn't have the rights to make this request."),
+      @ApiResponse(responseCode = "404", description = "The workflow instance could not be found."),
+      @ApiResponse(responseCode = "409", description = "The workflow instance cannot transition to this state.")
+  })
+  public Response updateWorkflowInstance(
+      @HeaderParam("Accept") String acceptHeader,
+      @Parameter(description = "The workflow instance id", required = true)
+      @PathParam("workflowInstanceId") Long id,
+      @Parameter(description = "The optional configuration for this workflow")
+      @FormParam("configuration") String configuration,
+      @Parameter(description = "The optional state transition for this workflow")
+      @FormParam("state") String stateStr,
+      @Parameter(
+          description = "Whether the workflow operations should be included in " + "the response"
+      )
+      @QueryParam("withoperations") boolean withOperations,
+      @Parameter(
+          description = "Whether the workflow configuration should be " + "included in the response"
+      )
+      @QueryParam("withconfiguration") boolean withConfiguration
+  ) {
     try {
       boolean changed = false;
       WorkflowInstance wi = workflowService.getWorkflowById(id);
@@ -390,26 +390,21 @@ public class WorkflowsEndpoint {
 
   @DELETE
   @Path("{workflowInstanceId}")
-  @RestQuery(
-      name = "deleteworkflowinstance",
-      description = "Deletes a workflow instance.",
-      returnDescription = "",
-      pathParameters = {
-          @RestParameter(name = "workflowInstanceId", description = "The workflow instance id", isRequired = true,
-              type = INTEGER)
-      },
-      responses = {
-          @RestResponse(description = "The workflow instance has been deleted.",
-              responseCode = HttpServletResponse.SC_NO_CONTENT),
-          @RestResponse(description = "The user doesn't have the rights to make this request.",
-              responseCode = HttpServletResponse.SC_FORBIDDEN),
-          @RestResponse(description = "The specified workflow instance does not exist.",
-              responseCode = HttpServletResponse.SC_NOT_FOUND),
-          @RestResponse(description = "The workflow instance cannot be deleted in this state.",
-              responseCode = HttpServletResponse.SC_CONFLICT)
-      })
-  public Response deleteWorkflowInstance(@HeaderParam("Accept") String acceptHeader,
-          @PathParam("workflowInstanceId") Long id) {
+  @Operation(
+      summary = "Delete a workflow instance",
+      description = "Deletes a workflow instance."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "204", description = "The workflow instance has been deleted."),
+      @ApiResponse(responseCode = "403", description = "The user doesn't have the rights to make this request."),
+      @ApiResponse(responseCode = "404", description = "The specified workflow instance does not exist."),
+      @ApiResponse(responseCode = "409", description = "The workflow instance cannot be deleted in this state.")
+  })
+  public Response deleteWorkflowInstance(
+      @HeaderParam("Accept") String acceptHeader,
+      @Parameter(description = "The workflow instance id", required = true)
+      @PathParam("workflowInstanceId") Long id
+  ) {
     try {
       workflowService.remove(id);
     } catch (WorkflowStateException e) {

@@ -24,9 +24,6 @@ import static org.apache.commons.lang3.StringUtils.trimToNull;
 import static org.opencastproject.index.service.util.JSONUtils.safeString;
 import static org.opencastproject.util.DateTimeSupport.toUTC;
 import static org.opencastproject.util.RestUtil.getEndpointUrl;
-import static org.opencastproject.util.doc.rest.RestParameter.Type.INTEGER;
-import static org.opencastproject.util.doc.rest.RestParameter.Type.STRING;
-import static org.opencastproject.util.doc.rest.RestParameter.Type.TEXT;
 
 import org.opencastproject.external.common.ApiMediaType;
 import org.opencastproject.external.common.ApiResponseBuilder;
@@ -50,10 +47,6 @@ import org.opencastproject.systems.OpencastConstants;
 import org.opencastproject.util.NotFoundException;
 import org.opencastproject.util.UrlSupport;
 import org.opencastproject.util.data.Tuple;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 import org.opencastproject.util.requests.SortCriterion;
 
 import com.cronutils.mapper.CronMapper;
@@ -84,7 +77,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.FormParam;
 import javax.ws.rs.GET;
@@ -97,13 +89,19 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Response;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 @Path("/api/lifecyclemanagement")
 @Produces({ ApiMediaType.JSON, ApiMediaType.VERSION_1_12_0 })
-@RestService(
-    name = "externalapilifecyclemanagement",
-    title = "External API LifeCycle Management Service",
-    notes = {},
-    abstractText = "Manage life cycle policies"
+@Tag(name = "External API")
+@Tag(
+    name = "External API - Lifecycle Management",
+    description = "Manage life cycle policies"
 )
 @Component(
     immediate = true,
@@ -158,26 +156,21 @@ public class LifeCycleManagementEndpoint {
 
   @GET
   @Path("policies/{id}")
-  @RestQuery(
-      name = "lifeCyclePolicy",
-      description = "Get a lifecycle policy.",
-      returnDescription = "A lifecycle policy as JSON",
-      pathParameters = {
-          @RestParameter(name = "id", isRequired = true, description = "The lifecycle policy identifier",
-              type = STRING),
-      },
-      responses = {
-          @RestResponse(description = "Returns the lifecycle policy.", responseCode = HttpServletResponse.SC_OK),
-          @RestResponse(description = "The specified lifecycle policy instance does not exist.",
-              responseCode = HttpServletResponse.SC_NOT_FOUND),
-          @RestResponse(description = "The user doesn't have the rights to make this request.",
-              responseCode = HttpServletResponse.SC_FORBIDDEN),
-          @RestResponse(description = "The request is invalid or inconsistent.",
-              responseCode = HttpServletResponse.SC_BAD_REQUEST),
-      })
+  @Operation(
+      summary = "Get a lifecycle policy",
+      description = "Get a lifecycle policy."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Returns the lifecycle policy."),
+      @ApiResponse(responseCode = "404", description = "The specified lifecycle policy instance does not exist."),
+      @ApiResponse(responseCode = "403", description = "The user doesn't have the rights to make this request."),
+      @ApiResponse(responseCode = "400", description = "The request is invalid or inconsistent.")
+  })
   public Response getPolicy(
       @HeaderParam("Accept") String acceptHeader,
-      @PathParam("id") String id) {
+      @Parameter(description = "The lifecycle policy identifier", required = true)
+      @PathParam("id") String id
+  ) {
     try {
       LifeCyclePolicy policy = service.getLifeCyclePolicyById(id);
 
@@ -201,31 +194,28 @@ public class LifeCycleManagementEndpoint {
 
   @GET
   @Path("policies")
-  @RestQuery(
-      name = "policies",
-      description = "Get policies. Policies that you do not have read access to will not show up.",
-      returnDescription = "A JSON object containing an array.",
-      restParameters = {
-          @RestParameter(name = "limit", isRequired = false, type = INTEGER,
-              description = "The maximum number of results to return for a single request.", defaultValue = "100"),
-          @RestParameter(name = "offset", isRequired = false, type = INTEGER,
-              description = "The index of the first result to return."),
-          @RestParameter(name = "sort", isRequired = false, type = STRING,
-              description = "Sort the results based upon a sorting criteria. A criteria is specified as a pair such as:"
-                + "<Sort Name>:ASC or <Sort Name>:DESC. Adding the suffix ASC or DESC sets the order as ascending or"
-                + "descending order and is mandatory. Sort Name is case sensitive. Supported Sort Names are 'title'"
-              , defaultValue = "title:ASC"),
-      },
-      responses = {
-          @RestResponse(description = "Returns the playlist.", responseCode = HttpServletResponse.SC_OK),
-          @RestResponse(description = "The request is invalid or inconsistent.",
-              responseCode = HttpServletResponse.SC_BAD_REQUEST),
-      })
+  @Operation(
+      summary = "Get lifecycle policies",
+      description = "Get policies. Policies that you do not have read access to will not show up."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Returns the playlist."),
+      @ApiResponse(responseCode = "400", description = "The request is invalid or inconsistent.")
+  })
   public Response getPoliciesAsJson(
       @HeaderParam("Accept") String acceptHeader,
+      @Parameter(description = "The maximum number of results to return for a single request.", example = "100")
       @QueryParam("limit") int limit,
+      @Parameter(description = "The index of the first result to return.")
       @QueryParam("offset") int offset,
-      @QueryParam("sort") String sort) throws LifeCycleServiceException {
+      @Parameter(
+          description = "Sort the results based upon a sorting criteria. A criteria is specified as a pair such as:"
+              + "<Sort Name>:ASC or <Sort Name>:DESC. Adding the suffix ASC or DESC sets the order as ascending or"
+              + "descending order and is mandatory. Sort Name is case sensitive. Supported Sort Names are 'title'",
+          example = "title:ASC"
+      )
+      @QueryParam("sort") String sort
+  ) throws LifeCycleServiceException {
     if (offset < 0) {
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
@@ -268,15 +258,16 @@ public class LifeCycleManagementEndpoint {
 
   @GET
   @Path("policies/actions")
-  @RestQuery(
-      name = "actions",
-      description = "Get lifecycle policy actions.",
-      returnDescription = "Lifecycle policy actions as JSON array",
-      responses = {
-          @RestResponse(description = "Returns the lifecycle policy actions.",
-              responseCode = HttpServletResponse.SC_OK),
-      })
-  public Response getActions(@HeaderParam("Accept") String acceptHeader) {
+  @Operation(
+      summary = "Get lifecycle policy actions",
+      description = "Get lifecycle policy actions."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Returns the lifecycle policy actions.")
+  })
+  public Response getActions(
+      @HeaderParam("Accept") String acceptHeader
+  ) {
     JsonArray actionsJson = new JsonArray();
     for (Action action : Action.values()) {
       actionsJson.add(new JsonPrimitive(action.toString()));
@@ -287,15 +278,16 @@ public class LifeCycleManagementEndpoint {
 
   @GET
   @Path("policies/targettypes")
-  @RestQuery(
-      name = "targettypes",
-      description = "Get lifecycle policy targettypes.",
-      returnDescription = "Lifecycle policy targettypes as JSON array",
-      responses = {
-          @RestResponse(description = "Returns the lifecycle policy targettypes.",
-              responseCode = HttpServletResponse.SC_OK),
-      })
-  public Response getTargetTypes(@HeaderParam("Accept") String acceptHeader) {
+  @Operation(
+      summary = "Get lifecycle policy target types",
+      description = "Get lifecycle policy targettypes."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Returns the lifecycle policy targettypes.")
+  })
+  public Response getTargetTypes(
+      @HeaderParam("Accept") String acceptHeader
+  ) {
     JsonArray targetTypesJson = new JsonArray();
     for (TargetType type : TargetType.values()) {
       targetTypesJson.add(new JsonPrimitive(type.toString()));
@@ -306,15 +298,16 @@ public class LifeCycleManagementEndpoint {
 
   @GET
   @Path("policies/timings")
-  @RestQuery(
-      name = "timings",
-      description = "Get lifecycle policy timings.",
-      returnDescription = "Lifecycle policy timings as JSON array",
-      responses = {
-          @RestResponse(description = "Returns the lifecycle policy timings.",
-              responseCode = HttpServletResponse.SC_OK),
-      })
-  public Response getTimings(@HeaderParam("Accept") String acceptHeader) {
+  @Operation(
+      summary = "Get lifecycle policy timings",
+      description = "Get lifecycle policy timings."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Returns the lifecycle policy timings.")
+  })
+  public Response getTimings(
+      @HeaderParam("Accept") String acceptHeader
+  ) {
     JsonArray timingsJson = new JsonArray();
     for (Timing timing : Timing.values()) {
       timingsJson.add(new JsonPrimitive(timing.toString()));
@@ -325,24 +318,22 @@ public class LifeCycleManagementEndpoint {
 
   @GET
   @Path("policiesForEvent/{eventId}")
-  @RestQuery(
-      name = "policiesForEvent",
-      description = "Get active lifecycle policies that would target the given event were they to be executed now.",
-      returnDescription = "Lifecycle policies",
-      pathParameters = {
-          @RestParameter(name = "eventId", isRequired = true, description = "The lifecycle policy identifier",
-              type = STRING),
-          @RestParameter(name = "limit", description = "The maximum number of results to return for a single request.",
-              isRequired = false, type = RestParameter.Type.INTEGER),
-          @RestParameter(name = "offset", description = "The index of the first result to return.", isRequired = false,
-              type = RestParameter.Type.INTEGER)
-      },
-      responses = {
-          @RestResponse(description = "Returns the lifecycle policies.", responseCode = HttpServletResponse.SC_OK),
-      })
-  public Response getPoliciesForEvent(@HeaderParam("Accept") String acceptHeader, @PathParam("eventId") String eventId,
-      @QueryParam("limit") int limit, @QueryParam("offset") int offset)
-          throws SearchIndexException, NotFoundException, LifeCycleServiceException {
+  @Operation(
+      summary = "Get the lifecycle policies targeting an event",
+      description = "Get active lifecycle policies that would target the given event were they to be executed now."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Returns the lifecycle policies.")
+  })
+  public Response getPoliciesForEvent(
+      @HeaderParam("Accept") String acceptHeader,
+      @Parameter(description = "The lifecycle policy identifier", required = true)
+      @PathParam("eventId") String eventId,
+      @Parameter(description = "The maximum number of results to return for a single request.", required = true)
+      @QueryParam("limit") int limit,
+      @Parameter(description = "The index of the first result to return.", required = true)
+      @QueryParam("offset") int offset
+  ) throws SearchIndexException, NotFoundException, LifeCycleServiceException {
     // Set default limit if necessary
     if (limit < 1) {
       limit = 100;
@@ -377,49 +368,54 @@ public class LifeCycleManagementEndpoint {
 
   @POST
   @Path("policies")
-  @RestQuery(
-      name = "create",
-      description = "Creates a lifecycle policy.",
-      returnDescription = "The created lifecycle policy.",
-      restParameters = {
-          @RestParameter(name = "title", isRequired = true, description = "Policy Title", type = STRING),
-          @RestParameter(name = "targetType", description = "EVENT, SERIES", isRequired = true, type = STRING,
-              defaultValue = "EVENT"),
-          @RestParameter(name = "action", description = "START_WORKFLOW", isRequired = true, type = STRING,
-              defaultValue = "START_WORKFLOW"),
-          @RestParameter(name = "actionParameters", description = "Depend entirely on the chosen action. JSON. To find "
-              + "how to structure your JSON check the documentation.", isRequired = false, type = TEXT,
-              defaultValue = actionParametersExampleJSON),
-          @RestParameter(name = "actionDate", description = "Required if timing is SPECIFIC_DATE. "
-              + "E.g. 2023-11-30T16:16:47Z", isRequired = false, type = STRING),
-          @RestParameter(name = "cronTrigger", description = "Required if timing is REPEATING. "
-              + "https://www.quartz-scheduler.org/documentation/quartz-2.3.0/tutorials/crontrigger.html",
-              isRequired = false, type = STRING),
-          @RestParameter(name = "timing", description = "SPECIFIC_DATE, REPEATING, ALWAYS", isRequired = true,
-              type = STRING, defaultValue = "SPECIFIC_DATE"),
-          @RestParameter(name = "targetFilters", isRequired = false, description = "Used to select applicable "
-              + "entities. JSON. To find how to structure your JSON check the documentation.", type = TEXT),
-          @RestParameter(name = "accessControlEntries", description = "Which user have what permissions on this "
-              + "policy. JSON. To find how to structure your JSON check the documentation.", isRequired = false,
-              type = TEXT, defaultValue = ""),
-      },
-      responses = {
-          @RestResponse(description = "Policy created.", responseCode = HttpServletResponse.SC_CREATED),
-          @RestResponse(description = "The user doesn't have the rights to make this request.",
-              responseCode = HttpServletResponse.SC_FORBIDDEN),
-          @RestResponse(description = "The request is invalid or inconsistent.",
-              responseCode = HttpServletResponse.SC_BAD_REQUEST),
-      })
+  @Operation(
+      summary = "Create a lifecycle policy",
+      description = "Creates a lifecycle policy."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "201", description = "Policy created."),
+      @ApiResponse(responseCode = "403", description = "The user doesn't have the rights to make this request."),
+      @ApiResponse(responseCode = "400", description = "The request is invalid or inconsistent.")
+  })
   public Response createAsJson(
       @HeaderParam("Accept") String acceptHeader,
+      @Parameter(description = "Policy Title", required = true)
       @FormParam("title") String title,
+      @Parameter(description = "EVENT, SERIES", required = true, schema = @Schema(example = "EVENT"))
       @FormParam("targetType") String targetType,
+      @Parameter(description = "START_WORKFLOW", required = true, schema = @Schema(example = "START_WORKFLOW"))
       @FormParam("action") String action,
+      @Parameter(
+          description = "Depend entirely on the chosen action. JSON. To find "
+              + "how to structure your JSON check the documentation.",
+          schema = @Schema(example = actionParametersExampleJSON)
+      )
       @FormParam("actionParameters") String actionParameters,
+      @Parameter(
+          description = "Required if timing is SPECIFIC_DATE. " + "E.g. 2023-11-30T16:16:47Z"
+      )
       @FormParam("actionDate") String actionDate,
+      @Parameter(
+          description = "Required if timing is REPEATING. "
+              + "https://www.quartz-scheduler.org/documentation/quartz-2.3.0/tutorials/crontrigger.html"
+      )
       @FormParam("cronTrigger") String cronTrigger,
+      @Parameter(
+          description = "SPECIFIC_DATE, REPEATING, ALWAYS",
+          required = true,
+          schema = @Schema(example = "SPECIFIC_DATE")
+      )
       @FormParam("timing") String timing,
+      @Parameter(
+          description = "Used to select applicable "
+              + "entities. JSON. To find how to structure your JSON check the documentation."
+      )
       @FormParam("targetFilters") String targetFilters,
+      @Parameter(
+          description = "Which user have what permissions on this "
+              + "policy. JSON. To find how to structure your JSON check the documentation.",
+          schema = @Schema(example = "")
+      )
       @FormParam("accessControlEntries") String accessControlEntries
   ) {
     try {
@@ -528,50 +524,53 @@ public class LifeCycleManagementEndpoint {
 
   @PUT
   @Path("policies/{id}")
-  @RestQuery(
-      name = "update",
-      description = "Updates a lifecycle policy.",
-      returnDescription = "The updated lifecycle policy.",
-      pathParameters = {
-          @RestParameter(name = "id", isRequired = true, description = "Policy identifier", type = STRING)
-      },
-      restParameters = {
-          @RestParameter(name = "title", isRequired = false, description = "Policy Title", type = STRING),
-          @RestParameter(name = "targetType", description = "EVENT, SERIES", isRequired = false, type = STRING),
-          @RestParameter(name = "action", description = "START_WORKFLOW", isRequired = false, type = STRING),
-          @RestParameter(name = "actionParameters", description = "Depend entirely on the chosen action. JSON. To "
-              + "find how to structure your JSON check the documentation.", isRequired = false, type = TEXT),
-          @RestParameter(name = "actionDate", description = "Required if timing is SPECIFIC_DATE. "
-              + "E.g. 2023-11-30T16:16:47Z", isRequired = false, type = STRING),
-          @RestParameter(name = "cronTrigger", description = "Required if timing is REPEATING. "
-              + "https://www.quartz-scheduler.org/documentation/quartz-2.3.0/tutorials/crontrigger.html",
-              isRequired = false, type = STRING),
-          @RestParameter(name = "timing", description = "SPECIFIC_DATE, REPEATING, ALWAYS", isRequired = false,
-              type = STRING),
-          @RestParameter(name = "targetFilters", isRequired = false, description = "The filter(s) used to select "
-              + "applicable entities. Format: 'filter1:value1,filter2:value2'", type = TEXT),
-          @RestParameter(name = "accessControlEntries", description = "JSON. To find how to structure your JSON check "
-              + "the documentation.", isRequired = false, type = TEXT),
-      },
-      responses = {
-          @RestResponse(description = "Policy updated.", responseCode = HttpServletResponse.SC_OK),
-          @RestResponse(description = "The user doesn't have the rights to make this request.",
-              responseCode = HttpServletResponse.SC_FORBIDDEN),
-          @RestResponse(description = "The request is invalid or inconsistent. Will also occur if the policy was "
-              + "created from configuration.",
-              responseCode = HttpServletResponse.SC_BAD_REQUEST),
-      })
+  @Operation(
+      summary = "Update a lifecycle policy",
+      description = "Updates a lifecycle policy."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Policy updated."),
+      @ApiResponse(responseCode = "403", description = "The user doesn't have the rights to make this request."),
+      @ApiResponse(
+          responseCode = "400",
+          description = "The request is invalid or inconsistent. Will also occur if the policy was "
+              + "created from configuration."
+      )
+  })
   public Response updateAsJson(
       @HeaderParam("Accept") String acceptHeader,
+      @Parameter(description = "Policy identifier", required = true)
       @PathParam("id") String id,
+      @Parameter(description = "Policy Title")
       @FormParam("title") String title,
+      @Parameter(description = "EVENT, SERIES")
       @FormParam("targetType") String targetType,
+      @Parameter(description = "START_WORKFLOW")
       @FormParam("action") String action,
+      @Parameter(
+          description = "Depend entirely on the chosen action. JSON. To "
+              + "find how to structure your JSON check the documentation."
+      )
       @FormParam("actionParameters") String actionParameters,
+      @Parameter(
+          description = "Required if timing is SPECIFIC_DATE. " + "E.g. 2023-11-30T16:16:47Z"
+      )
       @FormParam("actionDate") String actionDate,
+      @Parameter(
+          description = "Required if timing is REPEATING. "
+              + "https://www.quartz-scheduler.org/documentation/quartz-2.3.0/tutorials/crontrigger.html"
+      )
       @FormParam("cronTrigger") String cronTrigger,
+      @Parameter(description = "SPECIFIC_DATE, REPEATING, ALWAYS")
       @FormParam("timing") String timing,
+      @Parameter(
+          description = "The filter(s) used to select "
+              + "applicable entities. Format: 'filter1:value1,filter2:value2'"
+      )
       @FormParam("targetFilters") String targetFilters,
+      @Parameter(
+          description = "JSON. To find how to structure your JSON check " + "the documentation."
+      )
       @FormParam("accessControlEntries") String accessControlEntries
   ) {
     try {
@@ -671,23 +670,26 @@ public class LifeCycleManagementEndpoint {
 
   @DELETE
   @Path("policies/{id}")
-  @RestQuery(
-      name = "remove",
-      description = "Removes a lifecycle policy.",
-      returnDescription = "The removed lifecycle policy.",
-      pathParameters = {
-          @RestParameter(name = "id", isRequired = true, description = "Policy identifier", type = STRING)
-      },
-      responses = {
-          @RestResponse(responseCode = HttpServletResponse.SC_OK, description = "Policy removed."),
-          @RestResponse(responseCode = HttpServletResponse.SC_NOT_FOUND, description = "No lifecycle policy with that "
-              + "identifier exists."),
-          @RestResponse(responseCode = HttpServletResponse.SC_UNAUTHORIZED, description = "Not authorized to perform "
-              + "this action")
-      })
+  @Operation(
+      summary = "Remove a lifecycle policy",
+      description = "Removes a lifecycle policy."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Policy removed."),
+      @ApiResponse(
+          responseCode = "404",
+          description = "No lifecycle policy with that " + "identifier exists."
+      ),
+      @ApiResponse(
+          responseCode = "401",
+          description = "Not authorized to perform " + "this action"
+      )
+  })
   public Response remove(
       @HeaderParam("Accept") String acceptHeader,
-      @PathParam("id") String id) {
+      @Parameter(description = "Policy identifier", required = true)
+      @PathParam("id") String id
+  ) {
     try {
       service.deleteLifeCyclePolicy(id);
       return Response.status(Response.Status.OK).build();

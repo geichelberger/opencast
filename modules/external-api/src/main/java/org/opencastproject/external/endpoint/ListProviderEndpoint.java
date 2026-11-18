@@ -27,10 +27,6 @@ import org.opencastproject.list.api.ListProviderException;
 import org.opencastproject.list.api.ListProviderNotFoundException;
 import org.opencastproject.list.api.ListProvidersService;
 import org.opencastproject.list.query.StringListFilter;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
@@ -45,7 +41,6 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Map;
 
-import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.GET;
 import javax.ws.rs.HeaderParam;
 import javax.ws.rs.Path;
@@ -54,13 +49,18 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Response;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 @Path("/api/listproviders")
 @Produces({ ApiMediaType.JSON, ApiMediaType.VERSION_1_10_0, ApiMediaType.VERSION_1_11_0, ApiMediaType.VERSION_1_12_0 })
-@RestService(
-        name = "externalapilistproviders",
-        title = "External API List Providers Service",
-        notes = {},
-        abstractText = "Provides resources and operations related to configurable lists"
+@Tag(name = "External API")
+@Tag(
+    name = "External API - List Providers",
+    description = "Provides resources and operations related to configurable lists"
 )
 @Component(
         immediate = true,
@@ -94,15 +94,16 @@ public class ListProviderEndpoint {
 
   @GET
   @Path("providers.json")
-  @RestQuery(
-      name = "availableProviders",
-      description = "Provides the list of the available list providers",
-      responses = {
-          @RestResponse(description = "Returns the availables list providers.",
-              responseCode = HttpServletResponse.SC_OK)
-      },
-      returnDescription = "")
-  public Response getAvailableProviders(@HeaderParam("Accept") String acceptHeader) {
+  @Operation(
+      summary = "Get the available list providers",
+      description = "Provides the list of the available list providers"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Returns the availables list providers.")
+  })
+  public Response getAvailableProviders(
+      @HeaderParam("Accept") String acceptHeader
+  ) {
     // The provider names are nested one level deep, as an array inside the response array. Odd, but it is
     // the published shape of this response, so it is kept.
     JsonArray providers = new JsonArray();
@@ -116,29 +117,24 @@ public class ListProviderEndpoint {
 
   @GET
   @Path("{source}.json")
-  @RestQuery(
-      name = "list",
-      description = "Provides key-value list from the given source",
-      pathParameters = {
-          @RestParameter(name = "source", description = "The source for the key-value list", isRequired = true,
-              type = RestParameter.Type.STRING)
-      },
-      restParameters = {
-          @RestParameter(description = "The maximum number of items to return per page", isRequired = false,
-              name = "limit", type = RestParameter.Type.INTEGER),
-          @RestParameter(description = "The offset", isRequired = false, name = "offset",
-              type = RestParameter.Type.INTEGER),
-          @RestParameter(description = "Filters", isRequired = false, name = "filter",
-              type = RestParameter.Type.STRING)
-      },
-      responses = {
-          @RestResponse(description = "Returns the key-value list for the given source.",
-              responseCode = HttpServletResponse.SC_OK)
-      },
-      returnDescription = "")
-  public Response getList(@PathParam("source") final String source, @QueryParam("limit") final int limit,
-          @QueryParam("filter") final String filter, @QueryParam("offset") final int offset,
-          @HeaderParam("Accept") String acceptHeader) {
+  @Operation(
+      summary = "Get the values of a list provider",
+      description = "Provides key-value list from the given source"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Returns the key-value list for the given source.")
+  })
+  public Response getList(
+      @Parameter(description = "The source for the key-value list", required = true)
+      @PathParam("source") final String source,
+      @Parameter(description = "The maximum number of items to return per page")
+      @QueryParam("limit") final int limit,
+      @Parameter(description = "Filters")
+      @QueryParam("filter") final String filter,
+      @Parameter(description = "The offset")
+      @QueryParam("offset") final int offset,
+      @HeaderParam("Accept") String acceptHeader
+  ) {
 
     DefaultResourceListQuery query = new DefaultResourceListQuery();
     query.setLimit(limit);

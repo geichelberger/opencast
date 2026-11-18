@@ -20,17 +20,11 @@
  */
 package org.opencastproject.external.endpoint;
 
-import static javax.servlet.http.HttpServletResponse.SC_NOT_FOUND;
-import static javax.servlet.http.HttpServletResponse.SC_OK;
-import static javax.servlet.http.HttpServletResponse.SC_UNAUTHORIZED;
 import static org.apache.commons.lang3.StringUtils.trimToNull;
 import static org.opencastproject.index.service.util.JSONUtils.safeString;
 import static org.opencastproject.playlists.PlaylistRestService.SAMPLE_PLAYLIST_JSON;
 import static org.opencastproject.util.DateTimeSupport.toUTC;
 import static org.opencastproject.util.RestUtil.getEndpointUrl;
-import static org.opencastproject.util.doc.rest.RestParameter.Type.INTEGER;
-import static org.opencastproject.util.doc.rest.RestParameter.Type.STRING;
-import static org.opencastproject.util.doc.rest.RestParameter.Type.TEXT;
 
 import org.opencastproject.external.common.ApiMediaType;
 import org.opencastproject.external.common.ApiResponseBuilder;
@@ -39,7 +33,6 @@ import org.opencastproject.playlists.PlaylistAccessControlEntry;
 import org.opencastproject.playlists.PlaylistEntry;
 import org.opencastproject.playlists.PlaylistRestService;
 import org.opencastproject.playlists.PlaylistService;
-import org.opencastproject.playlists.serialization.JaxbPlaylist;
 import org.opencastproject.rest.RestConstants;
 import org.opencastproject.security.api.UnauthorizedException;
 import org.opencastproject.systems.OpencastConstants;
@@ -47,10 +40,6 @@ import org.opencastproject.util.NotFoundException;
 import org.opencastproject.util.RestUtil;
 import org.opencastproject.util.UrlSupport;
 import org.opencastproject.util.data.Tuple;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 import org.opencastproject.util.requests.SortCriterion;
 
 import com.google.gson.JsonArray;
@@ -71,7 +60,6 @@ import java.net.URI;
 import java.util.List;
 import java.util.Optional;
 
-import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.FormParam;
 import javax.ws.rs.GET;
@@ -84,13 +72,19 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Response;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 @Path("/api/playlists")
 @Produces({ ApiMediaType.JSON, ApiMediaType.VERSION_1_11_0, ApiMediaType.VERSION_1_12_0 })
-@RestService(
-    name = "externalapiplaylists",
-    title = "External API Playlists Service",
-    notes = {},
-    abstractText = "Provides access to playlist structures"
+@Tag(name = "External API")
+@Tag(
+    name = "External API - Playlists",
+    description = "Provides access to playlist structures"
 )
 @Component(
     immediate = true,
@@ -138,25 +132,21 @@ public class PlaylistsEndpoint {
 
   @GET
   @Path("{id}")
-  @RestQuery(
-      name = "playlist",
-      description = "Get a playlist.",
-      returnDescription = "A playlist as JSON",
-      pathParameters = {
-          @RestParameter(name = "id", isRequired = true, description = "The playlist identifier", type = STRING),
-      },
-      responses = {
-          @RestResponse(description = "Returns the playlist.", responseCode = HttpServletResponse.SC_OK),
-          @RestResponse(description = "The specified playlist instance does not exist.",
-              responseCode = HttpServletResponse.SC_NOT_FOUND),
-          @RestResponse(description = "The user doesn't have the rights to make this request.",
-              responseCode = HttpServletResponse.SC_FORBIDDEN),
-          @RestResponse(description = "The request is invalid or inconsistent.",
-              responseCode = HttpServletResponse.SC_BAD_REQUEST),
-      })
+  @Operation(
+      summary = "Get a playlist",
+      description = "Get a playlist."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Returns the playlist."),
+      @ApiResponse(responseCode = "404", description = "The specified playlist instance does not exist."),
+      @ApiResponse(responseCode = "403", description = "The user doesn't have the rights to make this request."),
+      @ApiResponse(responseCode = "400", description = "The request is invalid or inconsistent.")
+  })
   public Response getPlaylistAsJson(
       @HeaderParam("Accept") String acceptHeader,
-      @PathParam("id") String id) {
+      @Parameter(description = "The playlist identifier", required = true)
+      @PathParam("id") String id
+  ) {
     try {
       Playlist playlist = service.getPlaylistById(id);
 
@@ -172,31 +162,28 @@ public class PlaylistsEndpoint {
 
   @GET
   @Path("")
-  @RestQuery(
-      name = "playlists",
-      description = "Get playlists. Playlists that you do not have read access to will not show up.",
-      returnDescription = "A JSON object containing an array.",
-      restParameters = {
-          @RestParameter(name = "limit", isRequired = false, type = INTEGER,
-              description = "The maximum number of results to return for a single request.", defaultValue = "100"),
-          @RestParameter(name = "offset", isRequired = false, type = INTEGER,
-              description = "The index of the first result to return."),
-          @RestParameter(name = "sort", isRequired = false, type = STRING,
-              description = "Sort the results based upon a sorting criteria. A criteria is specified as a pair such as:"
-                  + "<Sort Name>:ASC or <Sort Name>:DESC. Adding the suffix ASC or DESC sets the order as ascending or"
-                  + "descending order and is mandatory. Sort Name is case sensitive. Supported Sort Names are 'updated'"
-              , defaultValue = "updated:ASC"),
-      },
-      responses = {
-          @RestResponse(description = "Returns the playlist.", responseCode = HttpServletResponse.SC_OK),
-          @RestResponse(description = "The request is invalid or inconsistent.",
-              responseCode = HttpServletResponse.SC_BAD_REQUEST),
-      })
+  @Operation(
+      summary = "Get playlists",
+      description = "Get playlists. Playlists that you do not have read access to will not show up."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Returns the playlist."),
+      @ApiResponse(responseCode = "400", description = "The request is invalid or inconsistent.")
+  })
   public Response getPlaylistsAsJson(
       @HeaderParam("Accept") String acceptHeader,
+      @Parameter(description = "The maximum number of results to return for a single request.", example = "100")
       @QueryParam("limit") int limit,
+      @Parameter(description = "The index of the first result to return.")
       @QueryParam("offset") int offset,
-      @QueryParam("sort") String sort) {
+      @Parameter(
+          description = "Sort the results based upon a sorting criteria. A criteria is specified as a pair such as:"
+              + "<Sort Name>:ASC or <Sort Name>:DESC. Adding the suffix ASC or DESC sets the order as ascending or"
+              + "descending order and is mandatory. Sort Name is case sensitive. Supported Sort Names are 'updated'",
+          example = "updated:ASC"
+      )
+      @QueryParam("sort") String sort
+  ) {
     if (offset < 0) {
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
@@ -238,24 +225,20 @@ public class PlaylistsEndpoint {
 
   @POST
   @Path("")
-  @RestQuery(
-      name = "create",
-      description = "Creates a playlist.",
-      returnDescription = "The created playlist.",
-      restParameters = {
-          @RestParameter(name = "playlist", isRequired = false, description = "Playlist in JSON format", type = TEXT,
-              jaxbClass = JaxbPlaylist.class, defaultValue = SAMPLE_PLAYLIST_JSON)
-      },
-      responses = {
-          @RestResponse(description = "Playlist created.", responseCode = HttpServletResponse.SC_CREATED),
-          @RestResponse(description = "The user doesn't have the rights to make this request.",
-              responseCode = HttpServletResponse.SC_FORBIDDEN),
-          @RestResponse(description = "The request is invalid or inconsistent.",
-              responseCode = HttpServletResponse.SC_BAD_REQUEST),
-      })
+  @Operation(
+      summary = "Create a playlist",
+      description = "Creates a playlist."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "201", description = "Playlist created."),
+      @ApiResponse(responseCode = "403", description = "The user doesn't have the rights to make this request."),
+      @ApiResponse(responseCode = "400", description = "The request is invalid or inconsistent.")
+  })
   public Response createAsJson(
       @HeaderParam("Accept") String acceptHeader,
-      @FormParam("playlist") String playlistText) {
+      @Parameter(description = "Playlist in JSON format", schema = @Schema(example = SAMPLE_PLAYLIST_JSON))
+      @FormParam("playlist") String playlistText
+  ) {
     try {
       // Map JSON to JPA
       Playlist playlist = restService.parseJsonToPlaylist(playlistText);
@@ -276,28 +259,22 @@ public class PlaylistsEndpoint {
 
   @PUT
   @Path("{id}")
-  @RestQuery(
-      name = "update",
-      description = "Updates a playlist.",
-      returnDescription = "The updated playlist.",
-      pathParameters = {
-          @RestParameter(name = "id", isRequired = true, description = "Playlist identifier", type = STRING)
-      },
-      restParameters = {
-          @RestParameter(name = "playlist", isRequired = false, description = "Playlist in JSON format", type = TEXT,
-              jaxbClass = JaxbPlaylist.class, defaultValue = SAMPLE_PLAYLIST_JSON)
-      },
-      responses = {
-          @RestResponse(description = "Playlist updated.", responseCode = HttpServletResponse.SC_OK),
-          @RestResponse(description = "The user doesn't have the rights to make this request.",
-              responseCode = HttpServletResponse.SC_FORBIDDEN),
-          @RestResponse(description = "The request is invalid or inconsistent.",
-              responseCode = HttpServletResponse.SC_BAD_REQUEST),
-      })
+  @Operation(
+      summary = "Update a playlist",
+      description = "Updates a playlist."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Playlist updated."),
+      @ApiResponse(responseCode = "403", description = "The user doesn't have the rights to make this request."),
+      @ApiResponse(responseCode = "400", description = "The request is invalid or inconsistent.")
+  })
   public Response updateAsJson(
       @HeaderParam("Accept") String acceptHeader,
+      @Parameter(description = "Playlist identifier", required = true)
       @PathParam("id") String id,
-      @FormParam("playlist") String playlistText) {
+      @Parameter(description = "Playlist in JSON format", schema = @Schema(example = SAMPLE_PLAYLIST_JSON))
+      @FormParam("playlist") String playlistText
+  ) {
     try {
       Playlist playlist = service.updateWithJson(id, playlistText);
       return ApiResponseBuilder.Json.ok(acceptHeader, playlistToJson(playlist));
@@ -310,21 +287,20 @@ public class PlaylistsEndpoint {
 
   @DELETE
   @Path("{id}")
-  @RestQuery(
-      name = "remove",
-      description = "Removes a playlist.",
-      returnDescription = "The removed playlist.",
-      pathParameters = {
-          @RestParameter(name = "id", isRequired = true, description = "Playlist identifier", type = STRING)
-      },
-      responses = {
-          @RestResponse(responseCode = SC_OK, description = "Playlist removed."),
-          @RestResponse(responseCode = SC_NOT_FOUND, description = "No playlist with that identifier exists."),
-          @RestResponse(responseCode = SC_UNAUTHORIZED, description = "Not authorized to perform this action")
-      })
+  @Operation(
+      summary = "Remove a playlist",
+      description = "Removes a playlist."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Playlist removed."),
+      @ApiResponse(responseCode = "404", description = "No playlist with that identifier exists."),
+      @ApiResponse(responseCode = "401", description = "Not authorized to perform this action")
+  })
   public Response remove(
       @HeaderParam("Accept") String acceptHeader,
-      @PathParam("id") String id) {
+      @Parameter(description = "Playlist identifier", required = true)
+      @PathParam("id") String id
+  ) {
     try {
       Playlist playlist = service.remove(id);
 
