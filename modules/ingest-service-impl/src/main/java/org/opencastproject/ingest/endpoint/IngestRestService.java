@@ -478,7 +478,7 @@ public class IngestRestService extends AbstractJobProducerEndpoint {
                       name = "tags",
                       schema = @Schema(
                           type = "string",
-                          description = "The tags of the media track"
+                          description = "The tags of the  media track"
                       )
                   ),
                   @SchemaProperty(
@@ -983,7 +983,7 @@ public class IngestRestService extends AbstractJobProducerEndpoint {
       description = "<p>Create and ingest media package from media tracks with additional Dublin Core metadata. It is "
           + "mandatory to set a title for the recording. This can be done with the 'title' form field or by supplying "
           + "a "
-          + "DC catalog with a title included. The identifier of the newly created media package will be taken from "
+          + "DC catalog with a title included.  The identifier of the newly created media package will be taken from "
           + "the "
           + "<em>identifier</em> field or the episode DublinCore catalog (deprecated<sup>*</sup>). If no identifier "
           + "is "
@@ -998,15 +998,15 @@ public class IngestRestService extends AbstractJobProducerEndpoint {
           + "<p>Ingest one video file:</p>"
           + "<p><pre>\n"
           + "curl -i -u admin:opencast http://localhost:8080/ingest/addMediaPackage \\\n"
-          + " -F creator='John Doe' -F title='Test Recording' \\\n"
-          + " -F 'flavor=presentation/source' -F 'BODY=@test-recording.mp4' \n"
+          + "    -F creator='John Doe' -F title='Test Recording' \\\n"
+          + "    -F 'flavor=presentation/source' -F 'BODY=@test-recording.mp4' \n"
           + "</pre></p>"
           + "<p>Ingest two video files:</p>"
           + "<p><pre>\n"
           + "curl -i -u admin:opencast http://localhost:8080/ingest/addMediaPackage \\\n"
-          + " -F creator='John Doe' -F title='Test Recording' \\\n"
-          + " -F 'flavor=presentation/source' -F 'BODY=@test-recording-vga.mp4' \\\n"
-          + " -F 'flavor=presenter/source' -F 'BODY=@test-recording-camera.mp4' \n"
+          + "    -F creator='John Doe' -F title='Test Recording' \\\n"
+          + "    -F 'flavor=presentation/source' -F 'BODY=@test-recording-vga.mp4' \\\n"
+          + "    -F 'flavor=presenter/source' -F 'BODY=@test-recording-camera.mp4' \n"
           + "</pre></p>"
   )
   @RequestBody(
@@ -1302,7 +1302,7 @@ public class IngestRestService extends AbstractJobProducerEndpoint {
       description = "<p>Create and ingest media package from media tracks with additional Dublin Core metadata. It is "
           + "mandatory to set a title for the recording. This can be done with the 'title' form field or by supplying "
           + "a "
-          + "DC catalog with a title included. The identifier of the newly created media package will be taken from "
+          + "DC catalog with a title included.  The identifier of the newly created media package will be taken from "
           + "the "
           + "<em>identifier</em> field or the episode DublinCore catalog (deprecated<sup>*</sup>). If no identifier "
           + "is "
@@ -1318,15 +1318,15 @@ public class IngestRestService extends AbstractJobProducerEndpoint {
           + "<p>Ingest one video file:</p>"
           + "<p><pre>\n"
           + "curl -i -u admin:opencast http://localhost:8080/ingest/addMediaPackage/fast \\\n"
-          + " -F creator='John Doe' -F title='Test Recording' \\\n"
-          + " -F 'flavor=presentation/source' -F 'BODY=@test-recording.mp4' \n"
+          + "    -F creator='John Doe' -F title='Test Recording' \\\n"
+          + "    -F 'flavor=presentation/source' -F 'BODY=@test-recording.mp4' \n"
           + "</pre></p>"
           + "<p>Ingest two video files:</p>"
           + "<p><pre>\n"
           + "curl -i -u admin:opencast http://localhost:8080/ingest/addMediaPackage/fast \\\n"
-          + " -F creator='John Doe' -F title='Test Recording' \\\n"
-          + " -F 'flavor=presentation/source' -F 'BODY=@test-recording-vga.mp4' \\\n"
-          + " -F 'flavor=presenter/source' -F 'BODY=@test-recording-camera.mp4' \n"
+          + "    -F creator='John Doe' -F title='Test Recording' \\\n"
+          + "    -F 'flavor=presentation/source' -F 'BODY=@test-recording-vga.mp4' \\\n"
+          + "    -F 'flavor=presenter/source' -F 'BODY=@test-recording-camera.mp4' \n"
           + "</pre></p>"
   )
   @RequestBody(
