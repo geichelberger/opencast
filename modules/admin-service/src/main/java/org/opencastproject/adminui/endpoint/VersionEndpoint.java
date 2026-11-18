@@ -21,11 +21,7 @@
 
 package org.opencastproject.adminui.endpoint;
 
-import static org.apache.hc.core5.http.HttpStatus.SC_OK;
 
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
@@ -50,14 +46,16 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 @Path("/admin-ng/oc-version")
-@RestService(
-    name = "VersionService",
-    title = "Version service",
-    abstractText = "Provides latest opencast version",
-    notes = {
-        "This service offers the GET method to retrieve the latest opencast version from https://api.github.com ."
-    })
+@Tag(
+    name = "Admin UI - Version",
+    description = "Provides latest opencast version"
+)
 @Component(
     immediate = true,
     service = VersionEndpoint.class,
@@ -94,9 +92,13 @@ public class VersionEndpoint {
   @GET
   @Path("version.json")
   @Produces(MediaType.APPLICATION_JSON)
-  @RestQuery(name = "latestversion", description = "Returns the latest Opencast version",
-          returnDescription = "Returns the latest Opencast version retrieved from GitHub",
-          responses = { @RestResponse(responseCode = SC_OK, description = "The latest Opencast version.") })
+  @Operation(
+      summary = "Get the latest Opencast version",
+      description = "Returns the latest Opencast version"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The latest Opencast version.")
+  })
   public String getVersion() {
     if (System.currentTimeMillis() / 1000L - lastUpdated >= 3600) {
       updateVersion();

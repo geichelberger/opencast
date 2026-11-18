@@ -43,10 +43,6 @@ import org.opencastproject.list.common.query.ServicesListQuery;
 import org.opencastproject.list.common.query.UsersListQuery;
 import org.opencastproject.security.api.SecurityService;
 import org.opencastproject.themes.list.ThemesListQuery;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -61,7 +57,6 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Map;
 
-import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -72,16 +67,17 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 @Path("/admin-ng/resources")
-@RestService(
-    name = "ResourceListsProviders",
-    title = "Admin UI - Resources List",
-    abstractText = "This service provides key-value list from different resources to use in the admin UI.",
-    notes = { "This service offers access to list providers for the admin UI.",
-              "<strong>Important:</strong> "
-                + "<em>This service is for exclusive use by the module admin-ui. Its API might change "
-                + "anytime without prior notice. Any dependencies other than the admin UI will be strictly ignored. "
-                + "DO NOT use this for integration of third-party applications.<em>"})
+@Tag(
+    name = "Admin UI - List Providers",
+    description = "This service provides key-value list from different resources to use in the admin UI."
+)
 @Component(
     immediate = true,
     service = ListProvidersEndpoint.class,
@@ -138,29 +134,24 @@ public class ListProvidersEndpoint {
   @GET
   @Path("{source}.json")
   @Produces(MediaType.APPLICATION_JSON)
-  @RestQuery(
-      name = "list",
-      description = "Provides key-value list from the given source",
-      pathParameters = {
-          @RestParameter(name = "source", description = "The source for the key-value list", isRequired = true,
-              type = RestParameter.Type.STRING)
-      },
-      restParameters = {
-          @RestParameter(description = "The maximum number of items to return per page", isRequired = false,
-              name = "limit", type = RestParameter.Type.INTEGER),
-          @RestParameter(description = "The offset", isRequired = false, name = "offset",
-              type = RestParameter.Type.INTEGER),
-          @RestParameter(description = "Filters", isRequired = false, name = "filter",
-              type = RestParameter.Type.STRING)
-      },
-      responses = {
-          @RestResponse(description = "Returns the key-value list for the given source.",
-              responseCode = HttpServletResponse.SC_OK)
-      },
-      returnDescription = "")
-  public Response getList(@PathParam("source") final String source, @QueryParam("limit") final int limit,
-      @QueryParam("filter") final String filter, @QueryParam("offset") final int offset,
-      @Context HttpHeaders headers) {
+  @Operation(
+      summary = "Get the values of a list provider",
+      description = "Provides key-value list from the given source"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Returns the key-value list for the given source.")
+  })
+  public Response getList(
+      @Parameter(description = "The source for the key-value list", required = true)
+      @PathParam("source") final String source,
+      @Parameter(description = "The maximum number of items to return per page")
+      @QueryParam("limit") final int limit,
+      @Parameter(description = "Filters")
+      @QueryParam("filter") final String filter,
+      @Parameter(description = "The offset")
+      @QueryParam("offset") final int offset,
+      @Context HttpHeaders headers
+  ) {
 
     DefaultResourceListQuery query = new DefaultResourceListQuery();
     query.setLimit(limit);
@@ -183,15 +174,20 @@ public class ListProvidersEndpoint {
   @GET
   @Path("components.json")
   @Produces(MediaType.APPLICATION_JSON)
-  @RestQuery(
-      name = "components",
-      description = "Provides a set of constants lists (right now only eventCommentReasons) for use in the admin UI",
-      responses = {
-          @RestResponse(description = "Returns a set of constants lists (right now only eventCommentReasons) for use "
-              + "in the admin UI", responseCode = HttpServletResponse.SC_OK)
-      },
-      returnDescription = "")
-  public Response getComponents(@Context HttpHeaders headers) {
+  @Operation(
+      summary = "Get UI constant lists",
+      description = "Provides a set of constants lists (right now only eventCommentReasons) for use in the admin UI"
+  )
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "200",
+          description = "Returns a set of constants lists (right now only eventCommentReasons) for use "
+              + "in the admin UI"
+      )
+  })
+  public Response getComponents(
+      @Context HttpHeaders headers
+  ) {
     String[] sources = { "eventCommentReasons" };
     ResourceListQuery query = new DefaultResourceListQuery();
 
@@ -216,15 +212,16 @@ public class ListProvidersEndpoint {
   @GET
   @Path("providers.json")
   @Produces(MediaType.APPLICATION_JSON)
-  @RestQuery(
-      name = "availableProviders",
-      description = "Provides the list of the available list providers",
-      responses = {
-          @RestResponse(description = "Returns the availables list providers.",
-              responseCode = HttpServletResponse.SC_OK)
-      },
-      returnDescription = "")
-  public Response getAvailablesProviders(@Context HttpHeaders headers) {
+  @Operation(
+      summary = "Get the available list providers",
+      description = "Provides the list of the available list providers"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Returns the availables list providers.")
+  })
+  public Response getAvailablesProviders(
+      @Context HttpHeaders headers
+  ) {
     // Same nested shape as the External API: the provider names are an array inside the response array.
     JsonArray providers = new JsonArray();
     listProvidersService.getAvailableProviders().forEach(providers::add);
@@ -238,20 +235,18 @@ public class ListProvidersEndpoint {
   @GET
   @Path("{page}/filters.json")
   @Produces(MediaType.APPLICATION_JSON)
-  @RestQuery(
-      name = "filters",
-      description = "Provides filters for the given page",
-      pathParameters = {
-          @RestParameter(name = "page", description = "The page for which the filters are required", isRequired = true,
-              type = RestParameter.Type.STRING)
-      },
-      responses = {
-          @RestResponse(description = "Returns the filters for the given page.",
-              responseCode = HttpServletResponse.SC_OK)
-      },
-      returnDescription = "")
-  public Response getFilters(@PathParam("page") final String page, @Context HttpHeaders headers)
-          throws ListProviderException {
+  @Operation(
+      summary = "Get the filters of a page",
+      description = "Provides filters for the given page"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Returns the filters for the given page.")
+  })
+  public Response getFilters(
+      @Parameter(description = "The page for which the filters are required", required = true)
+      @PathParam("page") final String page,
+      @Context HttpHeaders headers
+  ) throws ListProviderException {
 
     ResourceListQuery query;
 

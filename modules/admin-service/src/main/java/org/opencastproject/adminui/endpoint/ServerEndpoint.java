@@ -21,18 +21,12 @@
 
 package org.opencastproject.adminui.endpoint;
 
-import static org.opencastproject.util.doc.rest.RestParameter.Type.INTEGER;
-import static org.opencastproject.util.doc.rest.RestParameter.Type.STRING;
 
 import org.opencastproject.index.service.util.RestUtils;
 import org.opencastproject.serviceregistry.api.HostRegistration;
 import org.opencastproject.serviceregistry.api.HostStatistics;
 import org.opencastproject.serviceregistry.api.ServiceRegistry;
 import org.opencastproject.serviceregistry.api.ServiceRegistryException;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 import org.opencastproject.util.requests.SortCriterion;
 import org.opencastproject.util.requests.SortCriterion.Order;
 
@@ -60,7 +54,6 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -69,16 +62,17 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 @Path("/admin-ng/server")
-@RestService(
-    name = "ServerProxyService",
-    title = "UI Servers",
-    abstractText = "This service provides the server data for the UI.",
-    notes = { "These Endpoints deliver informations about the server required for the UI.",
-              "<strong>Important:</strong> "
-                + "<em>This service is for exclusive use by the module admin-ui. Its API might change "
-                + "anytime without prior notice. Any dependencies other than the admin UI will be strictly ignored. "
-                + "DO NOT use this for integration of third-party applications.<em>"})
+@Tag(
+    name = "Admin UI - Servers",
+    description = "This service provides the server data for the UI."
+)
 @Component(
     immediate = true,
     service = ServerEndpoint.class,
@@ -186,28 +180,27 @@ public class ServerEndpoint {
   @GET
   @Path("servers.json")
   @Produces(MediaType.APPLICATION_JSON)
-  @RestQuery(
-      description = "Returns the list of servers",
-      name = "servers",
-      restParameters = {
-          @RestParameter(name = "limit", description = "The maximum number of items to return per page",
-              isRequired = false, type = INTEGER),
-          @RestParameter(name = "offset", description = "The offset", isRequired = false, type = INTEGER),
-          @RestParameter(name = "filter", description = "Filter results by hostname, status or free text query",
-              isRequired = false, type = STRING),
-          @RestParameter(name = "sort", description = "The sort order.  May include any of the following: "
+  @Operation(
+      summary = "Get servers",
+      description = "Returns the list of servers"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Returns the list of jobs from Opencast")
+  })
+  public Response getServers(
+      @Parameter(description = "The maximum number of items to return per page")
+      @QueryParam("limit") int limit,
+      @Parameter(description = "The offset")
+      @QueryParam("offset") int offset,
+      @Parameter(description = "Filter results by hostname, status or free text query")
+      @QueryParam("filter") String filter,
+      @Parameter(
+          description = "The sort order.  May include any of the following: "
               + "CORES, HOSTNAME, MAINTENANCE, ONLINE, QUEUED (jobs), RUNNING (jobs)."
-              + "The suffix must be :ASC for ascending or :DESC for descending sort order (e.g. HOSTNAME:DESC).",
-              isRequired = false, type = STRING)
-      },
-      responses = {
-          @RestResponse(description = "Returns the list of jobs from Opencast",
-              responseCode = HttpServletResponse.SC_OK)
-      },
-      returnDescription = "The list of servers")
-  public Response getServers(@QueryParam("limit") int limit, @QueryParam("offset") int offset,
-      @QueryParam("filter") String filter, @QueryParam("sort") String sort)
-          throws Exception {
+              + "The suffix must be :ASC for ascending or :DESC for descending sort order (e.g. HOSTNAME:DESC)."
+      )
+      @QueryParam("sort") String sort
+  ) throws Exception {
 
     final Map<String, String> filters;
     try {

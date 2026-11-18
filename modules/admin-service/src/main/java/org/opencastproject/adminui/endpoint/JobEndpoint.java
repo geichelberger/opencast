@@ -42,10 +42,6 @@ import org.opencastproject.util.NotFoundException;
 import org.opencastproject.util.RestUtil;
 import org.opencastproject.util.SmartIterator;
 import org.opencastproject.util.data.Tuple;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 import org.opencastproject.util.requests.SortCriterion;
 import org.opencastproject.util.requests.SortCriterion.Order;
 import org.opencastproject.workflow.api.WorkflowService;
@@ -70,7 +66,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 
-import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -79,16 +74,17 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 @Path("/admin-ng/job")
-@RestService(
-    name = "JobProxyService",
-    title = "UI Jobs",
-    abstractText = "This service provides the job data for the UI.",
-    notes = { "These Endpoints deliver informations about the job required for the UI.",
-              "<strong>Important:</strong> "
-                + "<em>This service is for exclusive use by the module admin-ui. Its API might change "
-                + "anytime without prior notice. Any dependencies other than the admin UI will be strictly ignored. "
-                + "DO NOT use this for integration of third-party applications.<em>"})
+@Tag(
+    name = "Admin UI - Jobs",
+    description = "This service provides the job data for the UI."
+)
 @Component(
     immediate = true,
     service = JobEndpoint.class,
@@ -148,28 +144,27 @@ public class JobEndpoint {
   @GET
   @Path("jobs.json")
   @Produces(MediaType.APPLICATION_JSON)
-  @RestQuery(
-      description = "Returns the list of active jobs",
-      name = "jobs",
-      restParameters = {
-          @RestParameter(name = "limit", description = "The maximum number of items to return per page",
-              isRequired = false, type = RestParameter.Type.INTEGER),
-          @RestParameter(name = "offset", description = "The offset",
-              isRequired = false, type = RestParameter.Type.INTEGER),
-          @RestParameter(name = "filter", description = "Filter results by hostname, status or free text query",
-              isRequired = false, type = RestParameter.Type.STRING),
-          @RestParameter(name = "sort", description = "The sort order. May include any of the following: CREATOR, "
+  @Operation(
+      summary = "Get active jobs",
+      description = "Returns the list of active jobs"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Returns the list of active jobs from Opencast")
+  })
+  public Response getJobs(
+      @Parameter(description = "The maximum number of items to return per page")
+      @QueryParam("limit") final int limit,
+      @Parameter(description = "The offset")
+      @QueryParam("offset") final int offset,
+      @Parameter(description = "Filter results by hostname, status or free text query")
+      @QueryParam("filter") final String filter,
+      @Parameter(
+          description = "The sort order. May include any of the following: CREATOR, "
               + "OPERATION, PROCESSINGHOST, STATUS, STARTED, SUBMITTED or TYPE. "
-              + "The suffix must be :ASC for ascending or :DESC for descending sort order (e.g. OPERATION:DESC)",
-              isRequired = false, type = RestParameter.Type.STRING)
-      },
-      responses = {
-          @RestResponse(description = "Returns the list of active jobs from Opencast",
-              responseCode = HttpServletResponse.SC_OK)
-      },
-      returnDescription = "The list of jobs as JSON")
-  public Response getJobs(@QueryParam("limit") final int limit, @QueryParam("offset") final int offset,
-          @QueryParam("filter") final String filter, @QueryParam("sort") final String sort) {
+              + "The suffix must be :ASC for ascending or :DESC for descending sort order (e.g. OPERATION:DESC)"
+      )
+      @QueryParam("sort") final String sort
+  ) {
     JobsListQuery query = new JobsListQuery();
     EndpointUtil.addRequestFiltersToQuery(filter, query);
     query.setLimit(limit);

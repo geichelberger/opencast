@@ -21,18 +21,12 @@
 
 package org.opencastproject.adminui.endpoint;
 
-import static javax.servlet.http.HttpServletResponse.SC_BAD_REQUEST;
-import static javax.servlet.http.HttpServletResponse.SC_CONFLICT;
-import static javax.servlet.http.HttpServletResponse.SC_NOT_FOUND;
-import static javax.servlet.http.HttpServletResponse.SC_OK;
 import static org.apache.commons.lang3.StringUtils.trimToNull;
 import static org.opencastproject.index.service.util.RestUtils.okJsonList;
 import static org.opencastproject.userdirectory.UserIdRoleProvider.getUserRolePrefix;
 import static org.opencastproject.userdirectory.UserIdRoleProvider.isSanitize;
 import static org.opencastproject.util.RestUtil.R.conflict;
 import static org.opencastproject.util.RestUtil.R.noContent;
-import static org.opencastproject.util.doc.rest.RestParameter.Type.INTEGER;
-import static org.opencastproject.util.doc.rest.RestParameter.Type.STRING;
 
 import org.opencastproject.adminui.util.TextFilter;
 import org.opencastproject.authorization.xacml.manager.api.AclService;
@@ -54,10 +48,6 @@ import org.opencastproject.security.api.User;
 import org.opencastproject.security.api.UserDirectoryService;
 import org.opencastproject.util.GsonUtil;
 import org.opencastproject.util.NotFoundException;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 import org.opencastproject.util.requests.SortCriterion;
 import org.opencastproject.util.requests.SortCriterion.Order;
 
@@ -96,16 +86,17 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 @Path("/admin-ng/acl")
-@RestService(
-    name = "acl",
-    title = "Acl service",
-    abstractText = "Provides operations for acl",
-    notes = { "This service offers the default acl CRUD Operations for the admin UI.",
-              "<strong>Important:</strong> "
-                + "<em>This service is for exclusive use by the module admin-ui. Its API might change "
-                + "anytime without prior notice. Any dependencies other than the admin UI will be strictly ignored. "
-                + "DO NOT use this for integration of third-party applications.<em>"})
+@Tag(
+    name = "Admin UI - ACLs",
+    description = "Provides operations for acl"
+)
 @Component(
     immediate = true,
     service = AclEndpoint.class,
@@ -175,25 +166,29 @@ public class AclEndpoint {
   @GET
   @Path("acls.json")
   @Produces(MediaType.APPLICATION_JSON)
-  @RestQuery(
-      name = "allaclasjson",
-      description = "Returns a list of acls",
-      returnDescription = "Returns a JSON representation of the list of acls available the current user's organization",
-      restParameters = {
-          @RestParameter(name = "filter", isRequired = false, description = "The filter used for the query. They "
-              + "should be formated like that: 'filter1:value1,filter2:value2'", type = STRING),
-          @RestParameter(name = "sort", isRequired = false, description = "The sort order. May include any of the "
-              + "following: NAME. Add '_DESC' to reverse the sort order (e.g. NAME_DESC).", type = STRING),
-          @RestParameter(defaultValue = "100", description = "The maximum number of items to return per page.",
-              isRequired = false, name = "limit", type = RestParameter.Type.STRING),
-          @RestParameter(defaultValue = "0", description = "The page number.", isRequired = false, name = "offset",
-              type = RestParameter.Type.STRING)
-      },
-      responses = {
-          @RestResponse(responseCode = SC_OK, description = "The list of ACL's has successfully been returned")
-      })
-  public Response getAclsAsJson(@QueryParam("filter") String filter, @QueryParam("sort") String sort,
-          @QueryParam("offset") int offset, @QueryParam("limit") int limit) throws IOException {
+  @Operation(
+      summary = "Get ACLs",
+      description = "Returns a list of acls"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The list of ACL's has successfully been returned")
+  })
+  public Response getAclsAsJson(
+      @Parameter(
+          description = "The filter used for the query. They "
+              + "should be formated like that: 'filter1:value1,filter2:value2'"
+      )
+      @QueryParam("filter") String filter,
+      @Parameter(
+          description = "The sort order. May include any of the "
+              + "following: NAME. Add '_DESC' to reverse the sort order (e.g. NAME_DESC)."
+      )
+      @QueryParam("sort") String sort,
+      @Parameter(description = "The page number.", example = "0")
+      @QueryParam("offset") int offset,
+      @Parameter(description = "The maximum number of items to return per page.", example = "100")
+      @QueryParam("limit") int limit
+  ) throws IOException {
     if (limit < 1) {
       limit = 100;
     }
@@ -265,31 +260,28 @@ public class AclEndpoint {
   @GET
   @Path("roles.json")
   @Produces(MediaType.APPLICATION_JSON)
-  @RestQuery(
-      name = "getRoles",
-      description = "Returns a list of roles",
-      returnDescription = "Returns a JSON representation of the roles with the given parameters under the "
-          + "current user's organization.",
-      restParameters = {
-          @RestParameter(name = "query", isRequired = false,
-              description = "Only return roles whose name contains this string (case-insensitive).", type = STRING),
-          @RestParameter(name = "target", isRequired = false, description = "The target of the roles.",
-              type = STRING),
-          @RestParameter(name = "limit", defaultValue = "100",
-              description = "The maximum number of items to return per page.", isRequired = false,
-              type = RestParameter.Type.STRING),
-          @RestParameter(name = "offset", defaultValue = "0", description = "The page number.", isRequired = false,
-              type = RestParameter.Type.STRING),
-          @RestParameter(name = "hasUser", isRequired = false,
-              description = "If set, only returns roles that do (true) or do not (false) correspond to an actual "
-                  + "user account. If omitted, roles are not filtered by this criterion.",
-              type = RestParameter.Type.BOOLEAN)
-      },
-      responses = {
-          @RestResponse(responseCode = SC_OK, description = "The list of roles.")
-      })
-  public Response getRoles(@QueryParam("query") String query, @QueryParam("target") String target,
-      @QueryParam("offset") int offset, @QueryParam("limit") int limit, @QueryParam("hasUser") Boolean hasUser) {
+  @Operation(
+      summary = "Get roles",
+      description = "Returns a list of roles"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The list of roles.")
+  })
+  public Response getRoles(
+      @Parameter(description = "Only return roles whose name contains this string (case-insensitive).")
+      @QueryParam("query") String query,
+      @Parameter(description = "The target of the roles.")
+      @QueryParam("target") String target,
+      @Parameter(description = "The page number.", example = "0")
+      @QueryParam("offset") int offset,
+      @Parameter(description = "The maximum number of items to return per page.", example = "100")
+      @QueryParam("limit") int limit,
+      @Parameter(
+          description = "If set, only returns roles that do (true) or do not (false) correspond to an actual "
+              + "user account. If omitted, roles are not filtered by this criterion."
+      )
+      @QueryParam("hasUser") Boolean hasUser
+  ) {
 
     String roleQuery = "%";
     if (StringUtils.isNotBlank(query)) {
@@ -336,20 +328,22 @@ public class AclEndpoint {
 
   @DELETE
   @Path("{id}")
-  @RestQuery(
-      name = "deleteacl",
-      description = "Delete an ACL",
-      returnDescription = "Delete an ACL",
-      pathParameters = {
-          @RestParameter(name = "id", isRequired = true, description = "The ACL identifier", type = INTEGER)
-      },
-      responses = {
-          @RestResponse(responseCode = SC_OK, description = "The ACL has successfully been deleted"),
-          @RestResponse(responseCode = SC_NOT_FOUND, description = "The ACL has not been found"),
-          @RestResponse(responseCode = SC_CONFLICT, description = "The ACL could not be deleted, there are still "
-              + "references on it")
-      })
-  public Response deleteAcl(@PathParam("id") long aclId) throws NotFoundException {
+  @Operation(
+      summary = "Delete an ACL",
+      description = "Delete an ACL"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The ACL has successfully been deleted"),
+      @ApiResponse(responseCode = "404", description = "The ACL has not been found"),
+      @ApiResponse(
+          responseCode = "409",
+          description = "The ACL could not be deleted, there are still " + "references on it"
+      )
+  })
+  public Response deleteAcl(
+      @Parameter(description = "The ACL identifier", required = true)
+      @PathParam("id") long aclId
+  ) throws NotFoundException {
     try {
       if (!aclService().deleteAcl(aclId)) {
         return conflict();
@@ -364,20 +358,21 @@ public class AclEndpoint {
   @POST
   @Path("")
   @Produces(MediaType.APPLICATION_JSON)
-  @RestQuery(
-      name = "createacl",
-      description = "Create an ACL",
-      returnDescription = "Create an ACL",
-      restParameters = {
-          @RestParameter(name = "name", isRequired = true, description = "The ACL name", type = STRING),
-          @RestParameter(name = "acl", isRequired = true, description = "The access control list", type = STRING)
-      },
-      responses = {
-          @RestResponse(responseCode = SC_OK, description = "The ACL has successfully been added"),
-          @RestResponse(responseCode = SC_CONFLICT, description = "An ACL with the same name already exists"),
-          @RestResponse(responseCode = SC_BAD_REQUEST, description = "Unable to parse the ACL")
-      })
-  public Response createAcl(@FormParam("name") String name, @FormParam("acl") String accessControlList) {
+  @Operation(
+      summary = "Create an ACL",
+      description = "Create an ACL"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The ACL has successfully been added"),
+      @ApiResponse(responseCode = "409", description = "An ACL with the same name already exists"),
+      @ApiResponse(responseCode = "400", description = "Unable to parse the ACL")
+  })
+  public Response createAcl(
+      @Parameter(description = "The ACL name", required = true)
+      @FormParam("name") String name,
+      @Parameter(description = "The access control list", required = true)
+      @FormParam("acl") String accessControlList
+  ) {
     final AccessControlList acl = parseAcl(accessControlList);
     Optional<ManagedAcl> managedAcl = aclService().createAcl(acl, name);
     if (managedAcl.isEmpty()) {
@@ -390,24 +385,23 @@ public class AclEndpoint {
   @PUT
   @Path("{id}")
   @Produces(MediaType.APPLICATION_JSON)
-  @RestQuery(
-      name = "updateacl",
-      description = "Update an ACL",
-      returnDescription = "Update an ACL",
-      pathParameters = {
-          @RestParameter(name = "id", isRequired = true, description = "The ACL identifier", type = INTEGER)
-      },
-      restParameters = {
-          @RestParameter(name = "name", isRequired = true, description = "The ACL name", type = STRING),
-          @RestParameter(name = "acl", isRequired = true, description = "The access control list", type = STRING)
-      },
-      responses = {
-          @RestResponse(responseCode = SC_OK, description = "The ACL has successfully been updated"),
-          @RestResponse(responseCode = SC_NOT_FOUND, description = "The ACL has not been found"),
-          @RestResponse(responseCode = SC_BAD_REQUEST, description = "Unable to parse the ACL")
-      })
-  public Response updateAcl(@PathParam("id") long aclId, @FormParam("name") String name,
-      @FormParam("acl") String accessControlList) throws NotFoundException {
+  @Operation(
+      summary = "Update an ACL",
+      description = "Update an ACL"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The ACL has successfully been updated"),
+      @ApiResponse(responseCode = "404", description = "The ACL has not been found"),
+      @ApiResponse(responseCode = "400", description = "Unable to parse the ACL")
+  })
+  public Response updateAcl(
+      @Parameter(description = "The ACL identifier", required = true)
+      @PathParam("id") long aclId,
+      @Parameter(description = "The ACL name", required = true)
+      @FormParam("name") String name,
+      @Parameter(description = "The access control list", required = true)
+      @FormParam("acl") String accessControlList
+  ) throws NotFoundException {
     final Organization org = securityService.getOrganization();
     final AccessControlList acl = parseAcl(accessControlList);
     final ManagedAclImpl managedAcl = new ManagedAclImpl(aclId, name, org.getId(), acl);
@@ -421,18 +415,18 @@ public class AclEndpoint {
   @GET
   @Path("{id}")
   @Produces(MediaType.APPLICATION_JSON)
-  @RestQuery(
-      name = "getacl",
-      description = "Return the ACL by the given id",
-      returnDescription = "Return the ACL by the given id",
-      pathParameters = {
-          @RestParameter(name = "id", isRequired = true, description = "The ACL identifier", type = INTEGER)
-      },
-      responses = {
-          @RestResponse(responseCode = SC_OK, description = "The ACL has successfully been returned"),
-          @RestResponse(responseCode = SC_NOT_FOUND, description = "The ACL has not been found")
-      })
-  public Response getAcl(@PathParam("id") long aclId) throws NotFoundException {
+  @Operation(
+      summary = "Get an ACL by ID",
+      description = "Return the ACL by the given id"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The ACL has successfully been returned"),
+      @ApiResponse(responseCode = "404", description = "The ACL has not been found")
+  })
+  public Response getAcl(
+      @Parameter(description = "The ACL identifier", required = true)
+      @PathParam("id") long aclId
+  ) throws NotFoundException {
     Optional<ManagedAcl> managedAcl = aclService().getAcl(aclId);
     if (managedAcl.isPresent()) {
       return RestUtils.okJson(full(managedAcl.get()));
@@ -444,18 +438,18 @@ public class AclEndpoint {
   @GET
   @Path("acl/{name}")
   @Produces(MediaType.APPLICATION_JSON)
-  @RestQuery(
-      name = "getaclbyname",
-      description = "Return the ACL by the given name",
-      returnDescription = "Return the ACL by the given name",
-      pathParameters = {
-          @RestParameter(name = "name", isRequired = true, description = "The ACL name", type = STRING)
-      },
-      responses = {
-          @RestResponse(responseCode = SC_OK, description = "The ACL has successfully been returned"),
-          @RestResponse(responseCode = SC_NOT_FOUND, description = "The ACL has not been found")
-      })
-  public Response getAcl(@PathParam("name") String aclName) throws NotFoundException {
+  @Operation(
+      summary = "Get an ACL by name",
+      description = "Return the ACL by the given name"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The ACL has successfully been returned"),
+      @ApiResponse(responseCode = "404", description = "The ACL has not been found")
+  })
+  public Response getAcl(
+      @Parameter(description = "The ACL name", required = true)
+      @PathParam("name") String aclName
+  ) throws NotFoundException {
     Optional<ManagedAcl> managedAcl = aclService().getAcl(aclName);
     if (managedAcl.isPresent()) {
       return RestUtils.okJson(full(managedAcl.get()));

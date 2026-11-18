@@ -36,7 +36,6 @@ import org.opencastproject.security.api.SecurityService;
 import org.opencastproject.security.api.UserDirectoryService;
 import org.opencastproject.security.urlsigning.service.UrlSigningService;
 import org.opencastproject.security.urlsigning.utils.UrlSigningServiceOsgiUtil;
-import org.opencastproject.util.doc.rest.RestService;
 import org.opencastproject.workflow.api.WorkflowService;
 
 import org.apache.commons.lang3.BooleanUtils;
@@ -49,16 +48,13 @@ import org.osgi.service.jaxrs.whiteboard.propertytypes.JaxrsResource;
 import java.util.Map;
 import java.util.Objects;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 /** OSGi bound implementation. */
-@RestService(
-    name = "eventservice",
-    title = "Event Service",
-    abstractText = "Provides resources and operations related to the events",
-    notes = { "This service offers the event CRUD Operations for the admin UI.",
-            "<strong>Important:</strong> "
-                    + "<em>This service is for exclusive use by the module admin-ui. Its API might change anytime "
-                    + "without prior notice. Any dependencies other than the admin UI will be strictly ignored. "
-                    + "DO NOT use this for integration of third-party applications.<em>"})
+@Tag(
+    name = "Admin UI - Events",
+    description = "Provides resources and operations related to the events"
+)
 @Component(
     immediate = true,
     service = OsgiEventEndpoint.class,

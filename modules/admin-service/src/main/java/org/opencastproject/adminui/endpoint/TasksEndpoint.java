@@ -21,9 +21,6 @@
 
 package org.opencastproject.adminui.endpoint;
 
-import static javax.servlet.http.HttpServletResponse.SC_BAD_REQUEST;
-import static javax.servlet.http.HttpServletResponse.SC_NOT_FOUND;
-import static javax.servlet.http.HttpServletResponse.SC_OK;
 import static org.opencastproject.index.service.util.JSONUtils.safeString;
 import static org.opencastproject.index.service.util.RestUtils.okJson;
 import static org.opencastproject.workflow.api.ConfiguredWorkflow.workflow;
@@ -32,10 +29,6 @@ import org.opencastproject.assetmanager.api.AssetManager;
 import org.opencastproject.assetmanager.util.Workflows;
 import org.opencastproject.util.NotFoundException;
 import org.opencastproject.util.RestUtil;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 import org.opencastproject.workflow.api.ConfiguredWorkflow;
 import org.opencastproject.workflow.api.WorkflowDatabaseException;
 import org.opencastproject.workflow.api.WorkflowDefinition;
@@ -65,7 +58,6 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.FormParam;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -74,22 +66,17 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 @Path("/admin-ng/tasks")
-@RestService(
-    name = "TasksService",
-    title = "UI Tasks",
-    abstractText = "Provides resources and operations related to the tasks",
-    notes = { "All paths above are relative to the REST endpoint base (something like http://your.server/files)",
-              "If the service is down or not working it will return a status 503, this means the the underlying "
-                  + "service is not working and is either restarting or has failed",
-              "A status code 500 means a general failure has occurred which is not recoverable and was not "
-                  + "anticipated. In other words, there is a bug! You should file an error report with your server "
-                  + "logs from the time when the error occurred: "
-                  + "<a href=\"https://github.com/opencast/opencast/issues\">Opencast Issue Tracker</a>",
-              "<strong>Important:</strong> "
-                  + "<em>This service is for exclusive use by the module admin-ui. Its API might change "
-                  + "anytime without prior notice. Any dependencies other than the admin UI will be strictly ignored. "
-                  + "DO NOT use this for integration of third-party applications.<em>"})
+@Tag(
+    name = "Admin UI - Tasks",
+    description = "Provides resources and operations related to the tasks"
+)
 @Component(
     immediate = true,
     service = TasksEndpoint.class,
@@ -127,19 +114,22 @@ public class TasksEndpoint {
 
   @GET
   @Path("processing.json")
-  @RestQuery(
-      name = "getProcessing",
-      description = "Returns all the data related to the processing tab in the new tasks modal as JSON",
-      returnDescription = "All the data related to the tasks processing tab as JSON",
-      restParameters = {
-          @RestParameter(name = "tags", isRequired = false, description = "A comma separated list of tags to filter "
-              + "the workflow definitions", type = RestParameter.Type.STRING)
-      },
-      responses = {
-          @RestResponse(responseCode = SC_OK, description = "Returns all the data related to the tasks processing tab "
-              + "as JSON")
-      })
-  public Response getProcessing(@QueryParam("tags") String tagsString) {
+  @Operation(
+      summary = "Get the processing options for new tasks",
+      description = "Returns all the data related to the processing tab in the new tasks modal as JSON"
+  )
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "200",
+          description = "Returns all the data related to the tasks processing tab " + "as JSON"
+      )
+  })
+  public Response getProcessing(
+      @Parameter(
+          description = "A comma separated list of tags to filter " + "the workflow definitions"
+      )
+      @QueryParam("tags") String tagsString
+  ) {
     List<String> tags = RestUtil.splitCommaSeparatedParam(Optional.ofNullable(tagsString));
 
     JsonArray actions = new JsonArray();
@@ -166,27 +156,29 @@ public class TasksEndpoint {
 
   @POST
   @Path("/new")
-  @RestQuery(
-      name = "createNewTask",
-      description = "Creates a new task by the given metadata as JSON",
-      returnDescription = "The task identifiers",
-      restParameters = {
-          @RestParameter(name = "metadata", isRequired = true,
-              description = "The metadata as JSON.<p>Example:<p>"
-                  + "<code><pre>{\n"
-                  + "  \"workflow\":\"republish-metadata\",\n"
-                  + "  \"configuration\":{\n"
-                  + "    \"ID-dual-stream-demo\":{\"workflowVar\":\"true\"},\n"
-                  + "    \"ID-about-opencast\":{\"workflowVar\":\"true\"}\n"
-                  + "  }\n"
-                  + "}</pre></code>", type = RestParameter.Type.TEXT)
-      },
-      responses = {
-          @RestResponse(responseCode = HttpServletResponse.SC_CREATED, description = "Task sucessfully added"),
-          @RestResponse(responseCode = SC_NOT_FOUND, description = "If the workflow definition is not found"),
-          @RestResponse(responseCode = SC_BAD_REQUEST, description = "If the metadata is not set or couldn't be parsed")
-      })
-  public Response createNewTask(@FormParam("metadata") String metadata) throws NotFoundException {
+  @Operation(
+      summary = "Create a new task",
+      description = "Creates a new task by the given metadata as JSON"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "201", description = "Task sucessfully added"),
+      @ApiResponse(responseCode = "404", description = "If the workflow definition is not found"),
+      @ApiResponse(responseCode = "400", description = "If the metadata is not set or couldn't be parsed")
+  })
+  public Response createNewTask(
+      @Parameter(
+          description = "The metadata as JSON.<p>Example:<p>"
+              + "<code><pre>{\n"
+              + "  \"workflow\":\"republish-metadata\",\n"
+              + "  \"configuration\":{\n"
+              + "    \"ID-dual-stream-demo\":{\"workflowVar\":\"true\"},\n"
+              + "    \"ID-about-opencast\":{\"workflowVar\":\"true\"}\n"
+              + "  }\n"
+              + "}</pre></code>",
+          required = true
+      )
+      @FormParam("metadata") String metadata
+  ) throws NotFoundException {
     if (StringUtils.isBlank(metadata)) {
       logger.warn("No metadata set");
       return RestUtil.R.badRequest("No metadata set");

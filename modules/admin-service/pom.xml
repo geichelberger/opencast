@@ -15,6 +15,10 @@
     <skipTests>false</skipTests>
   </properties>
   <dependencies>
+    <dependency>
+      <groupId>io.swagger.core.v3</groupId>
+      <artifactId>swagger-annotations</artifactId>
+    </dependency>
     <!-- osgi support -->
     <dependency>
       <groupId>org.osgi</groupId>

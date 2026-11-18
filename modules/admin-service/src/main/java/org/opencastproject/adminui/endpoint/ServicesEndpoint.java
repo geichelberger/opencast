@@ -21,9 +21,7 @@
 
 package org.opencastproject.adminui.endpoint;
 
-import static javax.servlet.http.HttpServletResponse.SC_BAD_REQUEST;
 import static org.opencastproject.index.service.util.JSONUtils.safeString;
-import static org.opencastproject.util.doc.rest.RestParameter.Type.STRING;
 
 import org.opencastproject.index.service.util.RestUtils;
 import org.opencastproject.list.common.query.ServicesListQuery;
@@ -33,10 +31,6 @@ import org.opencastproject.serviceregistry.api.ServiceState;
 import org.opencastproject.serviceregistry.api.ServiceStatistics;
 import org.opencastproject.util.RestUtil;
 import org.opencastproject.util.SmartIterator;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 import org.opencastproject.util.requests.SortCriterion;
 import org.opencastproject.util.requests.SortCriterion.Order;
 
@@ -58,7 +52,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
-import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -66,16 +59,17 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 @Path("/admin-ng/services")
-@RestService(
-    name = "ServicesProxyService",
-    title = "UI Services",
-    abstractText = "This service provides the services data for the UI.",
-    notes = { "These Endpoints deliver informations about the services required for the UI.",
-              "<strong>Important:</strong> "
-                + "<em>This service is for exclusive use by the module admin-ui. Its API might change "
-                + "anytime without prior notice. Any dependencies other than the admin UI will be strictly ignored. "
-                + "DO NOT use this for integration of third-party applications.<em>"})
+@Tag(
+    name = "Admin UI - Services",
+    description = "This service provides the services data for the UI."
+)
 @Component(
     immediate = true,
     service = ServicesEndpoint.class,
@@ -96,29 +90,30 @@ public class ServicesEndpoint {
   @GET
   @Path("services.json")
   @Produces(MediaType.APPLICATION_JSON)
-  @RestQuery(
-      description = "Returns the list of services",
-      name = "services",
-      restParameters = {
-          @RestParameter(name = "limit", description = "The maximum number of items to return per page",
-              isRequired = false, type = RestParameter.Type.INTEGER),
-          @RestParameter(name = "offset", description = "The offset", isRequired = false,
-              type = RestParameter.Type.INTEGER),
-          @RestParameter(name = "filter", description = "Filter results by name, host, actions, status or free text "
-              + "query", isRequired = false, type = STRING),
-          @RestParameter(name = "sort", description = "The sort order.  May include any "
+  @Operation(
+      summary = "Get services",
+      description = "Returns the list of services"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Returns the list of services from Opencast"),
+      @ApiResponse(responseCode = "400", description = "If sorting failed")
+  })
+  public Response getServices(
+      @Parameter(description = "The maximum number of items to return per page")
+      @QueryParam("limit") final int limit,
+      @Parameter(description = "The offset")
+      @QueryParam("offset") final int offset,
+      @Parameter(
+          description = "Filter results by name, host, actions, status or free text " + "query"
+      )
+      @QueryParam("filter") String filter,
+      @Parameter(
+          description = "The sort order.  May include any "
               + "of the following: host, name, running, queued, completed,  meanRunTime, meanQueueTime, "
-              + "status. The sort suffix must be :asc for ascending sort order and :desc for descending.",
-              isRequired = false, type = STRING)
-      },
-      responses = {
-          @RestResponse(description = "Returns the list of services from Opencast",
-              responseCode = HttpServletResponse.SC_OK),
-          @RestResponse(responseCode = SC_BAD_REQUEST, description = "If sorting failed")
-      },
-      returnDescription = "The list of services")
-  public Response getServices(@QueryParam("limit") final int limit, @QueryParam("offset") final int offset,
-      @QueryParam("filter") String filter, @QueryParam("sort") String sort) throws Exception {
+              + "status. The sort suffix must be :asc for ascending sort order and :desc for descending."
+      )
+      @QueryParam("sort") String sort
+  ) throws Exception {
 
     Optional<String> sortOpt = Optional.ofNullable(StringUtils.trimToNull(sort));
     ServicesListQuery query = new ServicesListQuery();

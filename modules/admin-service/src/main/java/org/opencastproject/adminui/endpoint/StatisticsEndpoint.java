@@ -22,7 +22,6 @@
 package org.opencastproject.adminui.endpoint;
 
 import static org.opencastproject.util.data.functions.Misc.chuck;
-import static org.opencastproject.util.doc.rest.RestParameter.Type.STRING;
 
 import org.opencastproject.adminui.impl.ProviderQuery;
 import org.opencastproject.adminui.impl.RawProviderQuery;
@@ -45,10 +44,6 @@ import org.opencastproject.statistics.api.TimeSeriesProvider;
 import org.opencastproject.statistics.export.api.StatisticsExportService;
 import org.opencastproject.util.NotFoundException;
 import org.opencastproject.util.RestUtil;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
@@ -67,7 +62,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
 
-import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.FormParam;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -77,16 +71,18 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 
 @Path("/admin-ng/statistics")
-@RestService(
-    name = "statistics",
-    title = "statistics façade service",
-    abstractText = "Provides statistics",
-    notes = {"This service provides statistics."
-      + "<em>This service is for exclusive use by the module admin-ui. Its API might change "
-      + "anytime without prior notice. Any dependencies other than the admin UI will be strictly ignored. "
-      + "DO NOT use this for integration of third-party applications.<em>"})
+@Tag(
+    name = "Admin UI - Statistics",
+    description = "Provides statistics"
+)
 @Component(
     immediate = true,
     service = StatisticsEndpoint.class,
@@ -138,21 +134,24 @@ public class StatisticsEndpoint {
   @GET
   @Path("providers.json")
   @Produces(MediaType.APPLICATION_JSON)
-  @RestQuery(
-      name = "getprovidersbyresourcetype",
-      description = "Returns the available statistics providers for an (optional) resource type",
-      returnDescription = "The available statistics providers as JSON",
-      restParameters = {
-          @RestParameter(name = "resourceType", description = "The resource type: either 'episode', 'series' or "
-              + "'organization'", isRequired = false, type = STRING)
-      },
-      responses = {
-          @RestResponse(description = "Returns the providers for the given resource type as JSON, or all, if the "
-              + "resource type is missing", responseCode = HttpServletResponse.SC_OK),
-          @RestResponse(description = "If the current user is not authorized to perform this action",
-              responseCode = HttpServletResponse.SC_UNAUTHORIZED)
-    })
-  public Response getProviders(@QueryParam("resourceType") final String resourceTypeStr) {
+  @Operation(
+      summary = "Get statistics providers",
+      description = "Returns the available statistics providers for an (optional) resource type"
+  )
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "200",
+          description = "Returns the providers for the given resource type as JSON, or all, if the "
+              + "resource type is missing"
+      ),
+      @ApiResponse(responseCode = "401", description = "If the current user is not authorized to perform this action")
+  })
+  public Response getProviders(
+      @Parameter(
+          description = "The resource type: either 'episode', 'series' or " + "'organization'"
+      )
+      @QueryParam("resourceType") final String resourceTypeStr
+  ) {
     ResourceType resourceType;
     try {
       if (resourceTypeStr == null) {
@@ -207,22 +206,25 @@ public class StatisticsEndpoint {
   @POST
   @Path("data.json")
   @Produces(MediaType.APPLICATION_JSON)
-  @RestQuery(
-      name = "getproviderdata",
-      description = "Returns the statistical data for a specific provider and a specific resource",
-      returnDescription = "The statistical data as JSON",
-      restParameters = {
-          @RestParameter(name = "data", isRequired = true, description = "A list of statistical data requests, "
+  @Operation(
+      summary = "Get statistical data",
+      description = "Returns the statistical data for a specific provider and a specific resource"
+  )
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "200",
+          description = "Returns the statistical data for the given resource type as JSON"
+      ),
+      @ApiResponse(responseCode = "401", description = "If the current user is not authorized to perform this action")
+  })
+  public Response getProviderData(
+      @Parameter(
+          description = "A list of statistical data requests, "
               + "containing a provider id, from, to, the resource id and a resolution - all as JSON",
-              type = RestParameter.Type.TEXT)
-      },
-      responses = {
-        @RestResponse(description = "Returns the statistical data for the given resource type as JSON",
-            responseCode = HttpServletResponse.SC_OK),
-        @RestResponse(description = "If the current user is not authorized to perform this action",
-            responseCode = HttpServletResponse.SC_UNAUTHORIZED)
-      })
-  public Response getProviderData(@FormParam("data") String data) {
+          required = true
+      )
+      @FormParam("data") String data
+  ) {
     if (StringUtils.isBlank(data)) {
       return RestUtil.R.badRequest("No data set");
     }
@@ -259,33 +261,31 @@ public class StatisticsEndpoint {
   @GET
   @Path("export.csv")
   @Produces(MediaType.TEXT_PLAIN)
-  @RestQuery(
-      name = "getcsvdata",
-      description = "Returns the statistical data for a specific provider and a specific resource as CSV.",
-      returnDescription = "The statistical data as CSV",
-      restParameters = {
-          @RestParameter(name = "providerId", isRequired = true, description = "The provider id",
-              type = RestParameter.Type.TEXT),
-          @RestParameter(name = "resourceId", isRequired = true, description = "The resource id",
-              type = RestParameter.Type.TEXT),
-          @RestParameter(name = "from", isRequired = true, description = "The from date in iso 8601 UTC notation",
-              type = RestParameter.Type.TEXT),
-          @RestParameter(name = "to", isRequired = true, description = "The to date in iso 8601 UTC notation",
-              type = RestParameter.Type.TEXT),
-          @RestParameter(name = "dataResolution", isRequired = true, description = "The data resolution. Valid values "
-              + "are 'HOURLY', 'DAILY', 'WEEKLY', 'MONTHLY', and 'YEARLY'", type = RestParameter.Type.TEXT)
-      },
-      responses = {
-          @RestResponse(description = "Returns the statistical data for the given resource type as csv",
-              responseCode = HttpServletResponse.SC_OK),
-          @RestResponse(description = "If the current user is not authorized to perform this action",
-              responseCode = HttpServletResponse.SC_UNAUTHORIZED)
-      })
+  @Operation(
+      summary = "Export statistical data as CSV",
+      description = "Returns the statistical data for a specific provider and a specific resource as CSV."
+  )
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "200",
+          description = "Returns the statistical data for the given resource type as csv"
+      ),
+      @ApiResponse(responseCode = "401", description = "If the current user is not authorized to perform this action")
+  })
   public Response getCSVData(
+      @Parameter(description = "The provider id", required = true)
       @QueryParam("providerId") String providerId,
+      @Parameter(description = "The resource id", required = true)
       @QueryParam("resourceId") String resourceId,
+      @Parameter(description = "The from date in iso 8601 UTC notation", required = true)
       @QueryParam("from") String fromStr,
+      @Parameter(description = "The to date in iso 8601 UTC notation", required = true)
       @QueryParam("to") String toStr,
+      @Parameter(
+          description = "The data resolution. Valid values "
+              + "are 'HOURLY', 'DAILY', 'WEEKLY', 'MONTHLY', and 'YEARLY'",
+          required = true
+      )
       @QueryParam("dataResolution") String dataResolutionStr
   ) {
     try {

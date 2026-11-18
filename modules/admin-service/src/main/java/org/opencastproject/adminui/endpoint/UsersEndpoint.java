@@ -26,7 +26,6 @@ import static org.apache.commons.lang3.StringUtils.trimToEmpty;
 import static org.apache.commons.lang3.StringUtils.trimToNull;
 import static org.apache.hc.core5.http.HttpStatus.SC_BAD_REQUEST;
 import static org.apache.hc.core5.http.HttpStatus.SC_CONFLICT;
-import static org.apache.hc.core5.http.HttpStatus.SC_CREATED;
 import static org.apache.hc.core5.http.HttpStatus.SC_FORBIDDEN;
 import static org.apache.hc.core5.http.HttpStatus.SC_INTERNAL_SERVER_ERROR;
 import static org.apache.hc.core5.http.HttpStatus.SC_NOT_FOUND;
@@ -35,7 +34,6 @@ import static org.opencastproject.userdirectory.UserIdRoleProvider.getUserRolePr
 import static org.opencastproject.userdirectory.UserIdRoleProvider.isSanitize;
 import static org.opencastproject.util.RestUtil.getEndpointUrl;
 import static org.opencastproject.util.UrlSupport.uri;
-import static org.opencastproject.util.doc.rest.RestParameter.Type.STRING;
 
 import org.opencastproject.adminui.util.TextFilter;
 import org.opencastproject.index.service.util.RestUtils;
@@ -55,10 +53,6 @@ import org.opencastproject.util.NotFoundException;
 import org.opencastproject.util.SmartIterator;
 import org.opencastproject.util.UrlSupport;
 import org.opencastproject.util.data.Tuple;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 import org.opencastproject.util.requests.SortCriterion;
 import org.opencastproject.util.requests.SortCriterion.Order;
 import org.opencastproject.workflow.api.WorkflowDatabaseException;
@@ -100,16 +94,17 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 @Path("/admin-ng/users")
-@RestService(
-    name = "users",
-    title = "User service",
-    abstractText = "Provides operations for users",
-    notes = { "This service offers the default users CRUD Operations for the admin UI.",
-              "<strong>Important:</strong> "
-                + "<em>This service is for exclusive use by the module admin-ui. Its API might change "
-                + "anytime without prior notice. Any dependencies other than the admin UI will be strictly ignored. "
-                + "DO NOT use this for integration of third-party applications.<em>"})
+@Tag(
+    name = "Admin UI - Users",
+    description = "Provides operations for users"
+)
 @Component(
     immediate = true,
     service = UsersEndpoint.class,
@@ -205,26 +200,29 @@ public class UsersEndpoint {
   @GET
   @Path("users.json")
   @Produces(MediaType.APPLICATION_JSON)
-  @RestQuery(
-      name = "allusers",
-      description = "Returns a list of users",
-      returnDescription = "Returns a JSON representation of the list of user accounts",
-      restParameters = {
-          @RestParameter(name = "filter", isRequired = false, description = "The filter used for the query. They "
-              + "should be formated like that: 'filter1:value1,filter2:value2'", type = STRING),
-          @RestParameter(name = "sort", isRequired = false, description = "The sort order. May include any of the "
-              + "following: STATUS, NAME OR LAST_UPDATED.  Add '_DESC' to reverse the sort order (e.g. STATUS_DESC).",
-              type = STRING),
-          @RestParameter(defaultValue = "100", description = "The maximum number of items to return per page.",
-              isRequired = false, name = "limit", type = RestParameter.Type.STRING),
-          @RestParameter(defaultValue = "0", description = "The page number.", isRequired = false, name = "offset",
-              type = RestParameter.Type.STRING)
-      },
-      responses = {
-          @RestResponse(responseCode = SC_OK, description = "The user accounts.")
-      })
-  public Response getUsers(@QueryParam("filter") String filter, @QueryParam("sort") String sort,
-      @QueryParam("limit") int limit, @QueryParam("offset") int offset) throws IOException {
+  @Operation(
+      summary = "Get users",
+      description = "Returns a list of users"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The user accounts.")
+  })
+  public Response getUsers(
+      @Parameter(
+          description = "The filter used for the query. They "
+              + "should be formated like that: 'filter1:value1,filter2:value2'"
+      )
+      @QueryParam("filter") String filter,
+      @Parameter(
+          description = "The sort order. May include any of the "
+              + "following: STATUS, NAME OR LAST_UPDATED.  Add '_DESC' to reverse the sort order (e.g. STATUS_DESC)."
+      )
+      @QueryParam("sort") String sort,
+      @Parameter(description = "The maximum number of items to return per page.", example = "100")
+      @QueryParam("limit") int limit,
+      @Parameter(description = "The page number.", example = "0")
+      @QueryParam("offset") int offset
+  ) throws IOException {
     if (limit < 1) {
       limit = 100;
     }
@@ -338,17 +336,17 @@ public class UsersEndpoint {
   @GET
   @Path("usersforroles.json")
   @Produces(MediaType.APPLICATION_JSON)
-  @RestQuery(
-      name = "usersforroles",
-      description = "Returns a list of users",
-      returnDescription = "Returns a JSON representation of the list of user accounts",
-      restParameters = {
-          @RestParameter(name = "roles", isRequired = false, description = "JSON Array", type = STRING),
-      },
-      responses = {
-          @RestResponse(responseCode = SC_OK, description = "The user accounts.")
-      })
-  public Response getsUsersForRoles(@QueryParam("roles") String roles) {
+  @Operation(
+      summary = "Get users for roles",
+      description = "Returns a list of users"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The user accounts.")
+  })
+  public Response getsUsersForRoles(
+      @Parameter(description = "JSON Array")
+      @QueryParam("roles") String roles
+  ) {
     List<String> rolesList = gson.fromJson(roles, ArrayList.class);
     Map<String, Map<String, Object>> roleUserMap = new HashMap<>();
 
@@ -371,27 +369,34 @@ public class UsersEndpoint {
 
   @POST
   @Path("/")
-  @RestQuery(
-      name = "createUser",
-      description = "Create a new  user",
-      returnDescription = "The location of the new ressource",
-      restParameters = {
-          @RestParameter(description = "The username.", isRequired = true, name = "username", type = STRING),
-          @RestParameter(description = "The password.", isRequired = true, name = "password", type = STRING),
-          @RestParameter(description = "The name.", isRequired = false, name = "name", type = STRING),
-          @RestParameter(description = "The email.", isRequired = false, name = "email", type = STRING),
-          @RestParameter(name = "roles", type = STRING, isRequired = false, description = "The user roles as a json "
+  @Operation(
+      summary = "Create a user",
+      description = "Creates a new user."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "201", description = "User has been created."),
+      @ApiResponse(
+          responseCode = "403",
+          description = "Not enough permissions to create a user with a " + "admin role."
+      ),
+      @ApiResponse(responseCode = "409", description = "An user with this username already exist.")
+  })
+  public Response createUser(
+      @Parameter(description = "The username.", required = true)
+      @FormParam("username") String username,
+      @Parameter(description = "The password.", required = true)
+      @FormParam("password") String password,
+      @Parameter(description = "The name.")
+      @FormParam("name") String name,
+      @Parameter(description = "The email.")
+      @FormParam("email") String email,
+      @Parameter(
+          description = "The user roles as a json "
               + "array, e.g. <br>[{'name': 'ROLE_ADMIN', 'type': 'INTERNAL'}, "
-              + "{'name': 'ROLE_XY', 'type': 'INTERNAL'}]")
-      },
-      responses = {
-          @RestResponse(responseCode = SC_CREATED, description = "User has been created."),
-          @RestResponse(responseCode = SC_FORBIDDEN, description = "Not enough permissions to create a user with a "
-              + "admin role."),
-          @RestResponse(responseCode = SC_CONFLICT, description = "An user with this username already exist.")
-      })
-  public Response createUser(@FormParam("username") String username, @FormParam("password") String password,
-          @FormParam("name") String name, @FormParam("email") String email, @FormParam("roles") String roles) {
+              + "{'name': 'ROLE_XY', 'type': 'INTERNAL'}]"
+      )
+      @FormParam("roles") String roles
+  ) {
 
     if (StringUtils.isBlank(username)) {
       return Response.status(SC_BAD_REQUEST).entity("Missing username").build();
@@ -431,17 +436,21 @@ public class UsersEndpoint {
 
   @GET
   @Path("{username}.json")
-  @RestQuery(
-      name = "getUser",
-      description = "Get an user",
-      returnDescription = "Status ok",
-      pathParameters = @RestParameter(name = "username", type = STRING, isRequired = true, description = "The "
-          + "username"),
-      responses = {
-          @RestResponse(responseCode = SC_OK, description = "User has been found."),
-          @RestResponse(responseCode = SC_NOT_FOUND, description = "User not found.")
-      })
-  public Response getUser(@PathParam("username") String username) {
+  @Operation(
+      summary = "Get a user",
+      description = "Get an user"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "User has been found."),
+      @ApiResponse(responseCode = "404", description = "User not found.")
+  })
+  public Response getUser(
+      @Parameter(
+          description = "The " + "username",
+          required = true
+      )
+      @PathParam("username") String username
+  ) {
 
     User user = userDirectoryService.loadUser(username);
     if (user == null) {
@@ -453,27 +462,35 @@ public class UsersEndpoint {
 
   @PUT
   @Path("{username}.json")
-  @RestQuery(
-      name = "updateUser",
-      description = "Update an user",
-      returnDescription = "Status ok",
-      restParameters = {
-          @RestParameter(description = "The password.", isRequired = false, name = "password", type = STRING),
-          @RestParameter(description = "The name.", isRequired = false, name = "name", type = STRING),
-          @RestParameter(description = "The email.", isRequired = false, name = "email", type = STRING),
-          @RestParameter(name = "roles", type = STRING, isRequired = false, description = "The user roles as a json "
-              + "array")
-      },
-      pathParameters = @RestParameter(name = "username", type = STRING, isRequired = true, description = "The "
-          + "username"),
-      responses = {
-          @RestResponse(responseCode = SC_OK, description = "User has been updated."),
-          @RestResponse(responseCode = SC_FORBIDDEN, description = "Not enough permissions to update a user with admin "
-              + "role."),
-          @RestResponse(responseCode = SC_BAD_REQUEST, description = "Invalid data provided.")
-      })
-  public Response updateUser(@PathParam("username") String username, @FormParam("password") String password,
-      @FormParam("name") String name, @FormParam("email") String email, @FormParam("roles") String roles) {
+  @Operation(
+      summary = "Update a user",
+      description = "Update an user"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "User has been updated."),
+      @ApiResponse(
+          responseCode = "403",
+          description = "Not enough permissions to update a user with admin " + "role."
+      ),
+      @ApiResponse(responseCode = "400", description = "Invalid data provided.")
+  })
+  public Response updateUser(
+      @Parameter(
+          description = "The " + "username",
+          required = true
+      )
+      @PathParam("username") String username,
+      @Parameter(description = "The password.")
+      @FormParam("password") String password,
+      @Parameter(description = "The name.")
+      @FormParam("name") String name,
+      @Parameter(description = "The email.")
+      @FormParam("email") String email,
+      @Parameter(
+          description = "The user roles as a json " + "array"
+      )
+      @FormParam("roles") String roles
+  ) {
 
     User user = jpaUserAndRoleProvider.loadUser(username);
     if (user == null) {
@@ -511,19 +528,19 @@ public class UsersEndpoint {
 
   @PUT
   @Path("self")
-  @RestQuery(
-      name = "selfUpdate",
-      description = "Allow the user to update their own user data. Currently only changing password is allowed",
-      returnDescription = "Status ok",
-      restParameters = {
-          @RestParameter(description = "The password.", isRequired = false, name = "password", type = STRING),
-      },
-      responses = {
-          @RestResponse(responseCode = SC_OK, description = "User password has been updated."),
-          @RestResponse(responseCode = SC_FORBIDDEN, description = "Not enough permissions to change password."),
-          @RestResponse(responseCode = SC_BAD_REQUEST, description = "Invalid data provided.")
-      })
-  public Response selfUpdatePassword(@FormParam("password") String password) {
+  @Operation(
+      summary = "Update the current user",
+      description = "Allow the user to update their own user data. Currently only changing password is allowed"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "User password has been updated."),
+      @ApiResponse(responseCode = "403", description = "Not enough permissions to change password."),
+      @ApiResponse(responseCode = "400", description = "Invalid data provided.")
+  })
+  public Response selfUpdatePassword(
+      @Parameter(description = "The password.")
+      @FormParam("password") String password
+  ) {
 
     User currentUser = securityService.getUser();
     if (!currentUser.isManageable()) {
@@ -554,19 +571,25 @@ public class UsersEndpoint {
 
   @DELETE
   @Path("{username}.json")
-  @RestQuery(
-      name = "deleteUser",
-      description = "Deleter a new  user",
-      returnDescription = "Status ok",
-      pathParameters = @RestParameter(name = "username", type = STRING, isRequired = true, description = "The "
-          + "username"),
-      responses = {
-          @RestResponse(responseCode = SC_OK, description = "User has been deleted."),
-          @RestResponse(responseCode = SC_FORBIDDEN, description = "Not enough permissions to delete a user with admin "
-              + "role."),
-          @RestResponse(responseCode = SC_NOT_FOUND, description = "User not found.")
-      })
-  public Response deleteUser(@PathParam("username") String username) throws NotFoundException {
+  @Operation(
+      summary = "Delete a user",
+      description = "Deletes a user."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "User has been deleted."),
+      @ApiResponse(
+          responseCode = "403",
+          description = "Not enough permissions to delete a user with admin " + "role."
+      ),
+      @ApiResponse(responseCode = "404", description = "User not found.")
+  })
+  public Response deleteUser(
+      @Parameter(
+          description = "The " + "username",
+          required = true
+      )
+      @PathParam("username") String username
+  ) throws NotFoundException {
     Organization organization = securityService.getOrganization();
     boolean userReferenceNotFound = false;
     boolean userNotFound = false;
