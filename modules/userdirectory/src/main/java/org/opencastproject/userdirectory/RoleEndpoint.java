@@ -25,9 +25,6 @@ import org.opencastproject.security.api.JaxbRoleList;
 import org.opencastproject.security.api.OrganizationDirectoryService;
 import org.opencastproject.security.api.Role;
 import org.opencastproject.security.api.RoleDirectoryService;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
@@ -38,15 +35,18 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 /**
  * Provides a sorted set of known roles
  */
 @Path("/roles")
-@RestService(
-    name = "roles",
-    title = "User Roles",
-    notes = { "" },
-    abstractText = "Displays the roles available in the current user's organization"
+@Tag(
+    name = "User Roles",
+    description = "Displays the roles available in the current user's organization"
 )
 @Component(
     property = {
@@ -79,12 +79,13 @@ public class RoleEndpoint {
   @GET
   @Path("roles.xml")
   @Produces(MediaType.APPLICATION_XML)
-  @RestQuery(
-      name = "rolesasxml",
-      description = "Lists the roles as XML",
-      returnDescription = "The list of roles as XML",
-      responses = { @RestResponse(responseCode = 200, description = "OK, roles returned") }
+  @Operation(
+      summary = "List the roles as XML",
+      description = "Lists the roles as XML"
   )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "OK, roles returned")
+  })
   public JaxbRoleList getRolesAsXml() {
     JaxbRoleList roleList = new JaxbRoleList();
     for (Role role: roleDirectoryService.findRoles("%", Role.Target.ALL, 0, 0)) {
@@ -96,12 +97,13 @@ public class RoleEndpoint {
   @GET
   @Path("roles.json")
   @Produces(MediaType.APPLICATION_JSON)
-  @RestQuery(
-      name = "rolesasjson",
-      description = "Lists the roles as JSON",
-      returnDescription = "The list of roles as JSON",
-      responses = { @RestResponse(responseCode = 200, description = "OK, roles returned") }
+  @Operation(
+      summary = "List the roles as JSON",
+      description = "Lists the roles as JSON"
   )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "OK, roles returned")
+  })
   public JaxbRoleList getRolesAsJson() {
     return getRolesAsXml();
   }

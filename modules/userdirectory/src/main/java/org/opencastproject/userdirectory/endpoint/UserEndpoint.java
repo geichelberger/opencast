@@ -23,15 +23,12 @@ package org.opencastproject.userdirectory.endpoint;
 
 import static org.apache.hc.core5.http.HttpStatus.SC_BAD_REQUEST;
 import static org.apache.hc.core5.http.HttpStatus.SC_CONFLICT;
-import static org.apache.hc.core5.http.HttpStatus.SC_CREATED;
 import static org.apache.hc.core5.http.HttpStatus.SC_FORBIDDEN;
 import static org.apache.hc.core5.http.HttpStatus.SC_INTERNAL_SERVER_ERROR;
 import static org.apache.hc.core5.http.HttpStatus.SC_NOT_FOUND;
-import static org.apache.hc.core5.http.HttpStatus.SC_NO_CONTENT;
 import static org.apache.hc.core5.http.HttpStatus.SC_OK;
 import static org.opencastproject.util.RestUtil.getEndpointUrl;
 import static org.opencastproject.util.UrlSupport.uri;
-import static org.opencastproject.util.doc.rest.RestParameter.Type.STRING;
 
 import org.opencastproject.security.api.JaxbUser;
 import org.opencastproject.security.api.JaxbUserList;
@@ -45,10 +42,6 @@ import org.opencastproject.userdirectory.JpaUserAndRoleProvider;
 import org.opencastproject.util.NotFoundException;
 import org.opencastproject.util.UrlSupport;
 import org.opencastproject.util.data.Tuple;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
@@ -87,15 +80,23 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.parameters.RequestBody;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 /**
  * Provides a sorted set of known users
  */
 @Path("/user-utils")
-@RestService(
-    name = "UsersUtils",
-    title = "User utils",
-    notes = "This service offers the default CRUD Operations for the internal Opencast users.",
-    abstractText = "Provides operations for internal Opencast users")
+@Tag(
+    name = "User utils",
+    description = "Provides operations for internal Opencast users"
+)
 @Component(
     property = {
         "service.description=User REST endpoint",
@@ -158,30 +159,19 @@ public class UserEndpoint {
   @GET
   @Path("users.json")
   @Produces(MediaType.APPLICATION_JSON)
-  @RestQuery(
-      name = "allusersasjson",
-      description = "Returns a list of users",
-      returnDescription = "Returns a JSON representation of the list of user accounts",
-      restParameters = {
-      @RestParameter(
-        name = "limit",
-        defaultValue = "100",
-        description = "The maximum number of items to return per page.",
-        isRequired = false,
-        type = RestParameter.Type.STRING),
-      @RestParameter(
-        name = "offset",
-        defaultValue = "0",
-        description = "The page number.",
-        isRequired = false,
-        type = RestParameter.Type.STRING)
-      }, responses = {
-      @RestResponse(
-        responseCode = SC_OK,
-        description = "The user accounts.")
-    })
-  public JaxbUserList getUsersAsJson(@QueryParam("limit") int limit, @QueryParam("offset") int offset)
-          throws IOException {
+  @Operation(
+      summary = "List the users",
+      description = "Returns a list of users"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The user accounts.")
+  })
+  public JaxbUserList getUsersAsJson(
+      @Parameter(description = "The maximum number of items to return per page.", example = "100")
+      @QueryParam("limit") int limit,
+      @Parameter(description = "The page number.", example = "0")
+      @QueryParam("offset") int offset
+  ) throws IOException {
 
     // Set the maximum number of items to return to 100 if this limit parameter is not given
     if (limit < 1) {
@@ -198,25 +188,18 @@ public class UserEndpoint {
   @GET
   @Path("{username}.json")
   @Produces(MediaType.APPLICATION_JSON)
-  @RestQuery(
-      name = "user",
-      description = "Returns a user",
-      returnDescription = "Returns a JSON representation of a user",
-      pathParameters = {
-      @RestParameter(
-        name = "username",
-        description = "The username.",
-        isRequired = true,
-        type = STRING)
-      }, responses = {
-      @RestResponse(
-        responseCode = SC_OK,
-        description = "The user account."),
-      @RestResponse(
-        responseCode = SC_NOT_FOUND,
-        description = "User not found")
-    })
-  public Response getUserAsJson(@PathParam("username") String username) throws NotFoundException {
+  @Operation(
+      summary = "Get a user",
+      description = "Returns a user"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The user account."),
+      @ApiResponse(responseCode = "404", description = "User not found")
+  })
+  public Response getUserAsJson(
+      @Parameter(description = "The username.", required = true)
+      @PathParam("username") String username
+  ) throws NotFoundException {
     User user = jpaUserAndRoleProvider.loadUser(username);
     if (user == null) {
       logger.debug("Requested user not found: {}", username);
@@ -228,14 +211,12 @@ public class UserEndpoint {
   @GET
   @Path("users/md5.json")
   @Produces(MediaType.APPLICATION_JSON)
-  @RestQuery(
-      name = "users-with-insecure-hashing",
-      description = "Returns a list of users which passwords are stored using MD5 hashes",
-      returnDescription = "Returns a JSON representation of the list of matching user accounts",
-      responses = {
-      @RestResponse(
-          responseCode = SC_OK,
-          description = "The user accounts.")
+  @Operation(
+      summary = "List the users with insecure password hashing",
+      description = "Returns a list of users which passwords are stored using MD5 hashes"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The user accounts.")
   })
   public JaxbUserList getUserWithInsecurePasswordHashingAsJson() {
     JaxbUserList userList = new JaxbUserList();
@@ -247,52 +228,28 @@ public class UserEndpoint {
 
   @POST
   @Path("/")
-  @RestQuery(
-      name = "createUser",
-      description = "Create a new  user",
-      returnDescription = "Location of the new resource",
-      restParameters = {
-      @RestParameter(
-        name = "username",
-        description = "The username.",
-        isRequired = true,
-        type = STRING),
-      @RestParameter(
-        name = "password",
-        description = "The password.",
-        isRequired = true,
-        type = STRING),
-      @RestParameter(
-        name = "name",
-        description = "The name.",
-        isRequired = false,
-        type = STRING),
-      @RestParameter(
-        name = "email",
-        description = "The email.",
-        isRequired = false,
-        type = STRING),
-      @RestParameter(
-        name = "roles",
-        description = "The user roles as a json array, for example: [\"ROLE_USER\", \"ROLE_ADMIN\"]",
-        isRequired = false,
-        type = STRING)
-      }, responses = {
-      @RestResponse(
-        responseCode = SC_BAD_REQUEST,
-        description = "Malformed request syntax."),
-      @RestResponse(
-        responseCode = SC_CREATED,
-        description = "User has been created."),
-      @RestResponse(
-        responseCode = SC_CONFLICT,
-        description = "An user with this username already exist."),
-      @RestResponse(
-        responseCode = SC_FORBIDDEN,
-        description = "Not enough permissions to create a user with the admin role.")
-    })
-  public Response createUser(@FormParam("username") String username, @FormParam("password") String password,
-          @FormParam("name") String name, @FormParam("email") String email, @FormParam("roles") String roles) {
+  @Operation(
+      summary = "Create a user",
+      description = "Create a new user"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "400", description = "Malformed request syntax."),
+      @ApiResponse(responseCode = "201", description = "User has been created."),
+      @ApiResponse(responseCode = "409", description = "An user with this username already exist."),
+      @ApiResponse(responseCode = "403", description = "Not enough permissions to create a user with the admin role.")
+  })
+  public Response createUser(
+      @Parameter(description = "The username.", required = true)
+      @FormParam("username") String username,
+      @Parameter(description = "The password.", required = true)
+      @FormParam("password") String password,
+      @Parameter(description = "The name.")
+      @FormParam("name") String name,
+      @Parameter(description = "The email.")
+      @FormParam("email") String email,
+      @Parameter(description = "The user roles as a json array, for example: [\"ROLE_USER\", \"ROLE_ADMIN\"]")
+      @FormParam("roles") String roles
+  ) {
 
     if (jpaUserAndRoleProvider.loadUser(username) != null) {
       return Response.status(SC_CONFLICT).build();
@@ -323,20 +280,28 @@ public class UserEndpoint {
   @POST
   @Path("/users.json")
   @Consumes(MediaType.APPLICATION_JSON)
-  @RestQuery(
-      name = "createUsers",
-      description = "Create a list of new users",
-      returnDescription = "If the operation succeeded or not",
-      responses = {
-          @RestResponse(
-              responseCode = SC_BAD_REQUEST,
-              description = "Malformed request syntax."),
-          @RestResponse(
-              responseCode = SC_CONFLICT,
-              description = "At least one user already existed."),
-          @RestResponse(
-              responseCode = SC_NO_CONTENT,
-              description = "Users have been created.") })
+  @Operation(
+      summary = "Create multiple users",
+      description = "Create a list of new users"
+  )
+  @RequestBody(
+      description = "A JSON array of users. Each user has a `username` (required), a `password`, a `name`, "
+          + "an `email` and `roles`, an array of role names.",
+      required = true,
+      content = @Content(
+          mediaType = MediaType.APPLICATION_JSON,
+          schema = @Schema(
+              type = "array",
+              example = "[{\"username\": \"jdoe\", \"password\": \"password\", \"name\": \"Jane Doe\", "
+                  + "\"email\": \"jdoe@example.com\", \"roles\": [\"ROLE_USER\"]}]"
+          )
+      )
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "400", description = "Malformed request syntax."),
+      @ApiResponse(responseCode = "409", description = "At least one user already existed."),
+      @ApiResponse(responseCode = "201", description = "Users have been created.")
+  })
   public Response createUsers(String body) throws UnauthorizedException {
     logger.debug("Provided user JSON: {}", body);
     try {
@@ -356,48 +321,27 @@ public class UserEndpoint {
 
   @PUT
   @Path("{username}.json")
-  @RestQuery(
-      name = "updateUser",
-      description = "Update an user",
-      returnDescription = "Status ok",
-      restParameters = {
-      @RestParameter(
-        name = "password",
-        description = "The password.",
-        isRequired = true,
-        type = STRING),
-      @RestParameter(
-        name = "name",
-        description = "The name.",
-        isRequired = false,
-        type = STRING),
-      @RestParameter(
-        name = "email",
-        description = "The email.",
-        isRequired = false,
-        type = STRING),
-      @RestParameter(
-        name = "roles",
-        description = "The user roles as a json array, for example: [\"ROLE_USER\", \"ROLE_ADMIN\"]",
-        isRequired = false,
-        type = STRING)
-      }, pathParameters = @RestParameter(
-      name = "username",
-      description = "The username",
-      isRequired = true,
-      type = STRING),
-      responses = {
-      @RestResponse(
-        responseCode = SC_BAD_REQUEST,
-        description = "Malformed request syntax."),
-      @RestResponse(
-        responseCode = SC_FORBIDDEN,
-        description = "Not enough permissions to update a user with the admin role."),
-      @RestResponse(
-        responseCode = SC_OK,
-        description = "User has been updated.")    })
-  public Response setUser(@PathParam("username") String username, @FormParam("password") String password,
-          @FormParam("name") String name, @FormParam("email") String email, @FormParam("roles") String roles) {
+  @Operation(
+      summary = "Update a user",
+      description = "Update a user"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "400", description = "Malformed request syntax."),
+      @ApiResponse(responseCode = "403", description = "Not enough permissions to update a user with the admin role."),
+      @ApiResponse(responseCode = "200", description = "User has been updated.")
+  })
+  public Response setUser(
+      @Parameter(description = "The username", required = true)
+      @PathParam("username") String username,
+      @Parameter(description = "The password.", required = true)
+      @FormParam("password") String password,
+      @Parameter(description = "The name.")
+      @FormParam("name") String name,
+      @Parameter(description = "The email.")
+      @FormParam("email") String email,
+      @Parameter(description = "The user roles as a json array, for example: [\"ROLE_USER\", \"ROLE_ADMIN\"]")
+      @FormParam("roles") String roles
+  ) {
 
     try {
       User user = jpaUserAndRoleProvider.loadUser(username);
@@ -426,27 +370,19 @@ public class UserEndpoint {
 
   @DELETE
   @Path("{username}.json")
-  @RestQuery(
-      name = "deleteUser",
-      description = "Delete a new  user",
-      returnDescription = "Status ok",
-      pathParameters = @RestParameter(
-      name = "username",
-      type = STRING,
-      isRequired = true,
-      description = "The username"),
-      responses = {
-      @RestResponse(
-        responseCode = SC_OK,
-        description = "User has been deleted."),
-      @RestResponse(
-        responseCode = SC_FORBIDDEN,
-        description = "Not enough permissions to delete a user with the admin role."),
-      @RestResponse(
-        responseCode = SC_NOT_FOUND,
-        description = "User not found.")
-    })
-  public Response deleteUser(@PathParam("username") String username) {
+  @Operation(
+      summary = "Delete a user",
+      description = "Delete a user"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "User has been deleted."),
+      @ApiResponse(responseCode = "403", description = "Not enough permissions to delete a user with the admin role."),
+      @ApiResponse(responseCode = "404", description = "User not found.")
+  })
+  public Response deleteUser(
+      @Parameter(description = "The username", required = true)
+      @PathParam("username") String username
+  ) {
     try {
       jpaUserAndRoleProvider.deleteUser(username, securityService.getOrganization().getId());
     } catch (NotFoundException e) {

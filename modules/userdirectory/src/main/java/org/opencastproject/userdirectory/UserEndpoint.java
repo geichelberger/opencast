@@ -21,19 +21,12 @@
 
 package org.opencastproject.userdirectory;
 
-import static org.apache.hc.core5.http.HttpStatus.SC_NOT_FOUND;
-import static org.apache.hc.core5.http.HttpStatus.SC_OK;
-import static org.opencastproject.util.doc.rest.RestParameter.Type.STRING;
 
 import org.opencastproject.security.api.JaxbUser;
 import org.opencastproject.security.api.JaxbUserList;
 import org.opencastproject.security.api.User;
 import org.opencastproject.security.api.UserDirectoryService;
 import org.opencastproject.util.NotFoundException;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 
 import org.apache.commons.lang3.StringUtils;
 import org.osgi.service.component.annotations.Component;
@@ -52,15 +45,19 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 /**
  * Provides a sorted set of known users
  */
 @Path("/users")
-@RestService(
-    name = "users",
-    title = "User account manager",
-    notes = "This service offers the ability to manage the roles for internal accounts.",
-    abstractText = "Displays the users available in the current user's organization"
+@Tag(
+    name = "User account manager",
+    description = "Displays the users available in the current user's organization"
 )
 @Component(
     property = {
@@ -92,37 +89,19 @@ public class UserEndpoint {
   @GET
   @Path("users.xml")
   @Produces(MediaType.APPLICATION_XML)
-  @RestQuery(
-      name = "allusersasxml",
-      description = "Returns a list of users",
-      returnDescription = "Returns a XML representation of the list of user accounts",
-      restParameters = {
-          @RestParameter(
-              name = "query",
-              description = "The search query, must be at lest 3 characters long.",
-              isRequired = false,
-              type = RestParameter.Type.STRING
-          ),
-          @RestParameter(
-              name = "limit",
-              defaultValue = "100",
-              description = "The maximum number of items to return per page.",
-              isRequired = false,
-              type = RestParameter.Type.INTEGER
-          ),
-          @RestParameter(
-              name = "offset",
-              defaultValue = "0",
-              description = "The page number.",
-              isRequired = false,
-              type = RestParameter.Type.INTEGER
-          ),
-      },
-      responses = { @RestResponse(responseCode = SC_OK, description = "The user accounts.") }
+  @Operation(
+      summary = "List the users as XML",
+      description = "Returns a list of users"
   )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The user accounts.")
+  })
   public Response getUsersAsXml(
+      @Parameter(description = "The search query, must be at lest 3 characters long.")
       @QueryParam("query") String queryString,
+      @Parameter(description = "The maximum number of items to return per page.", example = "100")
       @QueryParam("limit") int limit,
+      @Parameter(description = "The page number.", example = "0")
       @QueryParam("offset") int offset
   ) throws IOException {
     if (limit < 1) {
@@ -147,37 +126,19 @@ public class UserEndpoint {
   @GET
   @Path("users.json")
   @Produces(MediaType.APPLICATION_JSON)
-  @RestQuery(
-      name = "allusersasjson",
-      description = "Returns a list of users",
-      returnDescription = "Returns a JSON representation of the list of user accounts",
-      restParameters = {
-          @RestParameter(
-              name = "query",
-              description = "The search query, must be at lest 3 characters long.",
-              isRequired = false,
-              type = RestParameter.Type.STRING
-          ),
-          @RestParameter(
-              name = "limit",
-              defaultValue = "100",
-              description = "The maximum number of items to return per page.",
-              isRequired = false,
-              type = RestParameter.Type.INTEGER
-          ),
-          @RestParameter(
-              name = "offset",
-              defaultValue = "0",
-              description = "The page number.",
-              isRequired = false,
-              type = RestParameter.Type.INTEGER
-          ),
-      },
-      responses = { @RestResponse(responseCode = SC_OK, description = "The user accounts.") }
+  @Operation(
+      summary = "List the users as JSON",
+      description = "Returns a list of users"
   )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The user accounts.")
+  })
   public Response getUsersAsJson(
+      @Parameter(description = "The search query, must be at lest 3 characters long.")
       @QueryParam("query") String queryString,
+      @Parameter(description = "The maximum number of items to return per page.", example = "100")
       @QueryParam("limit") int limit,
+      @Parameter(description = "The page number.", example = "0")
       @QueryParam("offset") int offset
   ) throws IOException {
     return getUsersAsXml(queryString, limit, offset);
@@ -186,19 +147,18 @@ public class UserEndpoint {
   @GET
   @Path("{username}.xml")
   @Produces(MediaType.APPLICATION_XML)
-  @RestQuery(
-      name = "user",
-      description = "Returns a user",
-      returnDescription = "Returns a XML representation of a user",
-      pathParameters = {
-          @RestParameter(description = "The username.", isRequired = true, name = "username", type = STRING),
-      },
-      responses = {
-          @RestResponse(responseCode = SC_OK, description = "The user account."),
-          @RestResponse(responseCode = SC_NOT_FOUND, description = "User not found"),
-      }
+  @Operation(
+      summary = "Get a user as XML",
+      description = "Returns a user"
   )
-  public JaxbUser getUserAsXml(@PathParam("username") String username) throws NotFoundException {
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The user account."),
+      @ApiResponse(responseCode = "404", description = "User not found")
+  })
+  public JaxbUser getUserAsXml(
+      @Parameter(description = "The username.", required = true)
+      @PathParam("username") String username
+  ) throws NotFoundException {
     User user = userDirectoryService.loadUser(username);
     if (user == null) {
       throw new NotFoundException();
@@ -209,19 +169,18 @@ public class UserEndpoint {
   @GET
   @Path("{username}.json")
   @Produces(MediaType.APPLICATION_JSON)
-  @RestQuery(
-      name = "user",
-      description = "Returns a user",
-      returnDescription = "Returns a JSON representation of a user",
-      pathParameters = {
-          @RestParameter(description = "The username.", isRequired = true, name = "username", type = STRING),
-      },
-      responses = {
-          @RestResponse(responseCode = SC_OK, description = "The user account."),
-          @RestResponse(responseCode = SC_NOT_FOUND, description = "User not found"),
-      }
+  @Operation(
+      summary = "Get a user as JSON",
+      description = "Returns a user"
   )
-  public JaxbUser getUserAsJson(@PathParam("username") String username) throws NotFoundException {
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The user account."),
+      @ApiResponse(responseCode = "404", description = "User not found")
+  })
+  public JaxbUser getUserAsJson(
+      @Parameter(description = "The username.", required = true)
+      @PathParam("username") String username
+  ) throws NotFoundException {
     return getUserAsXml(username);
   }
 
