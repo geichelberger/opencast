@@ -21,16 +21,12 @@
 
 package org.opencastproject.serviceregistry.impl.endpoint;
 
-import static javax.servlet.http.HttpServletResponse.SC_OK;
 
 import org.opencastproject.rest.OsgiAbstractJobProducerEndpoint;
 import org.opencastproject.serviceregistry.api.NopService;
 import org.opencastproject.serviceregistry.api.ServiceRegistry;
 import org.opencastproject.serviceregistry.impl.NopServiceImpl;
 import org.opencastproject.util.RestUtil;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
@@ -40,12 +36,16 @@ import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.core.Response;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 @Path("/nop")
-@RestService(
-        name = "nopservice",
-        title = "Nop Service",
-        notes = {},
-        abstractText = "No operation service. Creates empty jobs for testing purposes.")
+@Tag(
+    name = "Nop Service",
+    description = "No operation service. Creates empty jobs for testing purposes."
+)
 @Component(
     immediate = true,
     service = NopServiceEndpoint.class,
@@ -60,11 +60,13 @@ import javax.ws.rs.core.Response;
 public class NopServiceEndpoint extends OsgiAbstractJobProducerEndpoint<NopServiceImpl> {
   @GET
   @Path("nop")
-  @RestQuery(
-          name = "nop",
-          description = "Create an empty job for testing purposes.",
-          returnDescription = "The service statistics.",
-          responses = { @RestResponse(responseCode = SC_OK, description = "OK") })
+  @Operation(
+      summary = "Create an empty job",
+      description = "Create an empty job for testing purposes."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "OK")
+  })
   public Response nop() {
     return RestUtil.R.ok(getSvc().nop());
   }

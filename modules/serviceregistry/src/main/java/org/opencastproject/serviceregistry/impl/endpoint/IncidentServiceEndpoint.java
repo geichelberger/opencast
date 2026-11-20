@@ -21,11 +21,6 @@
 
 package org.opencastproject.serviceregistry.impl.endpoint;
 
-import static javax.servlet.http.HttpServletResponse.SC_BAD_REQUEST;
-import static javax.servlet.http.HttpServletResponse.SC_CONFLICT;
-import static javax.servlet.http.HttpServletResponse.SC_CREATED;
-import static javax.servlet.http.HttpServletResponse.SC_NOT_FOUND;
-import static javax.servlet.http.HttpServletResponse.SC_OK;
 import static javax.ws.rs.core.Response.Status.INTERNAL_SERVER_ERROR;
 import static org.opencastproject.util.RestUtil.R.badRequest;
 import static org.opencastproject.util.RestUtil.R.ok;
@@ -54,11 +49,6 @@ import org.opencastproject.util.LocalHashMap;
 import org.opencastproject.util.NotFoundException;
 import org.opencastproject.util.UrlSupport;
 import org.opencastproject.util.data.Tuple;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestParameter.Type;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -96,21 +86,18 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 /** REST endpoint for Incident Service. */
 @Path("/incidents")
-@RestService(
-    name = "incidentservice",
-    title = "Incident Service",
-    abstractText = "This service creates, edits and retrieves and helps managing incidents.",
-    notes = {
-        "All paths above are relative to the REST endpoint base (something like http://your.server/files)",
-        "If the service is down or not working it will return a status 503, this means the the underlying service is "
-                + "not working and is either restarting or has failed",
-        "A status code 500 means a general failure has occurred which is not recoverable and was not anticipated. In "
-                + "other words, there is a bug! You should file an error report with your server logs from the time "
-                + "when the error occurred: "
-                + "<a href=\"https://github.com/opencast/opencast/issues\">Opencast Issue Tracker</a>"
-    })
+@Tag(
+    name = "Incident Service",
+    description = "This service creates, edits and retrieves and helps managing incidents."
+)
 @Component(
     property = {
       "service.description=Incident Service REST Endpoint",
@@ -168,30 +155,22 @@ public class IncidentServiceEndpoint {
   @GET
   @Produces({MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON})
   @Path("job/incidents.{type:xml|json}")
-  @RestQuery(
-      name = "incidentsofjobaslist",
-      description = "Returns the job incidents with the given identifiers.",
-      returnDescription = "Returns the job incidents.",
-      pathParameters = {
-         @RestParameter(name = "type", isRequired = true,
-             description = "The media type of the response [xml|json]",
-             defaultValue = "xml",
-             type = Type.STRING)},
-      restParameters = {
-          @RestParameter(name = "id", isRequired = true, description = "The job identifiers.", type = Type.INTEGER),
-          @RestParameter(name = "format", isRequired = false,
-              description = "The response format [full|digest|sys]. Defaults to sys",
-              defaultValue = "sys",
-              type = Type.STRING)
-      },
-      responses = {
-          @RestResponse(responseCode = SC_OK, description = "The job incidents.")
-      })
+  @Operation(
+      summary = "Get the incidents of jobs",
+      description = "Returns the job incidents with the given identifiers."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The job incidents.")
+  })
   public Response getIncidentsOfJobAsList(
-          @Context HttpServletRequest request,
-          @QueryParam("id") final List<Long> jobIds,
-          @QueryParam("format") @DefaultValue(FMT_DEFAULT) final String format,
-          @PathParam("type") final String type) {
+      @Context HttpServletRequest request,
+      @Parameter(description = "The job identifiers.", required = true)
+      @QueryParam("id") final List<Long> jobIds,
+      @Parameter(description = "The response format [full|digest|sys]. Defaults to sys", example = "sys")
+      @QueryParam("format") @DefaultValue(FMT_DEFAULT) final String format,
+      @Parameter(description = "The media type of the response [xml|json]", required = true, example = "xml")
+      @PathParam("type") final String type
+  ) {
     try {
       final List<Incident> incidents = svc.getIncidentsOfJob(jobIds);
       final MediaType mt = getResponseType(type);
@@ -217,35 +196,25 @@ public class IncidentServiceEndpoint {
   @GET
   @Produces({MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON})
   @Path("job/{id}.{type:xml|json}")
-  @RestQuery(
-      name = "incidentsofjobastree",
-      description = "Returns the job incident for the job with the given identifier.",
-      returnDescription = "Returns the job incident.",
-      pathParameters = {
-          @RestParameter(name = "id", isRequired = true, description = "The job identifier.", type = Type.INTEGER),
-          @RestParameter(name = "type", isRequired = true,
-              description = "The media type of the response [xml|json]",
-              defaultValue = "xml",
-              type = Type.STRING)},
-      restParameters = {
-          @RestParameter(name = "cascade", isRequired = false, description = "Whether to show the cascaded incidents.",
-              type = Type.BOOLEAN, defaultValue = "false"),
-          @RestParameter(name = "format", isRequired = false,
-              description = "The response format [full|digest|sys]. Defaults to sys",
-              defaultValue = "sys",
-              type = Type.STRING)
-      },
-      responses = {
-             @RestResponse(responseCode = SC_OK, description = "The job incident."),
-             @RestResponse(responseCode = SC_NOT_FOUND, description = "No job incident with this identifier was found.")
-      })
+  @Operation(
+      summary = "Get the incidents of a job",
+      description = "Returns the job incident for the job with the given identifier."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The job incident."),
+      @ApiResponse(responseCode = "404", description = "No job incident with this identifier was found.")
+  })
   public Response getIncidentsOfJobAsTree(
-          @Context HttpServletRequest request,
-          @PathParam("id") final long jobId,
-          @QueryParam("cascade") @DefaultValue("false") boolean cascade,
-          @QueryParam("format") @DefaultValue(FMT_DEFAULT) final String format,
-          @PathParam("type") final String type)
-          throws NotFoundException {
+      @Context HttpServletRequest request,
+      @Parameter(description = "The job identifier.", required = true)
+      @PathParam("id") final long jobId,
+      @Parameter(description = "Whether to show the cascaded incidents.", example = "false")
+      @QueryParam("cascade") @DefaultValue("false") boolean cascade,
+      @Parameter(description = "The response format [full|digest|sys]. Defaults to sys", example = "sys")
+      @QueryParam("format") @DefaultValue(FMT_DEFAULT) final String format,
+      @Parameter(description = "The media type of the response [xml|json]", required = true, example = "xml")
+      @PathParam("type") final String type
+  ) throws NotFoundException {
     try {
       final IncidentTree tree = svc.getIncidentsOfJob(jobId, cascade);
       final MediaType mt = getResponseType(type);
@@ -267,22 +236,20 @@ public class IncidentServiceEndpoint {
   @GET
   @Produces({MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON})
   @Path("{id}.{type:xml|json}")
-  @RestQuery(
-      name = "incidentjson",
-      description = "Returns the job incident by it's incident identifier.",
-      returnDescription = "Returns the job incident.",
-      pathParameters = {
-          @RestParameter(name = "id", isRequired = true, description = "The incident identifier.", type = Type.INTEGER),
-          @RestParameter(name = "type", isRequired = true,
-              description = "The media type of the response [xml|json]",
-              defaultValue = "xml",
-              type = Type.STRING)},
-      responses = {
-         @RestResponse(responseCode = SC_OK, description = "The job incident."),
-         @RestResponse(responseCode = SC_NOT_FOUND, description = "No job incident with this identifier was found.")
-      })
-  public Response getIncident(@PathParam("id") final long incidentId, @PathParam("type") final String type)
-          throws NotFoundException {
+  @Operation(
+      summary = "Get an incident",
+      description = "Returns the job incident by it's incident identifier."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The job incident."),
+      @ApiResponse(responseCode = "404", description = "No job incident with this identifier was found.")
+  })
+  public Response getIncident(
+      @Parameter(description = "The incident identifier.", required = true)
+      @PathParam("id") final long incidentId,
+      @Parameter(description = "The media type of the response [xml|json]", required = true, example = "xml")
+      @PathParam("type") final String type
+  ) throws NotFoundException {
     try {
       Incident incident = svc.getIncident(incidentId);
       return ok(getResponseType(type), new JaxbIncident(incident));
@@ -296,23 +263,20 @@ public class IncidentServiceEndpoint {
   @SuppressWarnings("unchecked")
   @Produces(MediaType.APPLICATION_JSON)
   @Path("localization/{id}")
-  @RestQuery(
-      name = "getlocalization",
-      description = "Returns the localization of an incident by it's id as JSON",
-      returnDescription = "The localization of the incident as JSON",
-      pathParameters = {
-          @RestParameter(name = "id", isRequired = true, description = "The incident identifiers.", type = Type.INTEGER)
-      },
-      restParameters = {
-          @RestParameter(name = "locale", isRequired = true, description = "The locale.", type = Type.STRING)
-      },
-      responses = {
-          @RestResponse(responseCode = SC_OK, description = "The localization of the given job incidents."),
-          @RestResponse(responseCode = SC_NOT_FOUND,
-              description = "No job incident with this incident identifier was found.")
-      })
-  public Response getLocalization(@PathParam("id") final long incidentId, @QueryParam("locale") String locale)
-          throws NotFoundException {
+  @Operation(
+      summary = "Get the localization of an incident",
+      description = "Returns the localization of an incident by it's id as JSON"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The localization of the given job incidents."),
+      @ApiResponse(responseCode = "404", description = "No job incident with this incident identifier was found.")
+  })
+  public Response getLocalization(
+      @Parameter(description = "The incident identifiers.", required = true)
+      @PathParam("id") final long incidentId,
+      @Parameter(description = "The locale.", required = true)
+      @QueryParam("locale") String locale
+  ) throws NotFoundException {
     try {
       IncidentL10n localization = svc.getLocalization(incidentId, LocaleUtils.toLocale(locale));
       JsonObject json = new JsonObject();
@@ -328,32 +292,29 @@ public class IncidentServiceEndpoint {
   @POST
   @Produces(MediaType.APPLICATION_XML)
   @Path("/")
-  @RestQuery(
-      name = "postincident",
-      description = "Creates a new job incident and returns it as XML",
-      returnDescription = "Returns the created job incident as XML",
-      restParameters = {
-          @RestParameter(name = "job", isRequired = true, description = "The job on where to create the incident",
-              type = Type.TEXT),
-          @RestParameter(name = "date", isRequired = true, description = "The incident creation date",
-              type = Type.STRING),
-          @RestParameter(name = "code", isRequired = true, description = "The incident error code",
-              type = Type.STRING),
-          @RestParameter(name = "severity", isRequired = true, description = "The incident error code",
-              type = Type.STRING),
-          @RestParameter(name = "details", isRequired = false, description = "The incident details",
-              type = Type.TEXT),
-          @RestParameter(name = "params", isRequired = false, description = "The incident parameters",
-              type = Type.TEXT)
-      },
-      responses = {
-          @RestResponse(responseCode = SC_CREATED, description = "New job incident has been created"),
-          @RestResponse(responseCode = SC_BAD_REQUEST, description = "Unable to parse the one of the form params"),
-          @RestResponse(responseCode = SC_CONFLICT, description = "No job incident related job exists")
-      })
-  public Response postIncident(@FormParam("job") String jobXml, @FormParam("date") String date,
-                               @FormParam("code") String code, @FormParam("severity") String severityString,
-                               @FormParam("details") String details, @FormParam("params") LocalHashMap params) {
+  @Operation(
+      summary = "Create an incident",
+      description = "Creates a new job incident and returns it as XML"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "201", description = "New job incident has been created"),
+      @ApiResponse(responseCode = "400", description = "Unable to parse the one of the form params"),
+      @ApiResponse(responseCode = "409", description = "No job incident related job exists")
+  })
+  public Response postIncident(
+      @Parameter(description = "The job on where to create the incident", required = true)
+      @FormParam("job") String jobXml,
+      @Parameter(description = "The incident creation date", required = true)
+      @FormParam("date") String date,
+      @Parameter(description = "The incident error code", required = true)
+      @FormParam("code") String code,
+      @Parameter(description = "The incident error code", required = true)
+      @FormParam("severity") String severityString,
+      @Parameter(description = "The incident details")
+      @FormParam("details") String details,
+      @Parameter(description = "The incident parameters")
+      @FormParam("params") LocalHashMap params
+  ) {
     Job job;
     Date timestamp;
     Severity severity;
