@@ -121,12 +121,12 @@ public class TasksEndpoint {
   @ApiResponses({
       @ApiResponse(
           responseCode = "200",
-          description = "Returns all the data related to the tasks processing tab " + "as JSON"
+          description = "Returns all the data related to the tasks processing tab as JSON"
       )
   })
   public Response getProcessing(
       @Parameter(
-          description = "A comma separated list of tags to filter " + "the workflow definitions"
+          description = "A comma separated list of tags to filter the workflow definitions"
       )
       @QueryParam("tags") String tagsString
   ) {

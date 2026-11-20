@@ -137,7 +137,7 @@ public class CaptureAgentsEndpoint {
       @Parameter(description = "The page number.", example = "0")
       @QueryParam("offset") int offset,
       @Parameter(
-          description = "Define if the inputs should or not returned with the " + "capture agent.",
+          description = "Define if the inputs should or not returned with the capture agent.",
           example = "false"
       )
       @QueryParam("inputs") boolean inputs,

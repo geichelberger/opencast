@@ -196,7 +196,7 @@ public class ServiceRegistryEndpoint {
       @Parameter(description = "The service type identifier", required = true, schema = @Schema(example = ""))
       @FormParam("serviceType") String serviceType,
       @Parameter(
-          description = "The host providing the service, " + "including the http(s) protocol",
+          description = "The host providing the service, including the http(s) protocol",
           required = true,
           schema = @Schema(example = "")
       )
@@ -220,7 +220,7 @@ public class ServiceRegistryEndpoint {
       @Parameter(description = "The service type identifier", required = true, schema = @Schema(example = ""))
       @FormParam("serviceType") String serviceType,
       @Parameter(
-          description = "The host providing the service, " + "including the http(s) protocol",
+          description = "The host providing the service, including the http(s) protocol",
           required = true,
           schema = @Schema(example = "")
       )
@@ -228,7 +228,7 @@ public class ServiceRegistryEndpoint {
       @Parameter(description = "The service path on the host", required = true, schema = @Schema(example = ""))
       @FormParam("path") String path,
       @Parameter(
-          description = "Whether this service is a producer of " + "long running jobs requiring dispatch",
+          description = "Whether this service is a producer of long running jobs requiring dispatch",
           required = true,
           schema = @Schema(example = "false")
       )
@@ -254,7 +254,7 @@ public class ServiceRegistryEndpoint {
       @Parameter(description = "The service type identifier", required = true)
       @FormParam("serviceType") String serviceType,
       @Parameter(
-          description = "The host providing the service, " + "including the http(s) protocol",
+          description = "The host providing the service, including the http(s) protocol",
           required = true
       )
       @FormParam("host") String host
@@ -535,7 +535,7 @@ public class ServiceRegistryEndpoint {
   @Produces(MediaType.TEXT_XML)
   @Operation(
       summary = "Get service registrations as XML",
-      description = "Returns a service registration or list of available service registrations as " + "XML."
+      description = "Returns a service registration or list of available service registrations as XML."
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "Returned the available service."),
@@ -584,7 +584,7 @@ public class ServiceRegistryEndpoint {
   @Produces(MediaType.APPLICATION_JSON)
   @Operation(
       summary = "Get service registrations as JSON",
-      description = "Returns a service registration or list of available service registrations as " + "JSON."
+      description = "Returns a service registration or list of available service registrations as JSON."
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "Returned the available service."),

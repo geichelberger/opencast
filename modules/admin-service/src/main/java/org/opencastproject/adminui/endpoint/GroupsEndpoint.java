@@ -237,7 +237,7 @@ public class GroupsEndpoint {
       @ApiResponse(responseCode = "200", description = "Group deleted"),
       @ApiResponse(
           responseCode = "403",
-          description = "Not enough permissions to delete the group with " + "admin role."
+          description = "Not enough permissions to delete the group with admin role."
       ),
       @ApiResponse(responseCode = "404", description = "Group not found."),
       @ApiResponse(responseCode = "500", description = "An internal server error occured.")
@@ -270,7 +270,7 @@ public class GroupsEndpoint {
       @ApiResponse(responseCode = "400", description = "Name too long"),
       @ApiResponse(
           responseCode = "403",
-          description = "Not enough permissions to create a group with " + "admin role."
+          description = "Not enough permissions to create a group with admin role."
       ),
       @ApiResponse(responseCode = "409", description = "An group with this name already exists.")
   })
@@ -307,7 +307,7 @@ public class GroupsEndpoint {
       @ApiResponse(responseCode = "200", description = "Group updated"),
       @ApiResponse(
           responseCode = "403",
-          description = "Not enough permissions to update the group with " + "admin role."
+          description = "Not enough permissions to update the group with admin role."
       ),
       @ApiResponse(responseCode = "404", description = "Group not found"),
       @ApiResponse(responseCode = "400", description = "Name too long")

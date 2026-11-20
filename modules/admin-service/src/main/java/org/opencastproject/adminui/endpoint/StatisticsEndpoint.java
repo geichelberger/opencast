@@ -148,7 +148,7 @@ public class StatisticsEndpoint {
   })
   public Response getProviders(
       @Parameter(
-          description = "The resource type: either 'episode', 'series' or " + "'organization'"
+          description = "The resource type: either 'episode', 'series' or 'organization'"
       )
       @QueryParam("resourceType") final String resourceTypeStr
   ) {

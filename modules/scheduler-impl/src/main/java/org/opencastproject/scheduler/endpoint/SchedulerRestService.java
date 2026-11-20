@@ -304,20 +304,20 @@ public class SchedulerRestService {
   @ApiResponses({
       @ApiResponse(
           responseCode = "200",
-          description = "DublinCore of event is in the body " + "of response"
+          description = "DublinCore of event is in the body of response"
       ),
       @ApiResponse(
           responseCode = "404",
-          description = "Event with specified ID does " + "not exist"
+          description = "Event with specified ID does not exist"
       ),
       @ApiResponse(
           responseCode = "401",
-          description = "You do not have permission " + "to remove the event. Maybe you need to authenticate."
+          description = "You do not have permission to remove the event. Maybe you need to authenticate."
       )
   })
   public Response getMediaPackageXml(
       @Parameter(
-          description = "ID of event for which media package will be " + "retrieved",
+          description = "ID of event for which media package will be retrieved",
           required = true
       )
       @PathParam("id") String eventId
@@ -351,20 +351,20 @@ public class SchedulerRestService {
   @ApiResponses({
       @ApiResponse(
           responseCode = "200",
-          description = "DublinCore of event is in the body " + "of response"
+          description = "DublinCore of event is in the body of response"
       ),
       @ApiResponse(
           responseCode = "404",
-          description = "Event with specified ID does " + "not exist"
+          description = "Event with specified ID does not exist"
       ),
       @ApiResponse(
           responseCode = "401",
-          description = "You do not have permission " + "to remove the event. Maybe you need to authenticate."
+          description = "You do not have permission to remove the event. Maybe you need to authenticate."
       )
   })
   public Response getDublinCoreMetadataXml(
       @Parameter(
-          description = "ID of event for which DublinCore will be " + "retrieved",
+          description = "ID of event for which DublinCore will be retrieved",
           required = true
       )
       @PathParam("id") String eventId
@@ -400,20 +400,20 @@ public class SchedulerRestService {
   @ApiResponses({
       @ApiResponse(
           responseCode = "200",
-          description = "DublinCore of event is in the body " + "of response"
+          description = "DublinCore of event is in the body of response"
       ),
       @ApiResponse(
           responseCode = "404",
-          description = "Event with specified ID does " + "not exist"
+          description = "Event with specified ID does not exist"
       ),
       @ApiResponse(
           responseCode = "401",
-          description = "You do not have permission " + "to remove the event. Maybe you need to authenticate."
+          description = "You do not have permission to remove the event. Maybe you need to authenticate."
       )
   })
   public Response getDublinCoreMetadataJSON(
       @Parameter(
-          description = "ID of event for which DublinCore will be " + "retrieved",
+          description = "ID of event for which DublinCore will be retrieved",
           required = true
       )
       @PathParam("id") String eventId
@@ -449,20 +449,20 @@ public class SchedulerRestService {
   @ApiResponses({
       @ApiResponse(
           responseCode = "200",
-          description = "technical metadata of event is in " + "the body of response"
+          description = "technical metadata of event is in the body of response"
       ),
       @ApiResponse(
           responseCode = "404",
-          description = "Event with specified ID does " + "not exist"
+          description = "Event with specified ID does not exist"
       ),
       @ApiResponse(
           responseCode = "401",
-          description = "You do not have permission " + "to remove the event. Maybe you need to authenticate."
+          description = "You do not have permission to remove the event. Maybe you need to authenticate."
       )
   })
   public Response getTechnicalMetadataJSON(
       @Parameter(
-          description = "ID of event for which the technical metadata " + "will be retrieved",
+          description = "ID of event for which the technical metadata will be retrieved",
           required = true
       )
       @PathParam("id") String eventId
@@ -525,20 +525,20 @@ public class SchedulerRestService {
   @ApiResponses({
       @ApiResponse(
           responseCode = "200",
-          description = "workflow configuration of event is " + "in the body of response"
+          description = "workflow configuration of event is in the body of response"
       ),
       @ApiResponse(
           responseCode = "404",
-          description = "Event with specified ID does " + "not exist"
+          description = "Event with specified ID does not exist"
       ),
       @ApiResponse(
           responseCode = "401",
-          description = "You do not have permission " + "to remove the event. Maybe you need to authenticate."
+          description = "You do not have permission to remove the event. Maybe you need to authenticate."
       )
   })
   public Response getWorkflowConfiguration(
       @Parameter(
-          description = "ID of event for which workflow configuration " + "will be retrieved",
+          description = "ID of event for which workflow configuration will be retrieved",
           required = true
       )
       @PathParam("id") String eventId
@@ -573,20 +573,20 @@ public class SchedulerRestService {
   @ApiResponses({
       @ApiResponse(
           responseCode = "200",
-          description = "Capture Agent properties of " + "event is in the body of response"
+          description = "Capture Agent properties of event is in the body of response"
       ),
       @ApiResponse(
           responseCode = "404",
-          description = "Event with " + "specified ID does not exist"
+          description = "Event with specified ID does not exist"
       ),
       @ApiResponse(
           responseCode = "401",
-          description = "You do not have " + "permission to remove the event. Maybe you need to authenticate."
+          description = "You do not have permission to remove the event. Maybe you need to authenticate."
       )
   })
   public Response getCaptureAgentMetadata(
       @Parameter(
-          description = "ID of event for which agent properties will " + "be retrieved",
+          description = "ID of event for which agent properties will be retrieved",
           required = true
       )
       @PathParam("id") String eventId
@@ -623,15 +623,15 @@ public class SchedulerRestService {
       @ApiResponse(responseCode = "200", description = "Event was successfully removed"),
       @ApiResponse(
           responseCode = "404",
-          description = "Event with specified ID does " + "not exist"
+          description = "Event with specified ID does not exist"
       ),
       @ApiResponse(
           responseCode = "401",
-          description = "You do not have permission " + "to remove the event. Maybe you need to authenticate."
+          description = "You do not have permission to remove the event. Maybe you need to authenticate."
       ),
       @ApiResponse(
           responseCode = "409",
-          description = "Event with specified ID is " + "locked by a transaction, unable to delete event."
+          description = "Event with specified ID is locked by a transaction, unable to delete event."
       )
   })
   public Response deleteEvent(
@@ -673,15 +673,15 @@ public class SchedulerRestService {
   @ApiResponses({
       @ApiResponse(
           responseCode = "304",
-          description = "Events were not modified " + "since last request"
+          description = "Events were not modified since last request"
       ),
       @ApiResponse(
           responseCode = "200",
-          description = "Events were modified, new calendar " + "is in the body"
+          description = "Events were modified, new calendar is in the body"
       ),
       @ApiResponse(
           responseCode = "400",
-          description = "The cutoff parameter is " + "not a valid number"
+          description = "The cutoff parameter is not a valid number"
       )
   })
   public Response getCalendar(
@@ -740,11 +740,11 @@ public class SchedulerRestService {
   @ApiResponses({
       @ApiResponse(
           responseCode = "304",
-          description = "Events were not modified " + "since last request"
+          description = "Events were not modified since last request"
       ),
       @ApiResponse(
           responseCode = "200",
-          description = "Events were modified, new calendar " + "is in the body"
+          description = "Events were modified, new calendar is in the body"
       )
   })
   public Response getCalendarJson(
@@ -756,7 +756,7 @@ public class SchedulerRestService {
       )
       @QueryParam("cutoff") Long cutoff,
       @Parameter(
-          description = "Return dates as UNIX timestamp in milliseconds instead " + "of a date string."
+          description = "Return dates as UNIX timestamp in milliseconds instead of a date string."
       )
       @QueryParam("timestamp") Boolean timestamp,
       @Context HttpServletRequest request
@@ -811,12 +811,12 @@ public class SchedulerRestService {
   @ApiResponses({
       @ApiResponse(
           responseCode = "200",
-          description = "The last modified hash of agent " + "is in the body of response"
+          description = "The last modified hash of agent is in the body of response"
       )
   })
   public Response getLastModified(
       @Parameter(
-          description = "ID of capture agent for which the last " + "modified hash will be retrieved",
+          description = "ID of capture agent for which the last modified hash will be retrieved",
           required = true
       )
       @PathParam("id") String agentId
@@ -842,7 +842,7 @@ public class SchedulerRestService {
       @ApiResponse(responseCode = "400", description = "Unable to parse buffer."),
       @ApiResponse(
           responseCode = "401",
-          description = "You do not have permission to remove old " + "schedulings. Maybe you need to authenticate."
+          description = "You do not have permission to remove old schedulings. Maybe you need to authenticate."
       )
   })
   public Response removeOldScheduledRecordings(
@@ -1420,7 +1420,7 @@ public class SchedulerRestService {
       @Parameter(description = "End time of conflicting period, in milliseconds", required = true)
       @QueryParam("end") Long endDate,
       @Parameter(
-          description = "If recurrence rule is specified duration of each " + "conflicting period, in milliseconds"
+          description = "If recurrence rule is specified duration of each conflicting period, in milliseconds"
       )
       @QueryParam("duration") Long duration,
       @Parameter(description = "The timezone of the capture device")
@@ -1475,7 +1475,7 @@ public class SchedulerRestService {
       @Parameter(description = "End time of conflicting period, in milliseconds", required = true)
       @QueryParam("end") Long endDate,
       @Parameter(
-          description = "If recurrence rule is specified duration of each " + "conflicting period, in milliseconds"
+          description = "If recurrence rule is specified duration of each conflicting period, in milliseconds"
       )
       @QueryParam("duration") Long duration,
       @Parameter(description = "The timezone of the capture device")

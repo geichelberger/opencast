@@ -315,7 +315,7 @@ public class SeriesEndpoint {
   @ApiResponses({
       @ApiResponse(
           responseCode = "400",
-          description = "The required form params were missing in the " + "request."
+          description = "The required form params were missing in the request."
       ),
       @ApiResponse(responseCode = "404", description = "If the series has not been found."),
       @ApiResponse(responseCode = "200", description = "The access information ")
@@ -371,7 +371,7 @@ public class SeriesEndpoint {
       @ApiResponse(responseCode = "404", description = "The series has not been found"),
       @ApiResponse(
           responseCode = "401",
-          description = "If the current user is not authorized to " + "perform this action"
+          description = "If the current user is not authorized to perform this action"
       )
   })
   public Response getSeriesMetadata(
@@ -501,14 +501,14 @@ public class SeriesEndpoint {
       @ApiResponse(responseCode = "404", description = "The series has not been found"),
       @ApiResponse(
           responseCode = "401",
-          description = "If the current user is not authorized to " + "perform this action"
+          description = "If the current user is not authorized to perform this action"
       )
   })
   public Response updateSeriesMetadata(
       @Parameter(description = "The series identifier", required = true)
       @PathParam("seriesId") String seriesID,
       @Parameter(
-          description = "The list " + "of metadata to update",
+          description = "The list of metadata to update",
           required = true
       )
       @FormParam("metadata") String metadataJSON
@@ -532,7 +532,7 @@ public class SeriesEndpoint {
   @ApiResponses({
       @ApiResponse(
           responseCode = "200",
-          description = "Returns all the data related to the series metadata tab " + "as JSON"
+          description = "Returns all the data related to the series metadata tab as JSON"
       )
   })
   public Response getNewMetadata() {
@@ -564,7 +564,7 @@ public class SeriesEndpoint {
   @ApiResponses({
       @ApiResponse(
           responseCode = "200",
-          description = "Returns all the data related to the series themes tab as " + "JSON"
+          description = "Returns all the data related to the series themes tab as JSON"
       )
   })
   public Response getNewThemes() {
@@ -647,11 +647,11 @@ public class SeriesEndpoint {
       @ApiResponse(responseCode = "201", description = "Returns the created series id"),
       @ApiResponse(
           responseCode = "400",
-          description = "he request could not be " + "fulfilled due to the incorrect syntax of the request"
+          description = "he request could not be fulfilled due to the incorrect syntax of the request"
       ),
       @ApiResponse(
           responseCode = "401",
-          description = "If user doesn't have rights to create the " + "series"
+          description = "If user doesn't have rights to create the series"
       )
   })
   public Response createNewSeries(
@@ -805,7 +805,7 @@ public class SeriesEndpoint {
       @ApiResponse(responseCode = "200", description = "The access control list."),
       @ApiResponse(
           responseCode = "401",
-          description = "If the current user is not authorized to " + "perform this action"
+          description = "If the current user is not authorized to perform this action"
       )
   })
   public Response getSeries(
@@ -822,7 +822,7 @@ public class SeriesEndpoint {
       @Parameter(description = "The page offset", example = "0")
       @QueryParam("offset") int offset,
       @Parameter(
-          description = "The limit to define the number of " + "returned results (-1 for all)",
+          description = "The limit to define the number of returned results (-1 for all)",
           example = "100"
       )
       @QueryParam("limit") int limit
@@ -992,7 +992,7 @@ public class SeriesEndpoint {
       @ApiResponse(responseCode = "200", description = "The access control list."),
       @ApiResponse(
           responseCode = "401",
-          description = "If the current user is not authorized to " + "perform this action"
+          description = "If the current user is not authorized to perform this action"
       )
   })
   public Response getSeriesPropertiesAsJson(
@@ -1033,7 +1033,7 @@ public class SeriesEndpoint {
       @ApiResponse(responseCode = "200", description = "The access control list."),
       @ApiResponse(
           responseCode = "401",
-          description = "If the current user is not authorized to " + "perform this action"
+          description = "If the current user is not authorized to perform this action"
       )
   })
   public Response getSeriesProperty(
@@ -1074,11 +1074,11 @@ public class SeriesEndpoint {
       @ApiResponse(responseCode = "204", description = "The access control list has been updated."),
       @ApiResponse(
           responseCode = "401",
-          description = "If the current user is not authorized to " + "perform this action"
+          description = "If the current user is not authorized to perform this action"
       ),
       @ApiResponse(
           responseCode = "400",
-          description = "The required path or form params were missing " + "in the request."
+          description = "The required path or form params were missing in the request."
       )
   })
   public Response updateSeriesProperty(
@@ -1123,7 +1123,7 @@ public class SeriesEndpoint {
       @ApiResponse(responseCode = "404", description = "The series or property has not been found."),
       @ApiResponse(
           responseCode = "401",
-          description = "If the current user is not authorized to " + "perform this action"
+          description = "If the current user is not authorized to perform this action"
       )
   })
   public Response deleteSeriesProperty(
@@ -1222,19 +1222,19 @@ public class SeriesEndpoint {
   @ApiResponses({
       @ApiResponse(
           responseCode = "200",
-          description = "The series theme has been updated and the theme id and " + "name are returned as JSON."
+          description = "The series theme has been updated and the theme id and name are returned as JSON."
       ),
       @ApiResponse(responseCode = "404", description = "The series or theme has not been found"),
       @ApiResponse(
           responseCode = "401",
-          description = "If the current user is not authorized to " + "perform this action"
+          description = "If the current user is not authorized to perform this action"
       )
   })
   public Response updateSeriesTheme(
       @Parameter(description = "The series identifier", required = true)
       @PathParam("seriesId") String seriesID,
       @Parameter(
-          description = "The " + "id of the theme for this series",
+          description = "The id of the theme for this series",
           required = true
       )
       @FormParam("themeId") long themeId
@@ -1263,7 +1263,7 @@ public class SeriesEndpoint {
       @ApiResponse(responseCode = "404", description = "The series has not been found"),
       @ApiResponse(
           responseCode = "401",
-          description = "If the current user is not authorized to " + "perform this action"
+          description = "If the current user is not authorized to perform this action"
       )
   })
   public Response deleteSeriesTheme(
@@ -1431,7 +1431,7 @@ public Response getSeriesHostPages(
       @ApiResponse(responseCode = "500", description = "Internal error"),
       @ApiResponse(
           responseCode = "401",
-          description = "If the current user is not authorized to " + "perform this action"
+          description = "If the current user is not authorized to perform this action"
       )
   })
   public Response applyAclToSeries(
@@ -1440,7 +1440,7 @@ public Response getSeriesHostPages(
       @Parameter(description = "The ACL to apply", required = true)
       @FormParam("acl") String acl,
       @Parameter(
-          description = "If true the " + "series ACL will take precedence over any existing episode ACL",
+          description = "If true the series ACL will take precedence over any existing episode ACL",
           schema = @Schema(example = "false")
       )
       @DefaultValue("false") @FormParam("override") boolean override
@@ -1526,7 +1526,7 @@ public Response getSeriesHostPages(
   @ApiResponses({
       @ApiResponse(
           responseCode = "400",
-          description = "The required form params were missing in the " + "request."
+          description = "The required form params were missing in the request."
       ),
       @ApiResponse(responseCode = "404", description = "If the series has not been found."),
       @ApiResponse(responseCode = "200", description = "The access information ")
@@ -1571,7 +1571,7 @@ public Response getSeriesHostPages(
   @ApiResponses({
       @ApiResponse(
           responseCode = "400",
-          description = "The required form params were missing in the " + "request."
+          description = "The required form params were missing in the request."
       ),
       @ApiResponse(responseCode = "404", description = "If the series has not been found."),
       @ApiResponse(responseCode = "200", description = "The access information ")

@@ -229,11 +229,11 @@ public class SeriesEndpoint {
       @Parameter(description = "The maximum number of results to return for a single request.")
       @QueryParam("limit") int limit,
       @Parameter(
-          description = "Whether only to get the " + "series to which we have write access."
+          description = "Whether only to get the series to which we have write access."
       )
       @QueryParam("onlyWithWriteAccess") Boolean onlyWithWriteAccess,
       @Parameter(
-          description = "Whether the acl should be included in " + "the response."
+          description = "Whether the acl should be included in the response."
       )
       @QueryParam("withacl") Boolean withAcl
   ) throws UnauthorizedException {
@@ -1223,7 +1223,7 @@ public class SeriesEndpoint {
       @Parameter(description = "Access policy", required = true)
       @FormParam("acl") String aclJson,
       @Parameter(
-          description = "If true the series ACL will take " + "precedence over any existing episode ACL"
+          description = "If true the series ACL will take precedence over any existing episode ACL"
       )
       @DefaultValue("false") @FormParam("override") boolean override
   ) throws NotFoundException, SeriesException, UnauthorizedException {

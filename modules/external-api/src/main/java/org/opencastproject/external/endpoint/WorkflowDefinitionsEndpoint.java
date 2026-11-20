@@ -143,16 +143,16 @@ public class WorkflowDefinitionsEndpoint {
   public Response getWorkflowDefinitions(
       @HeaderParam("Accept") String acceptHeader,
       @Parameter(
-          description = "Whether the workflow operations should be included in " + "the response"
+          description = "Whether the workflow operations should be included in the response"
       )
       @QueryParam("withoperations") boolean withOperations,
       @Parameter(
-          description = "Whether the workflow configuration panel " + "should be included in the response"
+          description = "Whether the workflow configuration panel should be included in the response"
       )
       @QueryParam("withconfigurationpanel") boolean withConfigurationPanel,
       @QueryParam("withconfigurationpaneljson") boolean withConfigurationPanelJson,
       @Parameter(
-          description = "Usage [Filter Name]:[Value to Filter With]. Available filter: " + "\"tag\""
+          description = "Usage [Filter Name]:[Value to Filter With]. Available filter: \"tag\""
       )
       @QueryParam("filter") String filter,
       @Parameter(
@@ -274,15 +274,15 @@ public class WorkflowDefinitionsEndpoint {
       @Parameter(description = "The workflow definition id", required = true)
       @PathParam("workflowDefinitionId") String id,
       @Parameter(
-          description = "Whether the workflow operations should be included in " + "the response"
+          description = "Whether the workflow operations should be included in the response"
       )
       @QueryParam("withoperations") boolean withOperations,
       @Parameter(
-          description = "Whether the workflow configuration panel " + "should be included in the response"
+          description = "Whether the workflow configuration panel should be included in the response"
       )
       @QueryParam("withconfigurationpanel") boolean withConfigurationPanel,
       @Parameter(
-          description = "Whether the workflow configuration panel " + "in JSON should be included in the response"
+          description = "Whether the workflow configuration panel in JSON should be included in the response"
       )
       @QueryParam("withconfigurationpaneljson") boolean withConfigurationPanelJson
   ) throws Exception {

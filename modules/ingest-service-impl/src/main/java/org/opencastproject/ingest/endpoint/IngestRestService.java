@@ -1283,7 +1283,7 @@ public class IngestRestService extends AbstractJobProducerEndpoint {
       @ApiResponse(responseCode = "400", description = "Ingest failed due to invalid requests."),
       @ApiResponse(
           responseCode = "500",
-          description = "Ingest failed. Something went wrong internally. Please have a look at the " + "log files"
+          description = "Ingest failed. Something went wrong internally. Please have a look at the log files"
       )
   })
   public Response addMediaPackage(
@@ -1607,7 +1607,7 @@ public class IngestRestService extends AbstractJobProducerEndpoint {
       ),
       @ApiResponse(
           responseCode = "500",
-          description = "Ingest failed. Something went wrong internally. Please have a look at the " + "log files"
+          description = "Ingest failed. Something went wrong internally. Please have a look at the log files"
       )
   })
   public Response addMediaPackage(

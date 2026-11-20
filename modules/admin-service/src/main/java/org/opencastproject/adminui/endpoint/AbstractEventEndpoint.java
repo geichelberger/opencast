@@ -423,11 +423,11 @@ public abstract class AbstractEventEndpoint {
       @ApiResponse(responseCode = "200", description = "The event has been deleted."),
       @ApiResponse(
           responseCode = "202",
-          description = "The event will be retracted and deleted " + "afterwards."
+          description = "The event will be retracted and deleted afterwards."
       ),
       @ApiResponse(
           responseCode = "401",
-          description = "If the current user is not " + "authorized to perform this action"
+          description = "If the current user is not authorized to perform this action"
       )
   })
   public Response deleteEvent(
@@ -753,7 +753,7 @@ public abstract class AbstractEventEndpoint {
   @ApiResponses({
       @ApiResponse(
           responseCode = "400",
-          description = "The required params were missing in the " + "request."
+          description = "The required params were missing in the request."
       ),
       @ApiResponse(responseCode = "404", description = "If the event has not been found."),
       @ApiResponse(responseCode = "204", description = "The method doesn't return any content")
@@ -930,7 +930,7 @@ public abstract class AbstractEventEndpoint {
   @ApiResponses({
       @ApiResponse(
           responseCode = "200",
-          description = "Returns whether there is currently a transaction in progress for the given " + "event"
+          description = "Returns whether there is currently a transaction in progress for the given event"
       ),
       @ApiResponse(responseCode = "404", description = "No event with this identifier was found.")
   })
@@ -960,7 +960,7 @@ public abstract class AbstractEventEndpoint {
       @ApiResponse(responseCode = "200", description = "The comment as JSON."),
       @ApiResponse(
           responseCode = "404",
-          description = "No event or comment with this identifier was " + "found."
+          description = "No event or comment with this identifier was found."
       )
   })
   public Response getEventComment(
@@ -994,7 +994,7 @@ public abstract class AbstractEventEndpoint {
   @ApiResponses({
       @ApiResponse(
           responseCode = "404",
-          description = "The event or comment to update has not been " + "found."
+          description = "The event or comment to update has not been found."
       ),
       @ApiResponse(responseCode = "200", description = "The updated comment as JSON.")
   })
@@ -1193,7 +1193,7 @@ public abstract class AbstractEventEndpoint {
   @ApiResponses({
       @ApiResponse(
           responseCode = "404",
-          description = "The event or comment to resolve has not been " + "found."
+          description = "The event or comment to resolve has not been found."
       ),
       @ApiResponse(responseCode = "200", description = "The resolved comment as JSON.")
   })
@@ -1270,7 +1270,7 @@ public abstract class AbstractEventEndpoint {
   @ApiResponses({
       @ApiResponse(
           responseCode = "404",
-          description = "No event comment or reply with this identifier was " + "found."
+          description = "No event comment or reply with this identifier was found."
       ),
       @ApiResponse(responseCode = "200", description = "The updated comment as JSON.")
   })
@@ -1326,7 +1326,7 @@ public abstract class AbstractEventEndpoint {
   @ApiResponses({
       @ApiResponse(
           responseCode = "404",
-          description = "The event or comment to extend with a reply or the " + "reply has not been found."
+          description = "The event or comment to extend with a reply or the reply has not been found."
       ),
       @ApiResponse(responseCode = "400", description = "If no text is set."),
       @ApiResponse(responseCode = "200", description = "The updated comment as JSON.")
@@ -1392,7 +1392,7 @@ public abstract class AbstractEventEndpoint {
   @ApiResponses({
       @ApiResponse(
           responseCode = "404",
-          description = "The event or comment to extend with a reply has " + "not been found."
+          description = "The event or comment to extend with a reply has not been found."
       ),
       @ApiResponse(responseCode = "400", description = "If no text is set."),
       @ApiResponse(responseCode = "200", description = "The updated comment as JSON.")
@@ -1405,7 +1405,7 @@ public abstract class AbstractEventEndpoint {
       @Parameter(description = "The comment reply text", required = true)
       @FormParam("text") String text,
       @Parameter(
-          description = "Flag defining if this reply solve or " + "not the comment."
+          description = "Flag defining if this reply solve or not the comment."
       )
       @FormParam("resolved") Boolean resolved
   ) throws Exception {
@@ -1755,17 +1755,17 @@ public abstract class AbstractEventEndpoint {
       @ApiResponse(responseCode = "204", description = "No conflicting events found"),
       @ApiResponse(
           responseCode = "404",
-          description = "The events in the response " + "body were not found. No events were updated."
+          description = "The events in the response body were not found. No events were updated."
       ),
       @ApiResponse(responseCode = "409", description = "There is a conflict"),
       @ApiResponse(
           responseCode = "400",
-          description = "Missing or invalid " + "parameters"
+          description = "Missing or invalid parameters"
       )
   })
   public Response getBulkConflicts(
       @Parameter(
-          description = "The list " + "of events and fields to update.",
+          description = "The list of events and fields to update.",
           required = true
       )
       @FormParam("update") final String updateJson
@@ -2052,7 +2052,7 @@ public abstract class AbstractEventEndpoint {
   @ApiResponses({
       @ApiResponse(
           responseCode = "200",
-          description = "Returns the details of an attachment from the given event and attachment id as " + "JSON"
+          description = "Returns the details of an attachment from the given event and attachment id as JSON"
       ),
       @ApiResponse(responseCode = "404", description = "No event or attachment with this identifier was found.")
   })
@@ -2208,7 +2208,7 @@ public abstract class AbstractEventEndpoint {
   @ApiResponses({
       @ApiResponse(
           responseCode = "200",
-          description = "Returns the publication of a catalog from the given event and publication id as " + "JSON"
+          description = "Returns the publication of a catalog from the given event and publication id as JSON"
       ),
       @ApiResponse(responseCode = "404", description = "No event or publication with this identifier was found.")
   })
@@ -2735,7 +2735,7 @@ public abstract class AbstractEventEndpoint {
   @ApiResponses({
       @ApiResponse(
           responseCode = "400",
-          description = "The required form params were missing in the " + "request."
+          description = "The required form params were missing in the request."
       ),
       @ApiResponse(responseCode = "404", description = "If the event has not been found."),
       @ApiResponse(responseCode = "200", description = "The access information ")
@@ -2840,7 +2840,7 @@ public abstract class AbstractEventEndpoint {
   @ApiResponses({
       @ApiResponse(
           responseCode = "200",
-          description = "Returns all the data related to the event metadata tab as " + "JSON"
+          description = "Returns all the data related to the event metadata tab as JSON"
       )
   })
   public Response getNewMetadata() {
@@ -2911,12 +2911,12 @@ public abstract class AbstractEventEndpoint {
   @ApiResponses({
       @ApiResponse(
           responseCode = "200",
-          description = "Returns all the data related to the event processing tab " + "as JSON"
+          description = "Returns all the data related to the event processing tab as JSON"
       )
   })
   public Response getNewProcessing(
       @Parameter(
-          description = "A comma separated list of tags to filter " + "the workflow definitions"
+          description = "A comma separated list of tags to filter the workflow definitions"
       )
       @QueryParam("tags") String tagsString
   ) {
@@ -2962,7 +2962,7 @@ public abstract class AbstractEventEndpoint {
       @ApiResponse(responseCode = "409", description = "There is a conflict"),
       @ApiResponse(
           responseCode = "400",
-          description = "Missing or invalid " + "parameters"
+          description = "Missing or invalid parameters"
       )
   })
   public Response getNewConflicts(
@@ -3728,7 +3728,7 @@ public abstract class AbstractEventEndpoint {
       @ApiResponse(responseCode = "400", description = "Invalid action entered."),
       @ApiResponse(
           responseCode = "401",
-          description = "You do not have permission to perform the " + "action. Maybe you need to authenticate."
+          description = "You do not have permission to perform the action. Maybe you need to authenticate."
       ),
       @ApiResponse(responseCode = "500", description = "An exception occurred.")
   })
@@ -3787,7 +3787,7 @@ public abstract class AbstractEventEndpoint {
   @ApiResponses({
       @ApiResponse(
           responseCode = "400",
-          description = "When trying to delete the latest workflow of the " + "event."
+          description = "When trying to delete the latest workflow of the event."
       ),
       @ApiResponse(responseCode = "404", description = "If the event or the workflow has not been found."),
       @ApiResponse(responseCode = "204", description = "The method does not return any content")

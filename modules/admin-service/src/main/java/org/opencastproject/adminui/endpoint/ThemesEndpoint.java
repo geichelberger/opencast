@@ -531,7 +531,7 @@ public class ThemesEndpoint {
       @ApiResponse(responseCode = "204", description = "The method does not return any content"),
       @ApiResponse(
           responseCode = "401",
-          description = "If the current user is not authorized to " + "perform this action"
+          description = "If the current user is not authorized to perform this action"
       )
   })
   public Response deleteTheme(

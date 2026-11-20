@@ -377,7 +377,7 @@ public class UsersEndpoint {
       @ApiResponse(responseCode = "201", description = "User has been created."),
       @ApiResponse(
           responseCode = "403",
-          description = "Not enough permissions to create a user with a " + "admin role."
+          description = "Not enough permissions to create a user with a admin role."
       ),
       @ApiResponse(responseCode = "409", description = "An user with this username already exist.")
   })
@@ -446,7 +446,7 @@ public class UsersEndpoint {
   })
   public Response getUser(
       @Parameter(
-          description = "The " + "username",
+          description = "The username",
           required = true
       )
       @PathParam("username") String username
@@ -470,13 +470,13 @@ public class UsersEndpoint {
       @ApiResponse(responseCode = "200", description = "User has been updated."),
       @ApiResponse(
           responseCode = "403",
-          description = "Not enough permissions to update a user with admin " + "role."
+          description = "Not enough permissions to update a user with admin role."
       ),
       @ApiResponse(responseCode = "400", description = "Invalid data provided.")
   })
   public Response updateUser(
       @Parameter(
-          description = "The " + "username",
+          description = "The username",
           required = true
       )
       @PathParam("username") String username,
@@ -487,7 +487,7 @@ public class UsersEndpoint {
       @Parameter(description = "The email.")
       @FormParam("email") String email,
       @Parameter(
-          description = "The user roles as a json " + "array"
+          description = "The user roles as a json array"
       )
       @FormParam("roles") String roles
   ) {
@@ -579,13 +579,13 @@ public class UsersEndpoint {
       @ApiResponse(responseCode = "200", description = "User has been deleted."),
       @ApiResponse(
           responseCode = "403",
-          description = "Not enough permissions to delete a user with admin " + "role."
+          description = "Not enough permissions to delete a user with admin role."
       ),
       @ApiResponse(responseCode = "404", description = "User not found.")
   })
   public Response deleteUser(
       @Parameter(
-          description = "The " + "username",
+          description = "The username",
           required = true
       )
       @PathParam("username") String username

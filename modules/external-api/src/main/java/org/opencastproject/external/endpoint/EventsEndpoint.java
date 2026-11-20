@@ -601,7 +601,7 @@ public class EventsEndpoint {
                       name = "acl",
                       schema = @Schema(
                           type = "string",
-                          description = "A collection of roles with their possible " + "action"
+                          description = "A collection of roles with their possible action"
                       )
                   ),
                   @SchemaProperty(
@@ -643,7 +643,7 @@ public class EventsEndpoint {
                       name = "processing",
                       schema = @Schema(
                           type = "string",
-                          description = "Processing instructions task " + "configuration"
+                          description = "Processing instructions task configuration"
                       )
                   )
               }
@@ -770,7 +770,7 @@ public class EventsEndpoint {
                       name = "acl",
                       schema = @Schema(
                           type = "string",
-                          description = "A collection of roles with their possible " + "action"
+                          description = "A collection of roles with their possible action"
                       )
                   ),
                   @SchemaProperty(
@@ -958,31 +958,31 @@ public class EventsEndpoint {
       @Parameter(description = "The maximum number of results to return for a single request.")
       @QueryParam("limit") Integer limit,
       @Parameter(
-          description = "Whether public distribution urls should be " + "signed."
+          description = "Whether public distribution urls should be signed."
       )
       @QueryParam("sign") boolean sign,
       @Parameter(
-          description = "Whether the acl metadata should be " + "included in the response."
+          description = "Whether the acl metadata should be included in the response."
       )
       @QueryParam("withacl") Boolean withAcl,
       @Parameter(
-          description = "Whether the metadata catalogs " + "should be included in the response."
+          description = "Whether the metadata catalogs should be included in the response."
       )
       @QueryParam("withmetadata") Boolean withMetadata,
       @Parameter(
-          description = "Whether the scheduling " + "information should be included in the response."
+          description = "Whether the scheduling information should be included in the response."
       )
       @QueryParam("withscheduling") Boolean withScheduling,
       @Parameter(
-          description = "Whether only to get the " + "events to which we have write access."
+          description = "Whether only to get the events to which we have write access."
       )
       @QueryParam("onlyWithWriteAccess") Boolean onlyWithWriteAccess,
       @Parameter(
-          description = "Whether the publication ids and " + "urls should be included in the response."
+          description = "Whether the publication ids and urls should be included in the response."
       )
       @QueryParam("withpublications") Boolean withPublications,
       @Parameter(
-          description = "Whether internal publications should be " + "included."
+          description = "Whether internal publications should be included."
       )
       @QueryParam("includeInternalPublication") Boolean includeInternalPublication
   ) {
@@ -1511,7 +1511,7 @@ public class EventsEndpoint {
   @ApiResponses({
       @ApiResponse(
           responseCode = "204",
-          description = "The permission has been created in the access control list of the specified " + "event."
+          description = "The permission has been created in the access control list of the specified event."
       ),
       @ApiResponse(responseCode = "404", description = "The specified event does not exist.")
   })
@@ -1570,7 +1570,7 @@ public class EventsEndpoint {
   @ApiResponses({
       @ApiResponse(
           responseCode = "204",
-          description = "The permission has been revoked from the access control list of the specified " + "event."
+          description = "The permission has been revoked from the access control list of the specified event."
       ),
       @ApiResponse(responseCode = "404", description = "The specified event does not exist.")
   })
@@ -2123,7 +2123,7 @@ public class EventsEndpoint {
       @Parameter(description = "Whether public distribution urls should be signed.")
       @QueryParam("sign") boolean sign,
       @Parameter(
-          description = "Whether internal publications should be " + "included."
+          description = "Whether internal publications should be included."
       )
       @QueryParam("includeInternalPublication") boolean includeInternalPublication
   ) throws Exception {

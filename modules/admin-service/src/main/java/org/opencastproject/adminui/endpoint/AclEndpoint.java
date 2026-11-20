@@ -337,7 +337,7 @@ public class AclEndpoint {
       @ApiResponse(responseCode = "404", description = "The ACL has not been found"),
       @ApiResponse(
           responseCode = "409",
-          description = "The ACL could not be deleted, there are still " + "references on it"
+          description = "The ACL could not be deleted, there are still references on it"
       )
   })
   public Response deleteAcl(

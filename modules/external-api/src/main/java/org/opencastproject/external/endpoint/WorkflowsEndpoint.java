@@ -158,7 +158,7 @@ public class WorkflowsEndpoint {
   @ApiResponses({
       @ApiResponse(
           responseCode = "201",
-          description = "A new workflow is created and its identifier is returned in the Location " + "header."
+          description = "A new workflow is created and its identifier is returned in the Location header."
       ),
       @ApiResponse(responseCode = "400", description = "The request is invalid or inconsistent."),
       @ApiResponse(responseCode = "404", description = "The event or workflow definition could not be found.")
@@ -166,23 +166,23 @@ public class WorkflowsEndpoint {
   public Response createWorkflowInstance(
       @HeaderParam("Accept") String acceptHeader,
       @Parameter(
-          description = "The event identifier this workflow should run " + "against",
+          description = "The event identifier this workflow should run against",
           required = true
       )
       @FormParam("event_identifier") String eventId,
       @Parameter(
-          description = "The identifier of the workflow " + "definition to use",
+          description = "The identifier of the workflow definition to use",
           required = true
       )
       @FormParam("workflow_definition_identifier") String workflowDefinitionIdentifier,
       @Parameter(description = "The optional configuration for this workflow")
       @FormParam("configuration") String configuration,
       @Parameter(
-          description = "Whether the workflow operations should be included in " + "the response"
+          description = "Whether the workflow operations should be included in the response"
       )
       @QueryParam("withoperations") boolean withOperations,
       @Parameter(
-          description = "Whether the workflow configuration should be " + "included in the response"
+          description = "Whether the workflow configuration should be included in the response"
       )
       @QueryParam("withconfiguration") boolean withConfiguration
   ) {
@@ -252,11 +252,11 @@ public class WorkflowsEndpoint {
       @Parameter(description = "The workflow instance id", required = true)
       @PathParam("workflowInstanceId") Long id,
       @Parameter(
-          description = "Whether the workflow operations should be included in " + "the response"
+          description = "Whether the workflow operations should be included in the response"
       )
       @QueryParam("withoperations") boolean withOperations,
       @Parameter(
-          description = "Whether the workflow configuration should be " + "included in the response"
+          description = "Whether the workflow configuration should be included in the response"
       )
       @QueryParam("withconfiguration") boolean withConfiguration
   ) {
@@ -297,11 +297,11 @@ public class WorkflowsEndpoint {
       @Parameter(description = "The optional state transition for this workflow")
       @FormParam("state") String stateStr,
       @Parameter(
-          description = "Whether the workflow operations should be included in " + "the response"
+          description = "Whether the workflow operations should be included in the response"
       )
       @QueryParam("withoperations") boolean withOperations,
       @Parameter(
-          description = "Whether the workflow configuration should be " + "included in the response"
+          description = "Whether the workflow configuration should be included in the response"
       )
       @QueryParam("withconfiguration") boolean withConfiguration
   ) {

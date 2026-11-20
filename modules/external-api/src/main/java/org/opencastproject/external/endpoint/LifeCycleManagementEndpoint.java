@@ -392,7 +392,7 @@ public class LifeCycleManagementEndpoint {
       )
       @FormParam("actionParameters") String actionParameters,
       @Parameter(
-          description = "Required if timing is SPECIFIC_DATE. " + "E.g. 2023-11-30T16:16:47Z"
+          description = "Required if timing is SPECIFIC_DATE. E.g. 2023-11-30T16:16:47Z"
       )
       @FormParam("actionDate") String actionDate,
       @Parameter(
@@ -553,7 +553,7 @@ public class LifeCycleManagementEndpoint {
       )
       @FormParam("actionParameters") String actionParameters,
       @Parameter(
-          description = "Required if timing is SPECIFIC_DATE. " + "E.g. 2023-11-30T16:16:47Z"
+          description = "Required if timing is SPECIFIC_DATE. E.g. 2023-11-30T16:16:47Z"
       )
       @FormParam("actionDate") String actionDate,
       @Parameter(
@@ -569,7 +569,7 @@ public class LifeCycleManagementEndpoint {
       )
       @FormParam("targetFilters") String targetFilters,
       @Parameter(
-          description = "JSON. To find how to structure your JSON check " + "the documentation."
+          description = "JSON. To find how to structure your JSON check the documentation."
       )
       @FormParam("accessControlEntries") String accessControlEntries
   ) {
@@ -678,11 +678,11 @@ public class LifeCycleManagementEndpoint {
       @ApiResponse(responseCode = "200", description = "Policy removed."),
       @ApiResponse(
           responseCode = "404",
-          description = "No lifecycle policy with that " + "identifier exists."
+          description = "No lifecycle policy with that identifier exists."
       ),
       @ApiResponse(
           responseCode = "401",
-          description = "Not authorized to perform " + "this action"
+          description = "Not authorized to perform this action"
       )
   })
   public Response remove(

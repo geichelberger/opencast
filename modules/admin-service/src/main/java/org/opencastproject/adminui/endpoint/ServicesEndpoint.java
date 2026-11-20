@@ -104,7 +104,7 @@ public class ServicesEndpoint {
       @Parameter(description = "The offset")
       @QueryParam("offset") final int offset,
       @Parameter(
-          description = "Filter results by name, host, actions, status or free text " + "query"
+          description = "Filter results by name, host, actions, status or free text query"
       )
       @QueryParam("filter") String filter,
       @Parameter(
