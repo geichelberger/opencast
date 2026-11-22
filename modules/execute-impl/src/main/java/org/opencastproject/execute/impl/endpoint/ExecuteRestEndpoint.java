@@ -34,10 +34,6 @@ import org.opencastproject.mediapackage.MediaPackageException;
 import org.opencastproject.mediapackage.MediaPackageParser;
 import org.opencastproject.rest.AbstractJobProducerEndpoint;
 import org.opencastproject.serviceregistry.api.ServiceRegistry;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 
 import org.apache.commons.lang3.StringUtils;
 import org.osgi.service.component.annotations.Component;
@@ -46,7 +42,6 @@ import org.osgi.service.jaxrs.whiteboard.propertytypes.JaxrsResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.FormParam;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -54,16 +49,20 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 /**
  * The REST endpoint for {@link ExecuteService}s
  */
 @Path("/execute")
 // Endpoint to the execute service, that runs CLI commands using MediaPackageElement's as parameters
-@RestService(
-    name = "execute",
-    title = "Execute Service",
-    notes = {"" },
-    abstractText = "Runs CLI commands with MediaPackageElement's as parameters"
+@Tag(
+    name = "Execute Service",
+    description = "Runs CLI commands with MediaPackageElement's as parameters"
 )
 @Component(
     immediate = true,
@@ -90,43 +89,41 @@ public class ExecuteRestEndpoint extends AbstractJobProducerEndpoint {
   @POST
   @Produces(MediaType.TEXT_XML)
   @Path(ExecuteService.ENDPOINT_NAME)
-  @RestQuery(
-      name = "name",
-      description = "Executes the given command",
-      restParameters = {
-          @RestParameter(description = "The command to execute", isRequired = true,
-              name = ExecuteService.EXEC_FORM_PARAM, type = RestParameter.Type.STRING),
-          @RestParameter(description = "The arguments to the command", isRequired = true,
-              name = ExecuteService.PARAMS_FORM_PARAM, type = RestParameter.Type.STRING),
-          @RestParameter(description = "The estimated load placed on the system by this command", isRequired = false,
-              name = ExecuteService.LOAD_FORM_PARAM, type = RestParameter.Type.FLOAT),
-          @RestParameter(description = "The mediapackage to apply the command to. Either this or "
-              + ExecuteService.INPUT_ELEM_FORM_PARAM + " are required", isRequired = false,
-              name = ExecuteService.INPUT_MP_FORM_PARAM, type = RestParameter.Type.TEXT),
-          @RestParameter(description = "The mediapackage element to apply the command to. Either this or "
-              + ExecuteService.INPUT_MP_FORM_PARAM + " are required", isRequired = false,
-              name = ExecuteService.INPUT_ELEM_FORM_PARAM, type = RestParameter.Type.TEXT),
-          @RestParameter(description = "The mediapackage element produced by the command", isRequired = false,
-              name = ExecuteService.OUTPUT_NAME_FORM_PARAMETER, type = RestParameter.Type.STRING),
-          @RestParameter(description = "The type of the returned element", isRequired = false,
-              name = ExecuteService.TYPE_FORM_PARAMETER, type = RestParameter.Type.STRING)
-      },
-      responses = {
-          @RestResponse(description = "XML-encoded Job is returned.", responseCode = HttpServletResponse.SC_NO_CONTENT),
-          @RestResponse(description = "Service unavailabe or not currently present",
-              responseCode = HttpServletResponse.SC_SERVICE_UNAVAILABLE),
-          @RestResponse(description = "Incorrect parameters", responseCode = HttpServletResponse.SC_BAD_REQUEST),
-          @RestResponse(description = "Problem executing the command or serializing the arguments/results",
-              responseCode = HttpServletResponse.SC_INTERNAL_SERVER_ERROR)
-      },
-      returnDescription = "")
-  public Response execute(@FormParam(ExecuteService.EXEC_FORM_PARAM) String exec,
-          @FormParam(ExecuteService.PARAMS_FORM_PARAM) String params,
-          @FormParam(ExecuteService.LOAD_FORM_PARAM) Float loadParam,
-          @FormParam(ExecuteService.INPUT_ELEM_FORM_PARAM) String inputElementStr,
-          @FormParam(ExecuteService.INPUT_MP_FORM_PARAM) String inputMpStr,
-          @FormParam(ExecuteService.OUTPUT_NAME_FORM_PARAMETER) String outputFileName,
-          @FormParam(ExecuteService.TYPE_FORM_PARAMETER) String elementTypeStr) {
+  @Operation(
+      summary = "Execute a command",
+      description = "Executes the given command"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "204", description = "XML-encoded Job is returned."),
+      @ApiResponse(responseCode = "503", description = "Service unavailabe or not currently present"),
+      @ApiResponse(responseCode = "400", description = "Incorrect parameters"),
+      @ApiResponse(
+          responseCode = "500",
+          description = "Problem executing the command or serializing the arguments/results"
+      )
+  })
+  public Response execute(
+      @Parameter(description = "The command to execute", required = true)
+      @FormParam(ExecuteService.EXEC_FORM_PARAM) String exec,
+      @Parameter(description = "The arguments to the command", required = true)
+      @FormParam(ExecuteService.PARAMS_FORM_PARAM) String params,
+      @Parameter(description = "The estimated load placed on the system by this command")
+      @FormParam(ExecuteService.LOAD_FORM_PARAM) Float loadParam,
+      @Parameter(
+          description = "The mediapackage element to apply the command to. Either this or "
+              + ExecuteService.INPUT_MP_FORM_PARAM + " are required"
+      )
+      @FormParam(ExecuteService.INPUT_ELEM_FORM_PARAM) String inputElementStr,
+      @Parameter(
+          description = "The mediapackage to apply the command to. Either this or "
+              + ExecuteService.INPUT_ELEM_FORM_PARAM + " are required"
+      )
+      @FormParam(ExecuteService.INPUT_MP_FORM_PARAM) String inputMpStr,
+      @Parameter(description = "The mediapackage element produced by the command")
+      @FormParam(ExecuteService.OUTPUT_NAME_FORM_PARAMETER) String outputFileName,
+      @Parameter(description = "The type of the returned element")
+      @FormParam(ExecuteService.TYPE_FORM_PARAMETER) String elementTypeStr
+  ) {
 
     checkNotNull(service);
     try {
