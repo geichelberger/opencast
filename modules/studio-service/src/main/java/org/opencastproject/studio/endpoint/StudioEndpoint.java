@@ -21,7 +21,6 @@
 
 package org.opencastproject.studio.endpoint;
 
-import static org.opencastproject.util.doc.rest.RestParameter.Type.STRING;
 
 import org.opencastproject.opensearch.api.SearchIndexException;
 import org.opencastproject.opensearch.api.SearchResultItem;
@@ -30,10 +29,6 @@ import org.opencastproject.opensearch.index.objects.series.SeriesSearchQuery;
 import org.opencastproject.security.api.Permissions;
 import org.opencastproject.security.api.SecurityService;
 import org.opencastproject.studio.endpoint.dto.SeriesDto;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -47,7 +42,6 @@ import org.slf4j.LoggerFactory;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 
-import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -56,20 +50,16 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 @Path("/studio-api")
-@RestService(
-    name = "studioservice",
-    title = "Studio REST Endpoint",
-    abstractText = "The Internal studio API is not stable!",
-    notes = {
-        "All paths above are relative to the REST endpoint base (something like http://your.server/files)",
-        "If the service is down or not working it will return a status 503, this means the the "
-            + "underlying service is not working and is either restarting or has failed",
-        "A status code 500 means a general failure has occurred which is not recoverable and was "
-            + "not anticipated. In other words, there is a bug! You should file an error report "
-            + "with your server logs from the time when the error occurred: "
-            + "<a href=\"https://github.com/opencast/opencast/issues\">Opencast Issue Tracker</a>"
-    }
+@Tag(
+    name = "Studio REST Endpoint",
+    description = "The Internal studio API is not stable!"
 )
 @Component(
     immediate = true,
@@ -97,27 +87,20 @@ public class StudioEndpoint {
   @GET
   @Path("/series.json")
   @Produces(MediaType.APPLICATION_JSON)
-  @RestQuery(
-      name = "getSeries",
-      description = "Returns all series for which the current user has write permissions.",
-      returnDescription = "A list of JSON series objects",
-      restParameters = {
-          @RestParameter(
-              name = "filter",
-              isRequired = false,
-              description = "Usage <Filter Name>:<Value to Filter With>. Filters can combine using a comma \",\"."
-                  + " Available Filters: title, textFilter.",
-              type = STRING
-          ),
-      },
-      responses = {
-          @RestResponse(
-              description = "Returns a list of series.",
-              responseCode = HttpServletResponse.SC_OK
-          )
-      }
+  @Operation(
+      summary = "Get the series the current user can write to",
+      description = "Returns all series for which the current user has write permissions."
   )
-  public Response getSeries(@QueryParam("filter") String filter) {
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Returns a list of series.")
+  })
+  public Response getSeries(
+      @Parameter(
+          description = "Usage <Filter Name>:<Value to Filter With>. Filters can combine using a comma \",\"."
+              + " Available Filters: title, textFilter."
+      )
+      @QueryParam("filter") String filter
+  ) {
     SeriesSearchQuery query = new SeriesSearchQuery(securityService.getOrganization().getId(),
         securityService.getUser());
     query.withoutActions();
