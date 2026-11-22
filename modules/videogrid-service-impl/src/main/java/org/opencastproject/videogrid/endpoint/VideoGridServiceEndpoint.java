@@ -21,7 +21,6 @@
 
 package org.opencastproject.videogrid.endpoint;
 
-import static org.opencastproject.util.doc.rest.RestParameter.Type.STRING;
 
 import org.opencastproject.job.api.JaxbJob;
 import org.opencastproject.job.api.Job;
@@ -32,10 +31,6 @@ import org.opencastproject.mediapackage.MediaPackageException;
 import org.opencastproject.mediapackage.Track;
 import org.opencastproject.rest.AbstractJobProducerEndpoint;
 import org.opencastproject.serviceregistry.api.ServiceRegistry;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 import org.opencastproject.videogrid.api.VideoGridService;
 import org.opencastproject.videogrid.api.VideoGridServiceException;
 
@@ -52,7 +47,6 @@ import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
-import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.FormParam;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -60,19 +54,20 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 /**
  * A service endpoint to expose the {@link VideoGridService} via REST.
  */
 @Path("/videogrid")
-@RestService(
-    name = "videogrid",
-    title = "VideoGrid Service",
-    abstractText = "The Video Grid Service creates a section of the final video grid file for the "
-        + "Video Grid Workflow Operation Handler.",
-    notes = {
-        "Only offers one service",
-        "Only meant to be used with the VideoGridWorkflowOperationHandler"
-    }
+@Tag(
+    name = "VideoGrid Service",
+    description = "The Video Grid Service creates a section of the final video grid file for the "
+        + "Video Grid Workflow Operation Handler."
 )
 @Component(
     immediate = true,
@@ -121,33 +116,24 @@ public class VideoGridServiceEndpoint extends AbstractJobProducerEndpoint {
   @POST
   @Produces(MediaType.TEXT_XML)
   @Path("videogrid")
-  @RestQuery(
-      name = "videogrid",
-      description = "Create a section of the final video grid",
-      restParameters = {
-          @RestParameter(
-              name = "command",
-              isRequired = true,
-              type = STRING,
-              description = "An ffmpeg command as a list. File paths are replaced by track identifiers."
-          ),
-          @RestParameter(
-              name = "tracks",
-              isRequired = true,
-              type = RestParameter.Type.TEXT,
-              description = "The source tracks to concat as XML"
-          )
-      },
-      responses = {
-          @RestResponse(description = "Video created successfully", responseCode = HttpServletResponse.SC_OK),
-          @RestResponse(description = "Invalid data", responseCode = HttpServletResponse.SC_BAD_REQUEST),
-          @RestResponse(description = "Internal error", responseCode = HttpServletResponse.SC_INTERNAL_SERVER_ERROR)
-      },
-      returnDescription = "Returns the path to the generated video for the grid"
+  @Operation(
+      summary = "Create a section of the video grid",
+      description = "Create a section of the final video grid"
   )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Video created successfully"),
+      @ApiResponse(responseCode = "400", description = "Invalid data"),
+      @ApiResponse(responseCode = "500", description = "Internal error")
+  })
   public Response createPartialTrack(
-          @FormParam("command") String commandString,
-          @FormParam("sourceTracks") String tracksXml) throws MediaPackageException, EncoderException {
+      @Parameter(
+          description = "An ffmpeg command as a list. File paths are replaced by track identifiers.",
+          required = true
+      )
+      @FormParam("command") String commandString,
+      @Parameter(description = "The source tracks to concat as XML", required = true)
+      @FormParam("sourceTracks") String tracksXml
+  ) throws MediaPackageException, EncoderException {
     Gson gson = new Gson();
     try {
       List<String> command = gson.fromJson(commandString, new TypeToken<List<String>>() { }.getType());
