@@ -85,18 +85,28 @@ public class IngestDownloadServiceEndpoint extends AbstractJobProducerEndpoint {
       description = "Downloads mediapackage elements to workspace"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "Mediapackage as xml")
+      @ApiResponse(responseCode = "200", description = "An XML representation of the ingest download job"),
+      @ApiResponse(responseCode = "500", description = "The ingest download job could not be created.")
   })
   public Response ingestdownload(
       @Parameter(description = "mediapackage as xml", required = true)
       @FormParam("mediapackage") String mediapackageString,
-      @Parameter(description = "sourceFlavors as String seperated by , (presenter/source,presentation/source) ")
+      @Parameter(
+          description = "The source flavors separated by , (presenter/source,presentation/source). The parameter "
+              + "must be sent, but it can be empty, which selects all flavors (*/*)"
+      )
       @FormParam("sourceFlavors") String sourceFlavors,
-      @Parameter(description = "sourceTags as String seperated by , (archive,download)")
+      @Parameter(description = "The source tags separated by , (archive,download)")
       @FormParam("sourceTags") String sourceTags,
-      @Parameter(description = "delete from external workingfile repository: Boolean true / false")
+      @Parameter(
+          description = "Whether to delete the elements from the external working file repository (true or "
+              + "false). The parameter must be sent, but it can be empty, which means false"
+      )
       @FormParam("deleteExternal") String deleteExternal,
-      @Parameter(description = "select both tags and flavors: Boolean true / false")
+      @Parameter(
+          description = "Whether to select only the elements matching both the tags and the flavors (true or "
+              + "false). The parameter must be sent, but it can be empty, which means false"
+      )
       @FormParam("tagsAndFlavor") String tagsAndFlavor
   ) throws Exception {
     logger.info("starting ingest-download Service");
