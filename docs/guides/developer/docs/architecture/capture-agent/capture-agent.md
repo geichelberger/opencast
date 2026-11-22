@@ -491,7 +491,7 @@ Further Reading
 ---------------
 
 The communication involve several REST endpoints. Additional documentation about these can be found in the REST docs of
-the specific service. The REST documentation can be found at `/rest_docs.html` in every Opencast instance to reflect
+the specific service. The REST documentation can be found at `/rest-docs/index.html` in every Opencast instance to reflect
 that servers unique capabilities.
 
 Services involved in the communication with the capture agent are:

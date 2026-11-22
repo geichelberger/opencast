@@ -1,0 +1,10 @@
+The REST documentation in the admin UI now links to the OpenAPI documentation (Swagger UI at `/rest-docs/index.html`)
+by default. The endpoints are now documented with OpenAPI annotations instead of the legacy REST docs annotations,
+so the legacy documentation at `/rest_docs.html` no longer lists them.
+
+Administrators who want to keep linking to the legacy page can set the following option in the organization
+configuration (`etc/org.opencastproject.organization-mh_default_org.cfg`):
+
+    prop.org.opencastproject.admin.help.restdocs.url=/rest_docs.html
+
+This change contains no database schema change and no index change.
