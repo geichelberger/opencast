@@ -120,8 +120,7 @@ public class IBMWatsonTranscriptionRestService extends AbstractJobProducerEndpoi
       description = "Called by the speech-to-text service when registering the callback url"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "If no errors"),
-      @ApiResponse(responseCode = "500", description = "An error occurred")
+      @ApiResponse(responseCode = "200", description = "The challenge string is returned as plain text.")
   })
   // GET /transcripts/watson/results?challenge_string=51WRISEyAbuJq5fE HTTP/1.1" 302 5 "-" "Jersey/2.22.1 (Apache
   // HttpClient 4.5)"
@@ -162,7 +161,8 @@ public class IBMWatsonTranscriptionRestService extends AbstractJobProducerEndpoi
       content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(type = "object"))
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "Got notification!")
+      @ApiResponse(responseCode = "200", description = "Got notification!"),
+      @ApiResponse(responseCode = "500", description = "The notification could not be parsed or handled.")
   })
   public Response reportStatus(
       String body
