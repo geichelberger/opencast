@@ -28,11 +28,6 @@ import org.opencastproject.job.api.Job;
 import org.opencastproject.job.api.JobProducer;
 import org.opencastproject.rest.AbstractJobProducerEndpoint;
 import org.opencastproject.serviceregistry.api.ServiceRegistry;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestParameter.Type;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 
 import org.osgi.service.component.ComponentContext;
 import org.osgi.service.component.annotations.Activate;
@@ -42,7 +37,6 @@ import org.osgi.service.jaxrs.whiteboard.propertytypes.JaxrsResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.FormParam;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -50,22 +44,20 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 /**
  * REST endpoint for {@link CoverImageService}
  */
 @Path("/cover-image")
-@RestService(
-    name = "coverimage",
-    title = "Cover Image Service",
-    abstractText = "This endpoint triggers generation of cover images",
-    notes = {
-        "All paths above are relative to the REST endpoint base (something like http://your.server/files)",
-        "If the service is down or not working it will return a status 503, this means the the underlying service is "
-            + "not working and is either restarting or has failed",
-        "A status code 500 means a general failure has occurred which is not recoverable and was not anticipated. In "
-            + "other words, there is a bug! You should file an error report with your server logs from the time when "
-            + "the error occurred: <a href=\"https://github.com/opencast/opencast/issues\">Opencast Issue Tracker</a>"
-    }
+@Tag(
+    name = "Cover Image Service",
+    description = "This endpoint triggers generation of cover images"
 )
 @Component(
     immediate = true,
@@ -106,56 +98,33 @@ public class CoverImageEndpoint extends AbstractJobProducerEndpoint {
   @POST
   @Path("generate")
   @Produces(MediaType.TEXT_XML)
-  @RestQuery(
-      name = "generate",
-      description = "Generates a cover image based on the given metadata",
-      restParameters = {
-          @RestParameter(description = "Metadata XML", isRequired = false, name = "xml", type = Type.TEXT),
-          @RestParameter(description = "XSLT stylesheet", isRequired = true, name = "xsl", type = Type.TEXT),
-          @RestParameter(
-              description = "Width of the cover image",
-              isRequired = true,
-              name = "width", type = Type.INTEGER, defaultValue = "1600"
-          ),
-          @RestParameter(
-              description = "Height of the cover image",
-              isRequired = true,
-              name = "height",
-              type = Type.INTEGER,
-              defaultValue = "900"
-          ),
-          @RestParameter(
-              description = "URI of poster image",
-              isRequired = false,
-              name = "posterimage",
-              type = Type.STRING
-          ),
-          @RestParameter(
-              description = "Flavor of target cover image",
-              isRequired = true,
-              name = "targetflavor",
-              type = Type.STRING,
-              defaultValue = "image/cover"
-          )
-      },
-      responses = {
-          @RestResponse(
-              description = "Results in an xml document containing the job for the cover image generation task",
-              responseCode = HttpServletResponse.SC_OK
-          ),
-          @RestResponse(
-              description = "If required parameters aren't set or not valid",
-              responseCode = HttpServletResponse.SC_BAD_REQUEST
-          )
-      },
-      returnDescription = ""
+  @Operation(
+      summary = "Generate a cover image",
+      description = "Generates a cover image based on the given metadata"
   )
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "200",
+          description = "Results in an xml document containing the job for the cover image generation task"
+      ),
+      @ApiResponse(responseCode = "400", description = "If required parameters aren't set or not valid")
+  })
   public Response generateCoverImage(
+      @Parameter(description = "Metadata XML")
       @FormParam("xml") String xml,
+      @Parameter(description = "XSLT stylesheet", required = true)
       @FormParam("xsl") String xsl,
+      @Parameter(description = "Width of the cover image", required = true, schema = @Schema(example = "1600"))
       @FormParam("width") String width,
+      @Parameter(description = "Height of the cover image", required = true, schema = @Schema(example = "900"))
       @FormParam("height") String height,
+      @Parameter(description = "URI of poster image")
       @FormParam("posterimage") String posterFlavor,
+      @Parameter(
+          description = "Flavor of target cover image",
+          required = true,
+          schema = @Schema(example = "image/cover")
+      )
       @FormParam("targetflavor") String targetFlavor
   ) {
     try {
