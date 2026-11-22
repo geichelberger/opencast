@@ -21,14 +21,7 @@
 
 package org.opencastproject.redirect;
 
-import static javax.servlet.http.HttpServletResponse.SC_BAD_REQUEST;
-import static javax.servlet.http.HttpServletResponse.SC_SEE_OTHER;
-import static org.opencastproject.util.doc.rest.RestParameter.Type.STRING;
 
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.jaxrs.whiteboard.propertytypes.JaxrsResource;
@@ -42,6 +35,12 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import javax.ws.rs.core.UriInfo;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 /**
  * Endpoints for redirection schemes.
@@ -58,13 +57,9 @@ import javax.ws.rs.core.UriInfo;
         "opencast.service.jobproducer=false"
     }
 )
-@RestService(
-    name = "Redirect",
-    title = "Redirection Service",
-    abstractText = "This service redirects to given URLs.",
-    notes = {
-        "This is mostly useful for external applications, for example to realize certain (pre-)authentication schemes.."
-    }
+@Tag(
+    name = "Redirection Service",
+    description = "This service redirects to given URLs."
 )
 @Path("/redirect")
 @JaxrsResource
@@ -74,25 +69,25 @@ public class RedirectEndpoint {
    *
    * @see <a href="https://en.wikipedia.org/wiki/Post/Redirect/Get">Wikipedia</a>
    */
-  @RestQuery(
-      name = "get",
+  @Operation(
+      summary = "Redirect to a URL",
       description = "Redirects to the given `target` URL specifically instructing the client to issue a `GET` request."
-          + " Also verifies that the target lives on the same host as the original request.",
-      restParameters = {
-          @RestParameter(name = "target", description = "The URL to redirect to", isRequired = true, type = STRING)
-      },
-      responses = {
-          @RestResponse(description = "successful redirect", responseCode = SC_SEE_OTHER),
-          @RestResponse(
-              description = "missing or invalid target URL, including URLs pointing to another server",
-              responseCode = SC_BAD_REQUEST
-          )
-      },
-      returnDescription = "A temporary redirect to the given `target` URL"
+          + " Also verifies that the target lives on the same host as the original request."
   )
+  @ApiResponses({
+      @ApiResponse(responseCode = "303", description = "successful redirect"),
+      @ApiResponse(
+          responseCode = "400",
+          description = "missing or invalid target URL, including URLs pointing to another server"
+      )
+  })
   @POST
   @Path("get")
-  public Response get(@FormParam("target") String target, @Context UriInfo uriInfo) {
+  public Response get(
+      @Parameter(description = "The URL to redirect to", required = true)
+      @FormParam("target") String target,
+      @Context UriInfo uriInfo
+  ) {
     if (target == null) {
       return Response.status(Status.BAD_REQUEST).entity("missing `target` URL").build();
     }
