@@ -21,8 +21,6 @@
 
 package org.opencastproject.usertracking.endpoint;
 
-import static javax.servlet.http.HttpServletResponse.SC_CREATED;
-import static javax.servlet.http.HttpServletResponse.SC_OK;
 
 import org.opencastproject.rest.RestConstants;
 import org.opencastproject.security.api.SecurityService;
@@ -35,11 +33,6 @@ import org.opencastproject.usertracking.impl.UserActionListImpl;
 import org.opencastproject.usertracking.impl.UserSessionImpl;
 import org.opencastproject.util.NotFoundException;
 import org.opencastproject.util.UrlSupport;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestParameter.Type;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 
 import org.apache.commons.lang3.StringUtils;
 import org.osgi.service.component.ComponentContext;
@@ -68,23 +61,21 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 /**
  * REST Endpoint for User Tracking Service
  */
 @Path("/usertracking")
-@RestService(
-    name = "usertracking",
-    title = "User Tracking Service",
-    abstractText = "This service is used for tracking user interaction creates, edits and retrieves user actions and "
-        + "viewing statistics.",
-    notes = {
-        "All paths above are relative to the REST endpoint base (something like http://your.server/files)",
-        "If the service is down or not working it will return a status 503, this means the the underlying service is "
-                + "not working and is either restarting or has failed",
-        "A status code 500 means a general failure has occurred which is not recoverable and was not anticipated. In "
-                + "other words, there is a bug! You should file an error report with your server logs from the time "
-                + "when the error occurred: "
-                + "<a href=\"https://github.com/opencast/opencast/issues\">Opencast Issue Tracker</a>" })
+@Tag(
+    name = "User Tracking Service",
+    description = "This service is used for tracking user interaction creates, edits and retrieves user actions and "
+        + "viewing statistics."
+)
 @Component(
     immediate = true,
     service = UserTrackingRestService.class,
@@ -157,24 +148,25 @@ public class UserTrackingRestService {
   @GET
   @Produces(MediaType.TEXT_XML)
   @Path("/actions.xml")
-  @RestQuery(
-      name = "actionsasxml",
-      description = "Get user actions by type and day",
-      returnDescription = "The user actions.",
-      restParameters = {
-          @RestParameter(name = "type", description = "The type of the user action", isRequired = false,
-              type = Type.STRING),
-          @RestParameter(name = "day", description = "The day of creation (format: YYYYMMDD)", isRequired = false,
-              type = Type.STRING),
-          @RestParameter(name = "limit", description = "The maximum number of items to return per page",
-              isRequired = false, type = Type.INTEGER),
-          @RestParameter(name = "offset", description = "The page number", isRequired = false, type = Type.INTEGER)
-      },
-      responses = {
-          @RestResponse(responseCode = SC_OK, description = "An XML representation of the user actions")
-      })
-  public UserActionListImpl getUserActionsAsXml(@QueryParam("id") String id, @QueryParam("type") String type,
-          @QueryParam("day") String day, @QueryParam("limit") int limit, @QueryParam("offset") int offset) {
+  @Operation(
+      summary = "List user actions as XML",
+      description = "Get user actions by type and day"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "An XML representation of the user actions")
+  })
+  public UserActionListImpl getUserActionsAsXml(
+      @Parameter(description = "The episode identifier. Together with the type, restricts the actions to this episode")
+      @QueryParam("id") String id,
+      @Parameter(description = "The type of the user action")
+      @QueryParam("type") String type,
+      @Parameter(description = "The day of creation (format: YYYYMMDD)")
+      @QueryParam("day") String day,
+      @Parameter(description = "The maximum number of items to return per page")
+      @QueryParam("limit") int limit,
+      @Parameter(description = "The page number")
+      @QueryParam("offset") int offset
+  ) {
 
     // Are the values of offset and limit valid?
     if (offset < 0 || limit < 0) {
@@ -208,42 +200,44 @@ public class UserTrackingRestService {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/actions.json")
-  @RestQuery(
-      name = "actionsasjson",
-      description = "Get user actions by type and day",
-      returnDescription = "The user actions.",
-      restParameters = {
-          @RestParameter(name = "type", description = "The type of the user action", isRequired = false,
-              type = Type.STRING),
-          @RestParameter(name = "day", description = "The day of creation (format: YYYYMMDD)", isRequired = false,
-              type = Type.STRING),
-          @RestParameter(name = "limit", description = "The maximum number of items to return per page",
-              isRequired = false, type = Type.INTEGER),
-          @RestParameter(name = "offset", description = "The page number", isRequired = false, type = Type.INTEGER)
-      },
-      responses = {
-          @RestResponse(responseCode = SC_OK, description = "A JSON representation of the user actions")
-      })
-  public UserActionListImpl getUserActionsAsJson(@QueryParam("id") String id, @QueryParam("type") String type,
-          @QueryParam("day") String day, @QueryParam("limit") int limit, @QueryParam("offset") int offset) {
+  @Operation(
+      summary = "List user actions as JSON",
+      description = "Get user actions by type and day"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "A JSON representation of the user actions")
+  })
+  public UserActionListImpl getUserActionsAsJson(
+      @Parameter(description = "The episode identifier. Together with the type, restricts the actions to this episode")
+      @QueryParam("id") String id,
+      @Parameter(description = "The type of the user action")
+      @QueryParam("type") String type,
+      @Parameter(description = "The day of creation (format: YYYYMMDD)")
+      @QueryParam("day") String day,
+      @Parameter(description = "The maximum number of items to return per page")
+      @QueryParam("limit") int limit,
+      @Parameter(description = "The page number")
+      @QueryParam("offset") int offset
+  ) {
     return getUserActionsAsXml(id, type, day, limit, offset); // same logic, different @Produces annotation
   }
 
   @GET
   @Produces(MediaType.TEXT_XML)
   @Path("/stats.xml")
-  @RestQuery(
-      name = "statsasxml",
-      description = "Get the statistics for an episode",
-      returnDescription = "The statistics.",
-      restParameters = {
-          @RestParameter(name = "id", description = "The ID of the single episode to return the statistics for, "
-              + "if it exists", isRequired = false, type = Type.STRING)
-      },
-      responses = {
-          @RestResponse(responseCode = SC_OK, description = "An XML representation of the episode's statistics")
-      })
-  public StatsImpl statsAsXml(@QueryParam("id") String mediapackageId) {
+  @Operation(
+      summary = "Get the statistics of an episode as XML",
+      description = "Get the statistics for an episode"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "An XML representation of the episode's statistics")
+  })
+  public StatsImpl statsAsXml(
+      @Parameter(
+          description = "The ID of the single episode to return the statistics for, if it exists"
+      )
+      @QueryParam("id") String mediapackageId
+  ) {
     StatsImpl s = new StatsImpl();
     s.setMediapackageId(mediapackageId);
     try {
@@ -257,43 +251,42 @@ public class UserTrackingRestService {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/stats.json")
-  @RestQuery(
-      name = "statsasjson",
-      description = "Get the statistics for an episode",
-      returnDescription = "The statistics.",
-      restParameters = {
-          @RestParameter(name = "id", description = "The ID of the single episode to return the statistics for, "
-              + "if it exists", isRequired = false, type = Type.STRING)
-      },
-      responses = {
-          @RestResponse(responseCode = SC_OK, description = "A JSON representation of the episode's statistics")
-      })
-  public StatsImpl statsAsJson(@QueryParam("id") String mediapackageId) {
+  @Operation(
+      summary = "Get the statistics of an episode as JSON",
+      description = "Get the statistics for an episode"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "A JSON representation of the episode's statistics")
+  })
+  public StatsImpl statsAsJson(
+      @Parameter(
+          description = "The ID of the single episode to return the statistics for, if it exists"
+      )
+      @QueryParam("id") String mediapackageId
+  ) {
     return statsAsXml(mediapackageId); // same logic, different @Produces annotation
   }
 
   @GET
   @Produces(MediaType.TEXT_XML)
   @Path("/report.xml")
-  @RestQuery(
-      name = "reportasxml",
-      description = "Get a report for a time range",
-      returnDescription = "The report.",
-      restParameters = {
-          @RestParameter(name = "from", description = "The beginning of the time range", isRequired = false,
-              type = Type.STRING),
-          @RestParameter(name = "to", description = "The end of the time range", isRequired = false,
-              type = Type.STRING),
-          @RestParameter(name = "limit", description = "The maximum number of items to return per page",
-              isRequired = false, type = Type.INTEGER),
-          @RestParameter(name = "offset", description = "The page number", isRequired = false,
-              type = Type.INTEGER)
-      },
-      responses = {
-          @RestResponse(responseCode = SC_OK, description = "An XML representation of the report")
-      })
-  public ReportImpl reportAsXml(@QueryParam("from") String from, @QueryParam("to") String to,
-          @QueryParam("offset") int offset, @QueryParam("limit") int limit) {
+  @Operation(
+      summary = "Get a report as XML",
+      description = "Get a report for a time range"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "An XML representation of the report")
+  })
+  public ReportImpl reportAsXml(
+      @Parameter(description = "The beginning of the time range")
+      @QueryParam("from") String from,
+      @Parameter(description = "The end of the time range")
+      @QueryParam("to") String to,
+      @Parameter(description = "The page number")
+      @QueryParam("offset") int offset,
+      @Parameter(description = "The maximum number of items to return per page")
+      @QueryParam("limit") int limit
+  ) {
 
     // Are the values of offset and limit valid?
     if (offset < 0 || limit < 0) {
@@ -321,50 +314,53 @@ public class UserTrackingRestService {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/report.json")
-  @RestQuery(
-      name = "reportasjson",
-      description = "Get a report for a time range",
-      returnDescription = "The report.",
-      restParameters = {
-          @RestParameter(name = "from", description = "The beginning of the time range", isRequired = false,
-              type = Type.STRING),
-          @RestParameter(name = "to", description = "The end of the time range", isRequired = false,
-              type = Type.STRING),
-          @RestParameter(name = "limit", description = "The maximum number of items to return per page",
-              isRequired = false, type = Type.INTEGER),
-          @RestParameter(name = "offset", description = "The page number", isRequired = false, type = Type.INTEGER)
-      },
-      responses = {
-          @RestResponse(responseCode = SC_OK, description = "A JSON representation of the report")
-      })
-  public ReportImpl reportAsJson(@QueryParam("from") String from, @QueryParam("to") String to,
-          @QueryParam("offset") int offset, @QueryParam("limit") int limit) {
+  @Operation(
+      summary = "Get a report as JSON",
+      description = "Get a report for a time range"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "A JSON representation of the report")
+  })
+  public ReportImpl reportAsJson(
+      @Parameter(description = "The beginning of the time range")
+      @QueryParam("from") String from,
+      @Parameter(description = "The end of the time range")
+      @QueryParam("to") String to,
+      @Parameter(description = "The page number")
+      @QueryParam("offset") int offset,
+      @Parameter(description = "The maximum number of items to return per page")
+      @QueryParam("limit") int limit
+  ) {
     return reportAsXml(from, to, offset, limit); // same logic, different @Produces annotation
   }
 
   @PUT
   @Path("")
   @Produces(MediaType.TEXT_XML)
-  @RestQuery(
-      name = "add",
-      description = "Record a user action",
-      returnDescription = "An XML representation of the user action",
-      restParameters = {
-          @RestParameter(name = "id", description = "The episode identifier", isRequired = true, type = Type.STRING),
-          @RestParameter(name = "type", description = "The episode identifier", isRequired = true, type = Type.STRING),
-          @RestParameter(name = "in", description = "The beginning of the time range", isRequired = true,
-              type = Type.STRING),
-          @RestParameter(name = "out", description = "The end of the time range", isRequired = false,
-              type = Type.STRING),
-          @RestParameter(name = "playing", description = "Whether the player is currently playing",
-              isRequired = false, type = Type.STRING)
-      },
-      responses = {
-          @RestResponse(responseCode = SC_CREATED, description = "An XML representation of the user action")
-      })
-  public Response addFootprint(@FormParam("id") String mediapackageId, @FormParam("in") String inString,
-          @FormParam("out") String outString, @FormParam("type") String type, @FormParam("playing") String isPlaying,
-          @Context HttpServletRequest request) {
+  @Operation(
+      summary = "Record a user action",
+      description = "Record a user action"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "201", description = "An XML representation of the user action"),
+      @ApiResponse(responseCode = "400", description = "The time range is missing or is not an integer")
+  })
+  public Response addFootprint(
+      @Parameter(description = "The episode identifier", required = true)
+      @FormParam("id") String mediapackageId,
+      @Parameter(description = "The beginning of the time range", required = true)
+      @FormParam("in") String inString,
+      @Parameter(description = "The end of the time range")
+      @FormParam("out") String outString,
+      @Parameter(
+          description = "The type of the user action. FOOTPRINT records a footprint, any other type a tracking event",
+          required = true
+      )
+      @FormParam("type") String type,
+      @Parameter(description = "Whether the player is currently playing")
+      @FormParam("playing") String isPlaying,
+      @Context HttpServletRequest request
+  ) {
 
     String sessionId = request.getSession().getId();
     String userId = securityService.getUser().getUsername();
@@ -440,17 +436,17 @@ public class UserTrackingRestService {
   @GET
   @Produces(MediaType.TEXT_XML)
   @Path("/action/{id}.xml")
-  @RestQuery(
-      name = "add",
-      description = "Record a user action",
-      returnDescription = "An XML representation of the user action",
-      pathParameters = {
-          @RestParameter(name = "id", description = "The episode identifier", isRequired = true, type = Type.STRING)
-      },
-      responses = {
-          @RestResponse(responseCode = SC_OK, description = "An XML representation of the user action")
-      })
-  public UserActionImpl getActionAsXml(@PathParam("id") String actionId) {
+  @Operation(
+      summary = "Get a user action as XML",
+      description = "Get a user action"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "An XML representation of the user action")
+  })
+  public UserActionImpl getActionAsXml(
+      @Parameter(description = "The user action identifier", required = true)
+      @PathParam("id") String actionId
+  ) {
     Long id = null;
     try {
       id = Long.parseLong(actionId);
@@ -469,34 +465,34 @@ public class UserTrackingRestService {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/action/{id}.json")
-  @RestQuery(
-      name = "add",
-      description = "Record a user action",
-      returnDescription = "A JSON representation of the user action",
-      pathParameters = {
-          @RestParameter(name = "id", description = "The episode identifier", isRequired = true, type = Type.STRING)
-      },
-      responses = {
-          @RestResponse(responseCode = SC_OK, description = "A JSON representation of the user action")
-      })
-  public UserActionImpl getActionAsJson(@PathParam("id") String actionId) {
+  @Operation(
+      summary = "Get a user action as JSON",
+      description = "Get a user action"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "A JSON representation of the user action")
+  })
+  public UserActionImpl getActionAsJson(
+      @Parameter(description = "The user action identifier", required = true)
+      @PathParam("id") String actionId
+  ) {
     return getActionAsXml(actionId);
   }
 
   @GET
   @Produces(MediaType.TEXT_XML)
   @Path("/footprint.xml")
-  @RestQuery(
-      name = "footprintasxml",
-      description = "Gets the 'footprint' action for an episode",
-      returnDescription = "An XML representation of the footprints",
-      restParameters = {
-          @RestParameter(name = "id", description = "The episode identifier", isRequired = false, type = Type.STRING)
-      },
-      responses = {
-          @RestResponse(responseCode = SC_OK, description = "An XML representation of the footprints")
-      })
-  public FootprintsListImpl getFootprintAsXml(@QueryParam("id") String mediapackageId) {
+  @Operation(
+      summary = "Get the footprints of an episode as XML",
+      description = "Gets the 'footprint' action for an episode"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "An XML representation of the footprints")
+  })
+  public FootprintsListImpl getFootprintAsXml(
+      @Parameter(description = "The episode identifier", required = true)
+      @QueryParam("id") String mediapackageId
+  ) {
     String userId = securityService.getUser().getUsername();
 
     // Is the mediapackageId passed
@@ -514,17 +510,17 @@ public class UserTrackingRestService {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/footprint.json")
-  @RestQuery(
-      name = "footprintasxml",
-      description = "Gets the 'footprint' action for an episode",
-      returnDescription = "A JSON representation of the footprints",
-      restParameters = {
-          @RestParameter(name = "id", description = "The episode identifier", isRequired = false, type = Type.STRING)
-      },
-      responses = {
-          @RestResponse(responseCode = SC_OK, description = "A JSON representation of the footprints")
-      })
-  public FootprintsListImpl getFootprintAsJson(@QueryParam("id") String mediapackageId) {
+  @Operation(
+      summary = "Get the footprints of an episode as JSON",
+      description = "Gets the 'footprint' action for an episode"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "A JSON representation of the footprints")
+  })
+  public FootprintsListImpl getFootprintAsJson(
+      @Parameter(description = "The episode identifier", required = true)
+      @QueryParam("id") String mediapackageId
+  ) {
     return getFootprintAsXml(mediapackageId); // this is the same logic... it's just annotated differently
   }
 
