@@ -20,7 +20,6 @@
  */
 package org.opencastproject.oaipmh.server;
 
-import org.opencastproject.util.doc.rest.RestService;
 
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
@@ -28,13 +27,13 @@ import org.osgi.service.jaxrs.whiteboard.propertytypes.JaxrsResource;
 
 import javax.ws.rs.Path;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 @Path("/oaipmhinfo")
-@RestService(
-        name = "oaipmhserverinfo",
-        title = "OAI-PMH server info service",
-        abstractText = "This service "
-                + "provides system gateway to the OAI-PMH server.",
-        notes = {})
+@Tag(
+    name = "OAI-PMH server info service",
+    description = "This service provides system gateway to the OAI-PMH server."
+)
 @Component(
     immediate = true,
     service = OsgiOaiPmhServerInfoRestEndpoint.class,

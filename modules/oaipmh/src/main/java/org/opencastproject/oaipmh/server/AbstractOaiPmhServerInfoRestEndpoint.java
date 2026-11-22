@@ -20,12 +20,7 @@
  */
 package org.opencastproject.oaipmh.server;
 
-import static javax.servlet.http.HttpServletResponse.SC_OK;
 import static org.opencastproject.util.RestUtil.R.ok;
-
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -34,6 +29,11 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+
 /** Assistant REST endpoint to support a distributed deployment of the {@link OaiPmhServer}. */
 public abstract class AbstractOaiPmhServerInfoRestEndpoint {
   public abstract OaiPmhServerInfo getOaiPmhServerInfo();
@@ -41,27 +41,30 @@ public abstract class AbstractOaiPmhServerInfoRestEndpoint {
   @GET
   @Path("/hasrepo/{repoId}")
   @Produces(MediaType.TEXT_PLAIN)
-  @RestQuery(name = "hasRepo",
-             description = "Ask if the OAI-PMH server knows about a repository",
-             returnDescription = "true|false",
-             pathParameters = {
-                     @RestParameter(name = "repoId", isRequired = true,
-                             description = "The id of the repository",
-                             type = RestParameter.Type.STRING)},
-             responses = {
-                     @RestResponse(responseCode = SC_OK, description = "true|false")})
-  public Response hasRepo(@PathParam("repoId") String repoId) {
+  @Operation(
+      summary = "Check whether the OAI-PMH server knows a repository",
+      description = "Ask if the OAI-PMH server knows about a repository"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "true|false")
+  })
+  public Response hasRepo(
+      @Parameter(description = "The id of the repository", required = true)
+      @PathParam("repoId") String repoId
+  ) {
     return ok(getOaiPmhServerInfo().hasRepo(repoId));
   }
 
   @GET
   @Path("/mountpoint")
   @Produces(MediaType.TEXT_PLAIN)
-  @RestQuery(name = "mountPoint",
-             description = "Ask for the mount point of the OAI-PMH server",
-             returnDescription = "The mount point",
-             responses = {
-                     @RestResponse(responseCode = SC_OK, description = "The mount point")})
+  @Operation(
+      summary = "Get the mount point of the OAI-PMH server",
+      description = "Ask for the mount point of the OAI-PMH server"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The mount point")
+  })
   public Response getMountPoint() {
     return ok(getOaiPmhServerInfo().getMountPoint());
   }
