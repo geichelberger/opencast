@@ -26,11 +26,6 @@ import static javax.ws.rs.core.MediaType.TEXT_PLAIN_TYPE;
 import static org.opencastproject.util.RestUtil.R.notFound;
 import static org.opencastproject.util.RestUtil.R.ok;
 
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
-
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
@@ -47,7 +42,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 
-import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
@@ -56,12 +50,17 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Response;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 /** Bundle information via REST. */
-@RestService(
-    name = "systemInfo",
-    title = "System Bundle Info",
-    notes = { "This is used to display the version information on the login page." },
-    abstractText = "The system bundle info endpoint yields information about the running OSGi bundles of Opencast.")
+@Tag(
+    name = "System Bundle Info",
+    description = "The system bundle info endpoint yields information about the running OSGi bundles of Opencast."
+)
 public abstract class BundleInfoRestEndpoint {
 
   private static final Logger logger = LoggerFactory.getLogger(BundleInfoRestEndpoint.class);
@@ -90,12 +89,13 @@ public abstract class BundleInfoRestEndpoint {
   // See https://opencast.jira.com/browse/MH-9768
   @Path("bundles/list")
   @Produces(APPLICATION_JSON)
-  @RestQuery(
-      name = "list",
-      description = "Return a list of all running bundles on the whole cluster.",
-      responses = {
-          @RestResponse(description = "A list of bundles.", responseCode = HttpServletResponse.SC_OK) },
-      returnDescription = "The search results, expressed as xml or json.")
+  @Operation(
+      summary = "List the running bundles",
+      description = "Return a list of all running bundles on the whole cluster."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "A list of bundles.")
+  })
   public Response getVersions() {
     JsonArray bundleInfos = new JsonArray();
     for (BundleInfo bundle : getDb().getBundles()) {
@@ -111,22 +111,21 @@ public abstract class BundleInfoRestEndpoint {
   /** Return true if all bundles have the same bundle version and build number. */
   @GET
   @Path("bundles/check")
-  @RestQuery(
-      name = "check",
-      description = "Check if all bundles throughout the cluster have the same OSGi bundle version and build number.",
-      restParameters = {
-          @RestParameter(
-              name = "prefix",
-              description = "The bundle name prefixes to check. Defaults to '" + DEFAULT_BUNDLE_PREFIX + "'.",
-              isRequired = false,
-              defaultValue = DEFAULT_BUNDLE_PREFIX,
-              type = RestParameter.Type.STRING) },
-      responses = {
-          @RestResponse(description = "true/false", responseCode = HttpServletResponse.SC_OK),
-          @RestResponse(description = "cannot find any bundles with the given prefix",
-              responseCode = HttpServletResponse.SC_NOT_FOUND) },
-      returnDescription = "The search results, expressed as xml or json.")
-  public Response checkBundles(@DefaultValue(DEFAULT_BUNDLE_PREFIX) @QueryParam("prefix") List<String> prefixes) {
+  @Operation(
+      summary = "Check the bundle versions across the cluster",
+      description = "Check if all bundles throughout the cluster have the same OSGi bundle version and build number."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "true/false"),
+      @ApiResponse(responseCode = "404", description = "cannot find any bundles with the given prefix")
+  })
+  public Response checkBundles(
+      @Parameter(
+          description = "The bundle name prefixes to check. Defaults to '" + DEFAULT_BUNDLE_PREFIX + "'.",
+          example = DEFAULT_BUNDLE_PREFIX
+      )
+      @DefaultValue(DEFAULT_BUNDLE_PREFIX) @QueryParam("prefix") List<String> prefixes
+  ) {
     return withBundles(prefixes, infos -> {
       final String bundleVersion = infos.get(0).getBundleVersion();
       final Optional<String> buildNumber = infos.get(0).getBuildNumber();
@@ -143,22 +142,21 @@ public abstract class BundleInfoRestEndpoint {
   @GET
   @Path("bundles/version")
   @Produces(APPLICATION_JSON)
-  @RestQuery(
-      name = "bundleVersion",
-      description = "Return the common OSGi build version and build number of all bundles matching the given prefix.",
-      restParameters = {
-          @RestParameter(
-              name = "prefix",
-              description = "The bundle name prefixes to check. Defaults to '" + DEFAULT_BUNDLE_PREFIX + "'.",
-              isRequired = false,
-              defaultValue = DEFAULT_BUNDLE_PREFIX,
-              type = RestParameter.Type.STRING) },
-      responses = {
-          @RestResponse(description = "Version structure", responseCode = HttpServletResponse.SC_OK),
-          @RestResponse(description = "No bundles with the given prefix",
-              responseCode = HttpServletResponse.SC_NOT_FOUND) },
-      returnDescription = "The search results as json.")
-  public Response getBundleVersion(@DefaultValue(DEFAULT_BUNDLE_PREFIX) @QueryParam("prefix") List<String> prefixes) {
+  @Operation(
+      summary = "Get the common bundle version",
+      description = "Return the common OSGi build version and build number of all bundles matching the given prefix."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Version structure"),
+      @ApiResponse(responseCode = "404", description = "No bundles with the given prefix")
+  })
+  public Response getBundleVersion(
+      @Parameter(
+          description = "The bundle name prefixes to check. Defaults to '" + DEFAULT_BUNDLE_PREFIX + "'.",
+          example = DEFAULT_BUNDLE_PREFIX
+      )
+      @DefaultValue(DEFAULT_BUNDLE_PREFIX) @QueryParam("prefix") List<String> prefixes
+  ) {
     return withBundles(prefixes, infos -> {
       final Set<BundleVersion> versions = new HashSet<>();
       for (BundleInfo bundle : infos) {
@@ -194,23 +192,20 @@ public abstract class BundleInfoRestEndpoint {
 
   @DELETE
   @Path("bundles/host")
-  @RestQuery(
-          name = "clearHost",
-          description = "Removes the tracked bundles for a host. This is done automatically when you shut down "
+  @Operation(
+      summary = "Remove the tracked bundles of a host",
+      description = "Removes the tracked bundles for a host. This is done automatically when you shut down "
           + "Opencast. But this endpoint can be used to force this in case e.g. a machine got dropped. Make sure the "
           + "host is actually gone! The database will be automatically rebuilt when Opencast on that host is "
-          + "(re)started.",
-          restParameters = {
-                  @RestParameter(
-                          name = "host",
-                          description = "The name of the host to clear",
-                          isRequired = true,
-                          type = RestParameter.Type.STRING,
-                          defaultValue = "") },
-          responses = {
-                  @RestResponse(description = "Version structure", responseCode = HttpServletResponse.SC_NO_CONTENT) },
-          returnDescription = "No data is returned.")
-  public Response clearHost(@QueryParam("host") String host) {
+          + "(re)started."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "204", description = "The tracked bundles of the host were removed")
+  })
+  public Response clearHost(
+      @Parameter(description = "The name of the host to clear", required = true)
+      @QueryParam("host") String host
+  ) {
     logger.debug("Removing tracked bundles of host: {}", host);
     getDb().clear(host);
     return Response.noContent().build();
