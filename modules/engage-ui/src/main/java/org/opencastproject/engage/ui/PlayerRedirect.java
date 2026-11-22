@@ -87,10 +87,11 @@ public class PlayerRedirect {
   @Path("/{id:.+}")
   @Operation(
       summary = "Redirect to the player",
-      description = "Player redirect"
+      description = "Redirects to the player configured for the organization (organization property \"player\", "
+          + "Paella 8 by default) and passes on the query parameters."
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "307", description = "Returns the paella configuration")
+      @ApiResponse(responseCode = "307", description = "Redirect to the player of the event.")
   })
   public Response redirect(
       @Parameter(description = "The event identifier", required = true)
