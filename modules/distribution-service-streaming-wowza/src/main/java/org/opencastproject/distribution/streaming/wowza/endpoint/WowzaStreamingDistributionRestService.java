@@ -21,8 +21,6 @@
 
 package org.opencastproject.distribution.streaming.wowza.endpoint;
 
-import static javax.servlet.http.HttpServletResponse.SC_NO_CONTENT;
-import static javax.servlet.http.HttpServletResponse.SC_OK;
 import static javax.ws.rs.core.Response.status;
 
 import org.opencastproject.distribution.api.StreamingDistributionService;
@@ -35,11 +33,6 @@ import org.opencastproject.mediapackage.MediaPackageElementParser;
 import org.opencastproject.mediapackage.MediaPackageParser;
 import org.opencastproject.rest.AbstractJobProducerEndpoint;
 import org.opencastproject.serviceregistry.api.ServiceRegistry;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestParameter.Type;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
@@ -64,23 +57,21 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 /**
  * Rest endpoint for distributing media to the streaming distribution channel.
  */
 @Path("/distribution/streaming")
-@RestService(
-    name = "streamingdistributionservice",
-    title = "Streaming Distribution Service",
-    abstractText = "This service distributes media packages to the streaming server, especially "
-        + "Wowza Streaming Server.",
-    notes = {
-        "All paths above are relative to the REST endpoint base (something like http://your.server/files)",
-        "If the service is down or not working it will return a status 503, this means the the underlying service is "
-            + "not working and is either restarting or has failed",
-        "A status code 500 means a general failure has occurred which is not recoverable and was "
-            + "not anticipated. In other words, there is a bug! You should file an error report "
-            + "with your server logs from the time when the error occurred:"
-            + "<a href=\"https://github.com/opencast/opencast/issues\">Opencast Issue Tracker</a>" })
+@Tag(
+    name = "Streaming Distribution Service",
+    description = "This service distributes media packages to the streaming server, especially "
+        + "Wowza Streaming Server."
+)
 @Component(
     immediate = true,
     service = WowzaStreamingDistributionRestService.class,
@@ -139,13 +130,16 @@ public class WowzaStreamingDistributionRestService extends AbstractJobProducerEn
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/publishToStreaming")
-  @RestQuery(name = "publishToStreaming", description = "Checks whether publish to streaming is configured for the "
-                  + "current organization",
-          returnDescription = "Returns whether publish to streaming is configured for the current organization as a "
-                            + "boolean.",
-          responses = {
-                  @RestResponse(responseCode = SC_OK, description = "Whether publish to streaming is configured for "
-                                                                  + "the current organization.")})
+  @Operation(
+      summary = "Check whether publishing to streaming is configured",
+      description = "Checks whether publish to streaming is configured for the current organization"
+  )
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "200",
+          description = "Whether publish to streaming is configured for the current organization."
+      )
+  })
   public Response publishToStreaming() {
     return Response.ok(Boolean.toString(service.publishToStreaming())).build();
   }
@@ -153,44 +147,20 @@ public class WowzaStreamingDistributionRestService extends AbstractJobProducerEn
   @POST
   @Path("/")
   @Produces(MediaType.TEXT_XML)
-  @RestQuery(
-      name = "distribute",
-      description = "Distribute a media package element to this distribution channel",
-      returnDescription = "The job that can be used to track the distribution",
-      restParameters = {
-          @RestParameter(
-              name = "mediapackage",
-              isRequired = true,
-              description = "The mediapackage",
-              type = Type.TEXT
-          ),
-          @RestParameter(
-              name = "channelId",
-              isRequired = true,
-              description = "The publication channel ID",
-              type = Type.TEXT
-          ),
-          @RestParameter(
-              name = "elementIds",
-              isRequired = true,
-              description = "The elements to distribute as Json Array['IdOne','IdTwo']",
-              type = Type.STRING
-          )
-      },
-      responses = {
-          @RestResponse(
-              responseCode = SC_OK,
-              description = "An XML representation of the distribution job"
-          ),
-          @RestResponse(
-              responseCode = SC_NO_CONTENT,
-              description = "There is no streaming distribution service available"
-          )
-      }
+  @Operation(
+      summary = "Distribute a media package element to the streaming channel",
+      description = "Distribute a media package element to this distribution channel"
   )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "An XML representation of the distribution job"),
+      @ApiResponse(responseCode = "204", description = "There is no streaming distribution service available")
+  })
   public Response distribute(
+      @Parameter(description = "The mediapackage", required = true)
       @FormParam("mediapackage") String mediaPackageXml,
+      @Parameter(description = "The publication channel ID", required = true)
       @FormParam("channelId") String channelId,
+      @Parameter(description = "The elements to distribute as Json Array['IdOne','IdTwo']", required = true)
       @FormParam("elementIds") String elementIds
   ) {
     Job job;
@@ -215,44 +185,20 @@ public class WowzaStreamingDistributionRestService extends AbstractJobProducerEn
   @POST
   @Path("/distributesync")
   @Produces(MediaType.TEXT_XML)
-  @RestQuery(
-      name = "distributesync",
-      description = "Syncrhonously distribute a media package element to this distribution channel",
-      returnDescription = "The distribution",
-      restParameters = {
-          @RestParameter(
-              name = "mediapackage",
-              isRequired = true,
-              description = "The mediapackage",
-              type = Type.TEXT
-          ),
-          @RestParameter(
-              name = "channelId",
-              isRequired = true,
-              description = "The publication channel ID",
-              type = Type.TEXT
-          ),
-          @RestParameter(
-              name = "elementIds",
-              isRequired = true,
-              description = "The elements to distribute as Json Array['IdOne','IdTwo']",
-              type = Type.STRING
-          )
-      },
-      responses = {
-          @RestResponse(
-              responseCode = SC_OK,
-              description = "An XML representation of the distribution"
-          ),
-          @RestResponse(
-              responseCode = SC_NO_CONTENT,
-              description = "There is no streaming distribution service available"
-          )
-      }
+  @Operation(
+      summary = "Distribute a media package element to the streaming channel synchronously",
+      description = "Synchronously distribute a media package element to this distribution channel"
   )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "An XML representation of the distribution"),
+      @ApiResponse(responseCode = "204", description = "There is no streaming distribution service available")
+  })
   public Response distributeSync(
+      @Parameter(description = "The mediapackage", required = true)
       @FormParam("mediapackage") String mediaPackageXml,
+      @Parameter(description = "The publication channel ID", required = true)
       @FormParam("channelId") String channelId,
+      @Parameter(description = "The elements to distribute as Json Array['IdOne','IdTwo']", required = true)
       @FormParam("elementIds") String elementIds
   ) {
     List<MediaPackageElement> result;
@@ -277,44 +223,20 @@ public class WowzaStreamingDistributionRestService extends AbstractJobProducerEn
   @POST
   @Path("/retract")
   @Produces(MediaType.TEXT_XML)
-  @RestQuery(
-      name = "retract",
-      description = "Retract a media package element from this distribution channel",
-      returnDescription = "The job that can be used to track the retraction",
-      restParameters = {
-          @RestParameter(
-              name = "mediapackage",
-              isRequired = true,
-              description = "The mediapackage",
-              type = Type.TEXT
-          ),
-          @RestParameter(
-              name = "channelId",
-              isRequired = true,
-              description = "The publication channel ID",
-              type = Type.TEXT
-          ),
-          @RestParameter(
-              name = "elementIds",
-              isRequired = true,
-              description = "The elements to retract as Json Array['IdOne','IdTwo']",
-              type = Type.STRING
-          )
-      },
-      responses = {
-          @RestResponse(
-              responseCode = SC_OK,
-              description = "An XML representation of the retraction job"
-          ),
-          @RestResponse(
-              responseCode = SC_NO_CONTENT,
-              description = "There is no streaming distribution service available"
-          )
-      }
+  @Operation(
+      summary = "Retract a media package element from the streaming channel",
+      description = "Retract a media package element from this distribution channel"
   )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "An XML representation of the retraction job"),
+      @ApiResponse(responseCode = "204", description = "There is no streaming distribution service available")
+  })
   public Response retract(
+      @Parameter(description = "The mediapackage", required = true)
       @FormParam("mediapackage") String mediaPackageXml,
+      @Parameter(description = "The publication channel ID", required = true)
       @FormParam("channelId") String channelId,
+      @Parameter(description = "The elements to retract as Json Array['IdOne','IdTwo']", required = true)
       @FormParam("elementIds") String elementIds
   ) {
     Job job;
@@ -340,44 +262,22 @@ public class WowzaStreamingDistributionRestService extends AbstractJobProducerEn
   @POST
   @Path("/retractsync")
   @Produces(MediaType.TEXT_XML)
-  @RestQuery(
-      name = "retractsync",
-      description = "Synchronously retract a media package element from this distribution channel",
-      returnDescription = "The retraction",
-      restParameters = {
-          @RestParameter(
-              name = "mediapackage",
-              isRequired = true,
-              description = "The mediapackage",
-              type = Type.TEXT
-          ),
-          @RestParameter(
-              name = "channelId",
-              isRequired = true,
-              description = "The publication channel ID",
-              type = Type.TEXT
-          ),
-          @RestParameter(
-              name = "elementIds",
-              isRequired = true,
-              description = "The elements to retract as Json Array['IdOne','IdTwo']",
-              type = Type.STRING
-          )
-      },
-      responses = {
-          @RestResponse(
-              responseCode = SC_OK,
-              description = "An XML representation of the retraction"
-          ),
-          @RestResponse(
-              responseCode = SC_NO_CONTENT,
-              description = "There is no streaming distribution service available"
-          )
-      }
+  @Operation(
+      summary = "Retract a media package element from the streaming channel synchronously",
+      description = "Synchronously retract a media package element from this distribution channel"
   )
-  public Response retractSync(@FormParam("mediapackage") String mediaPackageXml,
-                          @FormParam("channelId") String channelId,
-                          @FormParam("elementIds") String elementIds) {
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "An XML representation of the retraction"),
+      @ApiResponse(responseCode = "204", description = "There is no streaming distribution service available")
+  })
+  public Response retractSync(
+      @Parameter(description = "The mediapackage", required = true)
+      @FormParam("mediapackage") String mediaPackageXml,
+      @Parameter(description = "The publication channel ID", required = true)
+      @FormParam("channelId") String channelId,
+      @Parameter(description = "The elements to retract as Json Array['IdOne','IdTwo']", required = true)
+      @FormParam("elementIds") String elementIds
+  ) {
     List<MediaPackageElement> result;
     try {
       Set<String> setElementIds = gson.fromJson(elementIds, new TypeToken<Set<String>>() { }.getType());
