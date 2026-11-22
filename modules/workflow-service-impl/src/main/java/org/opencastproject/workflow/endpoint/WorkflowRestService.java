@@ -208,6 +208,7 @@ public class WorkflowRestService extends AbstractJobProducerEndpoint {
   public Response getCount(
       @Parameter(description = "The workflow state")
       @QueryParam("state") WorkflowInstance.WorkflowState state,
+      @Parameter(description = "Not used. This parameter has no effect.")
       @QueryParam("operation") String operation
   ) {
     try {

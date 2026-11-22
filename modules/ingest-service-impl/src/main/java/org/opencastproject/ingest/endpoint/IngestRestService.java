@@ -1917,6 +1917,10 @@ public class IngestRestService extends AbstractJobProducerEndpoint {
       @Context HttpServletRequest request,
       @Parameter(description = "Workflow definition id", required = true)
       @PathParam("workflowDefinitionId") String wdID,
+      @Parameter(
+          description = "The workflow instance ID to associate with this zipped mediapackage. A form field "
+              + "workflowInstanceId in the request body takes precedence."
+      )
       @QueryParam("id") String wiID
   ) {
     logger.trace("add zipped media package with workflow definition id: {} and workflow instance id: {}", wdID, wiID);

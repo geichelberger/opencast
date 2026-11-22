@@ -3166,8 +3166,11 @@ public abstract class AbstractEventEndpoint {
       @ApiResponse(responseCode = "200", description = "Returns all events as JSON")
   })
   public Response getEvents(
+      @Parameter(description = "Not used. This parameter has no effect.")
       @QueryParam("id") String id,
+      @Parameter(description = "Not used. This parameter has no effect.")
       @QueryParam("commentReason") String reasonFilter,
+      @Parameter(description = "Not used. This parameter has no effect.")
       @QueryParam("commentResolution") String resolutionFilter,
       @Parameter(
           description = "The filter used for the query. They "

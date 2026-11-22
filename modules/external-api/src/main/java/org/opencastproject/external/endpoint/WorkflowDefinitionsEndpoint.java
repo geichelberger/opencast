@@ -150,6 +150,9 @@ public class WorkflowDefinitionsEndpoint {
           description = "Whether the workflow configuration panel should be included in the response"
       )
       @QueryParam("withconfigurationpanel") boolean withConfigurationPanel,
+      @Parameter(
+          description = "Whether the workflow configuration panel in JSON should be included in the response"
+      )
       @QueryParam("withconfigurationpaneljson") boolean withConfigurationPanelJson,
       @Parameter(
           description = "Usage [Filter Name]:[Value to Filter With]. Available filter: \"tag\""

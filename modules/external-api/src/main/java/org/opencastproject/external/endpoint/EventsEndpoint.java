@@ -931,12 +931,22 @@ public class EventsEndpoint {
           + "of signed URLs when caching this response."
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "A (potentially empty) list of events is returned.")
+      @ApiResponse(responseCode = "200", description = "A (potentially empty) list of events is returned."),
+      @ApiResponse(
+          responseCode = "400",
+          description = "The request is invalid, for example because the comment resolution is unknown."
+      )
   })
   public Response getEvents(
       @HeaderParam("Accept") String acceptHeader,
+      @Parameter(description = "Not used. This parameter has no effect.")
       @QueryParam("id") String id,
+      @Parameter(description = "Not used. This parameter has no effect.")
       @QueryParam("commentReason") String reasonFilter,
+      @Parameter(
+          description = "The comment resolution. It is only validated: an unknown value results in a bad request, "
+              + "but the result is not filtered by it."
+      )
       @QueryParam("commentResolution") String resolutionFilter,
       @Parameter(
           description = "Usage [Filter Name]:[Value to Filter With]"

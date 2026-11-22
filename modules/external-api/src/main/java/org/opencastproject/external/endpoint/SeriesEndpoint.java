@@ -223,6 +223,7 @@ public class SeriesEndpoint {
               + "descending order and is mandatory."
       )
       @QueryParam("sort") String sort,
+      @Parameter(description = "Not used. This parameter has no effect. Set the order with the sort parameter.")
       @QueryParam("order") String order,
       @Parameter(description = "The index of the first result to return.")
       @QueryParam("offset") int offset,
