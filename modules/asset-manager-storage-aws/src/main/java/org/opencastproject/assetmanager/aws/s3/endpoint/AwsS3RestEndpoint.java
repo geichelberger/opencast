@@ -34,10 +34,6 @@ import org.opencastproject.assetmanager.aws.s3.AwsS3AssetStore;
 import org.opencastproject.mediapackage.MediaPackageElement;
 import org.opencastproject.security.api.SecurityService;
 import org.opencastproject.util.NotFoundException;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 
 import com.amazonaws.services.s3.model.StorageClass;
 
@@ -51,7 +47,6 @@ import org.slf4j.LoggerFactory;
 import java.util.Optional;
 import java.util.function.Supplier;
 
-import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.BadRequestException;
 import javax.ws.rs.FormParam;
 import javax.ws.rs.GET;
@@ -63,15 +58,18 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 @Path("/assets/aws/s3")
-@RestService(name = "archive-aws-s3", title = "AWS S3 Archive",
-    notes = {
-        "All paths are relative to the REST endpoint base (something like http://your.server/files)",
-        "If you notice that this service is not working as expected, there might be a bug! "
-            + "You should file an error report with your server logs from the time when the error occurred: "
-            + "<a href=\"http://opencast.jira.com\">Opencast Issue Tracker</a>"
-    },
-    abstractText = "This service handles AWS S3 archived assets")
+@Tag(
+    name = "AWS S3 Archive",
+    description = "This service handles AWS S3 archived assets"
+)
 @Component(
     immediate = true,
     service = AwsS3RestEndpoint.class,
@@ -93,23 +91,18 @@ public class AwsS3RestEndpoint {
   @GET
   @Path("{mediaPackageId}/assets/storageClass")
   @Produces(MediaType.TEXT_PLAIN)
-  @RestQuery(name = "getStorageClass",
-      description = "Get the S3 Storage Class for each asset in the Media Package",
-      pathParameters = {
-          @RestParameter(
-              name = "mediaPackageId", isRequired = true,
-              type = RestParameter.Type.STRING,
-              description = "The media package indentifier.")},
-      responses = {
-          @RestResponse(
-              description = "mediapackage found in S3",
-              responseCode = HttpServletResponse.SC_OK),
-          @RestResponse(
-              description = "mediapackage not found or has no assets in S3",
-              responseCode = HttpServletResponse.SC_NOT_FOUND)
-      },
-      returnDescription = "List each assets's Object Key and S3 Storage Class")
-  public Response getStorageClass(@PathParam("mediaPackageId") final String mediaPackageId) {
+  @Operation(
+      summary = "Get the S3 storage class of the assets of a media package",
+      description = "Get the S3 Storage Class for each asset in the Media Package"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "mediapackage found in S3"),
+      @ApiResponse(responseCode = "404", description = "mediapackage not found or has no assets in S3")
+  })
+  public Response getStorageClass(
+      @Parameter(description = "The media package indentifier.", required = true)
+      @PathParam("mediaPackageId") final String mediaPackageId
+  ) {
     return handleException(() -> {
       String mpId = StringUtils.trimToNull(mediaPackageId);
 
@@ -146,33 +139,24 @@ public class AwsS3RestEndpoint {
   @PUT
   @Path("{mediaPackageId}/assets")
   @Produces(MediaType.TEXT_PLAIN)
-  @RestQuery(name = "modifyStorageClass",
-      description = "Move the Media Package assets to the specified S3 Storage Class if possible",
-      pathParameters = {
-          @RestParameter(
-              name = "mediaPackageId",
-              isRequired = true,
-              type = RestParameter.Type.STRING,
-              description = "The media package indentifier.")
-      },
-      restParameters = {
-          @RestParameter(
-              name = "storageClass",
-              isRequired = true,
-              type = RestParameter.Type.STRING,
-              description = "The S3 storage class, valid terms STANDARD, STANDARD_IA, INTELLIGENT_TIERING, ONEZONE_IA,"
-                          + "GLACIER_IR, GLACIER, and DEEP_ARCHIVE. See https://aws.amazon.com/s3/storage-classes/")
-      },
-      responses = {
-          @RestResponse(
-              description = "mediapackage found in S3",
-              responseCode = HttpServletResponse.SC_OK),
-          @RestResponse(
-              description = "mediapackage not found or has no assets in S3",
-              responseCode = HttpServletResponse.SC_NOT_FOUND)      },
-      returnDescription = "List each asset's Object Key and new S3 Storage Class")
-  public Response modifyStorageClass(@PathParam("mediaPackageId") final String mediaPackageId,
-                                     @FormParam("storageClass") final String storageClass) {
+  @Operation(
+      summary = "Change the S3 storage class of the assets of a media package",
+      description = "Move the Media Package assets to the specified S3 Storage Class if possible"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "mediapackage found in S3"),
+      @ApiResponse(responseCode = "404", description = "mediapackage not found or has no assets in S3")
+  })
+  public Response modifyStorageClass(
+      @Parameter(description = "The media package indentifier.", required = true)
+      @PathParam("mediaPackageId") final String mediaPackageId,
+      @Parameter(
+          description = "The S3 storage class, valid terms STANDARD, STANDARD_IA, INTELLIGENT_TIERING, ONEZONE_IA,"
+              + "GLACIER_IR, GLACIER, and DEEP_ARCHIVE. See https://aws.amazon.com/s3/storage-classes/",
+          required = true
+      )
+      @FormParam("storageClass") final String storageClass
+  ) {
     return handleException(() -> {
       String mpId = StringUtils.trimToNull(mediaPackageId);
       String sc = StringUtils.trimToNull(storageClass);
@@ -209,28 +193,19 @@ public class AwsS3RestEndpoint {
   @GET
   @Path("glacier/{mediaPackageId}/assets")
   @Produces(MediaType.TEXT_PLAIN)
-  @RestQuery(name = "restoreAssetsStatus",
-      description = "Get the mediapackage asset's restored status",
-      pathParameters = {
-          @RestParameter(
-              name = "mediaPackageId",
-              isRequired = true,
-              type = RestParameter.Type.STRING,
-              description = "The media package indentifier.")
-      },
-      responses = {
-          @RestResponse(
-              description = "mediapackage found in S3 and assets in Glacier",
-              responseCode = HttpServletResponse.SC_OK),
-          @RestResponse(
-              description = "mediapackage found in S3 but no assets in Glacier",
-              responseCode = HttpServletResponse.SC_NO_CONTENT),
-          @RestResponse(
-              description = "mediapackage not found or has no assets in S3",
-              responseCode = HttpServletResponse.SC_NOT_FOUND)
-      },
-      returnDescription = "List each glacier asset's restoration status and expiration date")
-  public Response getAssetRestoreState(@PathParam("mediaPackageId") final String mediaPackageId) {
+  @Operation(
+      summary = "Get the restore status of the assets of a media package",
+      description = "Get the mediapackage asset's restored status"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "mediapackage found in S3 and assets in Glacier"),
+      @ApiResponse(responseCode = "204", description = "mediapackage found in S3 but no assets in Glacier"),
+      @ApiResponse(responseCode = "404", description = "mediapackage not found or has no assets in S3")
+  })
+  public Response getAssetRestoreState(
+      @Parameter(description = "The media package indentifier.", required = true)
+      @PathParam("mediaPackageId") final String mediaPackageId
+  ) {
     return handleException(() -> {
       String mpId = StringUtils.trimToNull(mediaPackageId);
 
@@ -270,37 +245,24 @@ public class AwsS3RestEndpoint {
   @PUT
   @Path("glacier/{mediaPackageId}/assets")
   @Produces(MediaType.TEXT_PLAIN)
-  @RestQuery(name = "restoreAssets",
-      description = "Initiate the restore of any assets in Glacier storage class",
-      pathParameters = {
-          @RestParameter(
-              name = "mediaPackageId",
-              isRequired = true,
-              type = RestParameter.Type.STRING,
-              description = "The media package indentifier.")
-      },
-      restParameters = {
-          @RestParameter(
-              name = "restorePeriod",
-              isRequired = false,
-              type = RestParameter.Type.INTEGER,
-              defaultValue = "2",
-              description = "Number of days to restore the assets for, default see service configuration")
-      },
-      responses = {
-          @RestResponse(
-              description = "restore of assets started",
-              responseCode = HttpServletResponse.SC_NO_CONTENT),
-          @RestResponse(
-              description = "invalid restore period, must be greater than zero",
-              responseCode = HttpServletResponse.SC_BAD_REQUEST),
-          @RestResponse(
-              description = "mediapackage not found or has no assets in S3",
-              responseCode = HttpServletResponse.SC_NOT_FOUND)
-      },
-      returnDescription = "Restore of assets initiated")
-  public Response restoreAssets(@PathParam("mediaPackageId") final String mediaPackageId,
-                                @FormParam("restorePeriod") final Integer restorePeriod) {
+  @Operation(
+      summary = "Restore the assets of a media package from Glacier",
+      description = "Initiate the restore of any assets in Glacier storage class"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "204", description = "restore of assets started"),
+      @ApiResponse(responseCode = "400", description = "invalid restore period, must be greater than zero"),
+      @ApiResponse(responseCode = "404", description = "mediapackage not found or has no assets in S3")
+  })
+  public Response restoreAssets(
+      @Parameter(description = "The media package indentifier.", required = true)
+      @PathParam("mediaPackageId") final String mediaPackageId,
+      @Parameter(
+          description = "Number of days to restore the assets for, default see service configuration",
+          schema = @Schema(example = "2")
+      )
+      @FormParam("restorePeriod") final Integer restorePeriod
+  ) {
     return handleException(() -> {
       String mpId = StringUtils.trimToNull(mediaPackageId);
       Integer rp = restorePeriod != null ? restorePeriod : awsS3AssetStore.getRestorePeriod();
