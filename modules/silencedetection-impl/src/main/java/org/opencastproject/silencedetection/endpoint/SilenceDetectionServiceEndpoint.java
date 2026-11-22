@@ -29,10 +29,6 @@ import org.opencastproject.mediapackage.Track;
 import org.opencastproject.rest.AbstractJobProducerEndpoint;
 import org.opencastproject.serviceregistry.api.ServiceRegistry;
 import org.opencastproject.silencedetection.api.SilenceDetectionService;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
@@ -40,7 +36,6 @@ import org.osgi.service.jaxrs.whiteboard.propertytypes.JaxrsResource;
 
 import java.util.List;
 
-import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.FormParam;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -48,15 +43,19 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 /**
  * SilenceDetectionService REST Endpoint.
  */
 @Path("/silencedetection")
-@RestService(
-    name = "SilenceDetectionServiceEndpoint",
-    title = "Silence Detection Service REST Endpoint",
-    abstractText = "Detect silent sequences in audio file.",
-    notes = {"All paths above are relative to the REST endpoint base (/silencedetection)"}
+@Tag(
+    name = "Silence Detection Service REST Endpoint",
+    description = "Detect silent sequences in audio file."
 )
 @Component(
     property = {
@@ -77,28 +76,20 @@ public class SilenceDetectionServiceEndpoint extends AbstractJobProducerEndpoint
   @POST
   @Path("/detect")
   @Produces({MediaType.APPLICATION_XML})
-  @RestQuery(
-      name = "detect",
-      description = "Create silence detection job.",
-      returnDescription = "Silence detection job.",
-      restParameters = {
-          @RestParameter(name = "track", type = RestParameter.Type.TEXT,
-              description = "Track where to run silence detection.", isRequired = true),
-          @RestParameter(name = "referenceTracks", type = RestParameter.Type.TEXT,
-              description = "Tracks referenced by resulting smil (as sources).", isRequired = false)
-      },
-      responses = {
-          @RestResponse(
-              description = "Silence detection job created successfully.",
-              responseCode = HttpServletResponse.SC_OK
-          ),
-          @RestResponse(
-              description = "Create silence detection job failed.",
-              responseCode = HttpServletResponse.SC_INTERNAL_SERVER_ERROR
-          )
-      }
+  @Operation(
+      summary = "Detect silent sequences in a track",
+      description = "Create silence detection job."
   )
-  public Response detect(@FormParam("track") String trackXml, @FormParam("referenceTracks") String referenceTracksXml) {
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Silence detection job created successfully."),
+      @ApiResponse(responseCode = "500", description = "Create silence detection job failed.")
+  })
+  public Response detect(
+      @Parameter(description = "Track where to run silence detection.", required = true)
+      @FormParam("track") String trackXml,
+      @Parameter(description = "Tracks referenced by resulting smil (as sources).")
+      @FormParam("referenceTracks") String referenceTracksXml
+  ) {
     try {
       Track track = (Track) MediaPackageElementParser.getFromXml(trackXml);
       Job job = null;
