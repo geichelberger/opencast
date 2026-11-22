@@ -25,11 +25,6 @@ import org.opencastproject.rest.AbstractJobProducerEndpoint;
 import org.opencastproject.serviceregistry.api.ServiceRegistry;
 import org.opencastproject.transcription.ibmwatson.IBMWatsonTranscriptionService;
 import org.opencastproject.util.GsonUtil;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestParameter.Type;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
@@ -55,14 +50,19 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.parameters.RequestBody;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 @Path("/transcripts/watson")
-@RestService(
-    name = "IBMWatsonTranscriptionRestService",
-    title = "Transcription Service REST Endpoint (uses IBM Watson services)",
-    abstractText = "Uses external service to generate transcriptions of recordings.",
-    notes = {
-        "All paths above are relative to the REST endpoint base (something like http://your.server/transcription)",
-    }
+@Tag(
+    name = "Transcription Service REST Endpoint (uses IBM Watson services)",
+    description = "Uses external service to generate transcriptions of recordings."
 )
 @Component(
     immediate = true,
@@ -115,27 +115,21 @@ public class IBMWatsonTranscriptionRestService extends AbstractJobProducerEndpoi
   @GET
   @Path("results")
   @Produces(MediaType.TEXT_PLAIN)
-  @RestQuery(
-      name = "results",
-      description = "Called by the speech-to-text service when registering the callback url",
-      returnDescription = "Echo the string sent.",
-      restParameters = {
-          @RestParameter(
-              name = "challenge_string",
-              description = "String to be echoed in the response body",
-              isRequired = true,
-              type = Type.STRING
-          ),
-      },
-      responses = {
-          @RestResponse(responseCode = HttpServletResponse.SC_OK, description = "If no errors"),
-          @RestResponse(responseCode = HttpServletResponse.SC_INTERNAL_SERVER_ERROR, description = "An error occurred"),
-      }
+  @Operation(
+      summary = "Verify the callback URL",
+      description = "Called by the speech-to-text service when registering the callback url"
   )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "If no errors"),
+      @ApiResponse(responseCode = "500", description = "An error occurred")
+  })
   // GET /transcripts/watson/results?challenge_string=51WRISEyAbuJq5fE HTTP/1.1" 302 5 "-" "Jersey/2.22.1 (Apache
   // HttpClient 4.5)"
-  public Response checkCallbackUrl(@QueryParam("challenge_string") String challengeString,
-          @Context HttpServletRequest request) {
+  public Response checkCallbackUrl(
+      @Parameter(description = "String to be echoed in the response body", required = true)
+      @QueryParam("challenge_string") String challengeString,
+      @Context HttpServletRequest request
+  ) {
     // Registering callback: just echo the challenge string
     logger.debug("==== checkCallback got called: challenge_string is '{}'", challengeString);
     Enumeration en = request.getHeaderNames();
@@ -156,15 +150,23 @@ public class IBMWatsonTranscriptionRestService extends AbstractJobProducerEndpoi
   @POST
   @Path("results")
   @Produces(MediaType.TEXT_PLAIN)
-  @RestQuery(
-      name = "results",
-      description = "Called by the speech-to-text service to report status.",
-      returnDescription = "",
-      responses = {
-          @RestResponse(responseCode = HttpServletResponse.SC_OK, description = "Got notification!"),
-      }
+  @Operation(
+      summary = "Receive a transcription notification",
+      description = "Called by the speech-to-text service to report status."
   )
-  public Response reportStatus(String body) {
+  @RequestBody(
+      description = "The notification as JSON with the fields id, event and user_token. If the event is "
+          + "recognitions.completed_with_results, it also has a results field with the results of the recognition "
+          + "request.",
+      required = true,
+      content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(type = "object"))
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Got notification!")
+  })
+  public Response reportStatus(
+      String body
+  ) {
     logger.trace("Body is: " + body);
 
     JsonObject jsonObj = null;
