@@ -123,9 +123,9 @@ public class CropRestEndpoint extends AbstractJobProducerEndpoint {
   @ApiResponses({
       @ApiResponse(
           responseCode = "200",
-          description = "The job ID to use when polling for the resulting mpeg7 catalog."
+          description = "The crop job as XML. The job can be polled for the resulting track."
       ),
-      @ApiResponse(responseCode = "400", description = "The \"crop\" is NULL or not a valid track type."),
+      @ApiResponse(responseCode = "400", description = "The track is blank or is not a track."),
       @ApiResponse(responseCode = "500", description = "The underlying service could not crop the video.")
   })
   public Response crop(
