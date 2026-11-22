@@ -29,7 +29,6 @@ import org.opencastproject.security.api.AuthorizationService;
 import org.opencastproject.security.api.SecurityService;
 import org.opencastproject.util.UrlSupport;
 import org.opencastproject.util.data.Tuple;
-import org.opencastproject.util.doc.rest.RestService;
 
 import org.osgi.service.component.ComponentContext;
 import org.osgi.service.component.annotations.Component;
@@ -40,13 +39,13 @@ import org.slf4j.LoggerFactory;
 
 import javax.ws.rs.Path;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 /** REST endpoint for ACL manager. */
 @Path("/acl-manager")
-@RestService(
-    name = "aclmanager",
-    title = "ACL Manager",
-    abstractText = "This service creates, edits, retrieves and helps managing access policies (ACL templates).",
-    notes = {}
+@Tag(
+    name = "ACL Manager",
+    description = "This service creates, edits, retrieves and helps managing access policies (ACL templates)."
 )
 @Component(
     name = "org.opencastproject.authorization.xacml.manager.endpoint.ACLManagerRestService",
