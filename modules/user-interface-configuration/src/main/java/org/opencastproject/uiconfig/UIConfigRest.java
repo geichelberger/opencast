@@ -134,10 +134,17 @@ public class UIConfigRest {
   @Produces(MediaType.WILDCARD)
   @Operation(
       summary = "Get a UI configuration file",
-      description = "Returns the requested configuration file (json, css, etc..)"
+      description = "Returns the requested configuration file (json, css, etc..) of the current organization. If the "
+          + "organization has no such file, the file of the default organization is returned."
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "the requested configuration file"),
+      @ApiResponse(
+          responseCode = "204",
+          description = "If the delivery of static files is delegated to a reverse proxy, no content is returned but "
+              + "the header X-Accel-Redirect that points the proxy to the file."
+      ),
+      @ApiResponse(responseCode = "403", description = "The requested file is outside of the configuration folder."),
       @ApiResponse(responseCode = "404", description = "if the configuration file doesn't exist")
   })
   public Response getConfigFile(
