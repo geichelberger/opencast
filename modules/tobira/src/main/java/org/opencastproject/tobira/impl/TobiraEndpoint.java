@@ -23,7 +23,6 @@ package org.opencastproject.tobira.impl;
 
 import static javax.ws.rs.core.MediaType.APPLICATION_JSON;
 import static javax.ws.rs.core.Response.Status.BAD_REQUEST;
-import static org.opencastproject.util.doc.rest.RestParameter.Type;
 
 import org.opencastproject.adopter.registration.AdopterRegistrationExtra;
 import org.opencastproject.db.DBSession;
@@ -37,10 +36,6 @@ import org.opencastproject.security.api.User;
 import org.opencastproject.security.api.UserDirectoryService;
 import org.opencastproject.series.api.SeriesService;
 import org.opencastproject.userdirectory.UserIdRoleProvider;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 import org.opencastproject.workspace.api.Workspace;
 
 import com.google.gson.Gson;
@@ -69,7 +64,6 @@ import java.util.regex.Pattern;
 
 import javax.persistence.EntityManagerFactory;
 import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -81,20 +75,22 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.parameters.RequestBody;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 /**
  * Tobira API Endpoint
  */
 @Path("/tobira")
-@RestService(
-    name = "TobiraApiEndpoint",
-    title = "Tobira API Endpoint",
-    abstractText = "Opencast Tobira API endpoint.",
-    notes = {
-      "This provides API endpoint used by Tobira to harvest media metadata. "
-              + "This API is specifically designed for Tobira and there are no "
-              + "stability guarantees for this API beyond what Tobira needs. "
-              + "Thus, you should not use this API for any other purposes!"
-    }
+@Tag(
+    name = "Tobira API Endpoint",
+    description = "Opencast Tobira API endpoint."
 )
 @Component(
     property = {
@@ -215,15 +211,13 @@ public class TobiraEndpoint {
   @GET
   @Path("/version")
   @Produces(APPLICATION_JSON)
-  @RestQuery(
-      name = "version",
-      description = "The Tobira Module API version",
-      restParameters = {},
-      responses = {
-          @RestResponse(description = "Version information", responseCode = HttpServletResponse.SC_OK)
-      },
-      returnDescription = "JSON object with string field 'version'"
+  @Operation(
+      summary = "Get the Tobira module API version",
+      description = "The Tobira Module API version"
   )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Version information")
+  })
   public Response version() {
     var body = new JsonObject();
     body.addProperty("version", VERSION);
@@ -233,35 +227,28 @@ public class TobiraEndpoint {
   @GET
   @Path("/harvest")
   @Produces(APPLICATION_JSON)
-  @RestQuery(
-      name = "harvest",
-      description = "Harvesting API to get incremental updates about series and events.",
-      restParameters = {
-          @RestParameter(
-              name = "preferredAmount",
-              isRequired = true,
-              description = "A preferred number of items the request should return. This is "
-                  + "merely a rough guideline and the API might return more or fewer items than "
-                  + "this parameter. You cannot rely on an exact number of returned items! "
-                  + "In practice this API usually returns between 0 and twice this parameter "
-                  + "number of items.",
-              type = Type.INTEGER
-          ),
-          @RestParameter(
-              name = "since",
-              isRequired = true,
-              description = "Only return items that changed after or at this timestamp. "
-                  + "Specified in milliseconds since 1970-01-01T00:00:00Z.",
-              type = Type.INTEGER
-          ),
-      },
-      responses = {
-          @RestResponse(description = "Event and Series Data", responseCode = HttpServletResponse.SC_OK)
-      },
-      returnDescription = "Event and Series Data changed after the given timestamp"
+  @Operation(
+      summary = "Harvest incremental updates of series and events",
+      description = "Harvesting API to get incremental updates about series and events."
   )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Event and Series Data")
+  })
   public Response harvest(
+      @Parameter(
+          description = "A preferred number of items the request should return. This is "
+              + "merely a rough guideline and the API might return more or fewer items than "
+              + "this parameter. You cannot rely on an exact number of returned items! "
+              + "In practice this API usually returns between 0 and twice this parameter "
+              + "number of items.",
+          required = true
+      )
       @QueryParam("preferredAmount") Integer preferredAmount,
+      @Parameter(
+          description = "Only return items that changed after or at this timestamp. "
+              + "Specified in milliseconds since 1970-01-01T00:00:00Z.",
+          required = true
+      )
       @QueryParam("since") Long since
   ) {
     // Parameter error handling
@@ -297,23 +284,18 @@ public class TobiraEndpoint {
   @GET
   @Path("/callback/{token}")
   @Produces(APPLICATION_JSON)
-  @RestQuery(
-      name = "callback",
-      description = "Auth callback API to get user information. This is used by Tobira to get user information.",
-      pathParameters = {
-          @RestParameter(
-              name = "token",
-              isRequired = true,
-              description = "The token to authorize the request.",
-              type = Type.STRING
-          )
-      },
-      responses = {
-          @RestResponse(description = "User Outcome Data", responseCode = HttpServletResponse.SC_OK)
-      },
-      returnDescription = "Returns user information"
+  @Operation(
+      summary = "Get the user information for a Tobira login",
+      description = "Auth callback API to get user information. This is used by Tobira to get user information."
   )
-  public Response callback(@PathParam("token") String token, @Context HttpHeaders headers) {
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "User Outcome Data")
+  })
+  public Response callback(
+      @Parameter(description = "The token to authorize the request.", required = true)
+      @PathParam("token") String token,
+      @Context HttpHeaders headers
+  ) {
 
     if (callbackToken == null || !callbackToken.equals(token)) {
       return badRequest("Invalid token or callback disabled");
@@ -387,15 +369,22 @@ public class TobiraEndpoint {
   @POST
   @Path("/stats")
   @Consumes(APPLICATION_JSON)
-  @RestQuery(
-      name = "stats",
-      description = "Accepts a json blob of statistical data about Tobira.  To test this properly see the code.",
-      responses = {
-          @RestResponse(description = "Stats parsed", responseCode = HttpServletResponse.SC_ACCEPTED)
-      },
-      returnDescription = "No data returned, just a 204 on success"
+  @Operation(
+      summary = "Accept statistics about Tobira",
+      description = "Accepts a JSON blob of statistical data about Tobira. To test this properly see the code."
   )
-  public Response acceptStats(@Context HttpServletRequest request) {
+  @RequestBody(
+      description = "A JSON object with statistical data about Tobira",
+      required = true,
+      content = @Content(mediaType = APPLICATION_JSON, schema = @Schema(type = "object"))
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "204", description = "Stats parsed, no content is returned"),
+      @ApiResponse(responseCode = "406", description = "The request body is not a JSON object")
+  })
+  public Response acceptStats(
+      @Context HttpServletRequest request
+  ) {
     try (InputStream is = request.getInputStream()) {
       String body = IOUtils.toString(is, request.getCharacterEncoding());
       cachedStats = gson.fromJson(body, JsonElement.class).getAsJsonObject();
@@ -424,12 +413,13 @@ public class TobiraEndpoint {
   @GET
   @Path("/stats")
   @Produces(APPLICATION_JSON)
-  @RestQuery(name = "stats",
-      description = "Returns the stats, if any, pushed from Tobira",
-      returnDescription = "The stats, or an empty object",
-      responses = {
-          @RestResponse(description = "The stats, or an empty object", responseCode = HttpServletResponse.SC_OK)
-      })
+  @Operation(
+      summary = "Get the statistics pushed by Tobira",
+      description = "Returns the stats, if any, pushed from Tobira"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The stats, or an empty object")
+  })
   public Response getCachedStats() {
     return Response.ok(gson.toJson(cachedStats)).build();
   }
