@@ -21,15 +21,9 @@
 
 package org.opencastproject.engage.ui;
 
-import static javax.servlet.http.HttpServletResponse.SC_TEMPORARY_REDIRECT;
-import static org.opencastproject.util.doc.rest.RestParameter.Type.STRING;
 
 import org.opencastproject.security.api.Organization;
 import org.opencastproject.security.api.SecurityService;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
@@ -51,16 +45,21 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriBuilder;
 import javax.ws.rs.core.UriInfo;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 /**
  * This REST endpoint redirects users to the currently configured default player, allowing the default to be changed
  * without re-publishing all events.
  */
 @Path("/play")
-@RestService(
-    name = "PlayerRedirect",
-    title = "Configurable Player Endpoint",
-    abstractText = "This service redirects to configured players.",
-    notes = {})
+@Tag(
+    name = "Configurable Player Endpoint",
+    description = "This service redirects to configured players."
+)
 @Component(
     immediate = true,
     service = PlayerRedirect.class,
@@ -86,18 +85,18 @@ public class PlayerRedirect {
 
   @GET
   @Path("/{id:.+}")
-  @RestQuery(
-      name = "redirect",
-      description = "Player redirect",
-      pathParameters = {
-          @RestParameter(name = "id", description = "The event identifier", isRequired = true, type = STRING)
-      },
-      responses = {
-          @RestResponse(description = "Returns the paella configuration", responseCode = SC_TEMPORARY_REDIRECT)
-      },
-      returnDescription = ""
+  @Operation(
+      summary = "Redirect to the player",
+      description = "Player redirect"
   )
-  public Response redirect(@PathParam("id") String id, @Context UriInfo uriInfo) {
+  @ApiResponses({
+      @ApiResponse(responseCode = "307", description = "Returns the paella configuration")
+  })
+  public Response redirect(
+      @Parameter(description = "The event identifier", required = true)
+      @PathParam("id") String id,
+      @Context UriInfo uriInfo
+  ) {
     final Organization org = securityService.getOrganization();
     final String playerPath = Objects.toString(org.getProperties().get("player"), PLAYER_DEFAULT)
             .replace("#{id}", URLEncoder.encode(id, StandardCharsets.UTF_8));
