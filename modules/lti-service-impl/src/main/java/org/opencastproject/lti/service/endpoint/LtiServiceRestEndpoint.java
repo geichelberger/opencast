@@ -20,18 +20,12 @@
  */
 package org.opencastproject.lti.service.endpoint;
 
-import static org.opencastproject.util.doc.rest.RestParameter.Type.STRING;
 
 import org.opencastproject.lti.service.api.LtiFileUpload;
 import org.opencastproject.lti.service.api.LtiJob;
 import org.opencastproject.lti.service.api.LtiService;
 import org.opencastproject.security.api.UnauthorizedException;
 import org.opencastproject.util.NotFoundException;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestParameter.Type;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
@@ -50,7 +44,6 @@ import java.io.InputStream;
 import java.util.List;
 
 import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.FormParam;
@@ -66,15 +59,23 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.media.SchemaProperty;
+import io.swagger.v3.oas.annotations.parameters.RequestBody;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 /**
  * The REST endpoint for the remote LTI service (for multi-node setups with LTI)
  */
 @Path("/lti-service")
-@RestService(
-    name = "ltirestservice",
-    title = "LTI Service",
-    notes = {},
-    abstractText = "Provides operations to LTI clients"
+@Tag(
+    name = "LTI Service",
+    description = "Provides operations to LTI clients"
 )
 @Component(
     immediate = true,
@@ -101,23 +102,17 @@ public class LtiServiceRestEndpoint {
   @GET
   @Path("/jobs")
   @Produces(MediaType.APPLICATION_JSON)
-  @RestQuery(
-      name = "listjobs",
-      description = "List recent jobs for a specific series.",
-      returnDescription = "",
-      restParameters = {
-          @RestParameter(
-              name = "seriesId",
-              description = "The id of the series you want jobs for",
-              isRequired = true,
-              type = STRING
-          ),
-      },
-      responses = {
-          @RestResponse(description = "The list of jobs", responseCode = HttpServletResponse.SC_OK),
-      }
+  @Operation(
+      summary = "List the recent jobs of a series",
+      description = "List recent jobs for a specific series."
   )
-  public Response listJobs(@QueryParam("seriesId") String seriesId) {
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The list of jobs")
+  })
+  public Response listJobs(
+      @Parameter(description = "The id of the series you want jobs for", required = true)
+      @QueryParam("seriesId") String seriesId
+  ) {
     return Response.status(Status.OK)
             .entity(gson.toJson(service.listJobs(seriesId), new TypeToken<List<LtiJob>>() {
             }.getType())).build();
@@ -126,70 +121,66 @@ public class LtiServiceRestEndpoint {
   @POST
   @Path("/")
   @Consumes(MediaType.MULTIPART_FORM_DATA)
-  @RestQuery(
-      name = "createevent",
-      description = "Creates an event by sending metadata in a multipart request.",
-      returnDescription = "",
-      restParameters = {
-          @RestParameter(
-              name = "metadata",
-              description = "Event metadata",
-              isRequired = true,
-              type = STRING
-          ),
-          @RestParameter(
-              name = "presenter",
-              description = "Presenter movie track",
-              isRequired = true,
-              type = Type.FILE
-          ),
-          @RestParameter(
-              name = "captions",
-              description = "Caption file",
-              isRequired = false,
-              type = STRING
-          ),
-          @RestParameter(
-            name = "captionFormat",
-            description = "Caption file format",
-            isRequired = false,
-            type = STRING
-          ),
-          @RestParameter(
-            name = "captionLanguage",
-            description = "Caption language",
-            isRequired = false,
-            type = STRING
-          ),
-          @RestParameter(
-              name = "isPartOf",
-              description = "Series id of the event",
-              isRequired = false,
-              type = STRING
-          ),
-          @RestParameter(
-              name = "eventId",
-              description = "ID of the event to update (if it's an update)",
-              isRequired = false,
-              type = STRING
+  @Operation(
+      summary = "Create an event",
+      description = "Creates an event by sending metadata in a multipart request."
+  )
+  @RequestBody(
+      content = {
+          @Content(
+              mediaType = MediaType.MULTIPART_FORM_DATA,
+              schema = @Schema(type = "object", requiredProperties = {"metadata", "presenter"}),
+              schemaProperties = {
+                  @SchemaProperty(name = "metadata", schema = @Schema(type = "string", description = "Event metadata")),
+                  @SchemaProperty(
+                      name = "presenter",
+                      schema = @Schema(
+                          type = "string", format = "binary",
+                          description = "Presenter movie track"
+                      )
+                  ),
+                  @SchemaProperty(name = "captions", schema = @Schema(type = "string", description = "Caption file")),
+                  @SchemaProperty(
+                      name = "captionFormat",
+                      schema = @Schema(
+                          type = "string",
+                          description = "Caption file format"
+                      )
+                  ),
+                  @SchemaProperty(
+                      name = "captionLanguage",
+                      schema = @Schema(
+                          type = "string",
+                          description = "Caption language"
+                      )
+                  ),
+                  @SchemaProperty(
+                      name = "isPartOf",
+                      schema = @Schema(
+                          type = "string",
+                          description = "Series id of the event"
+                      )
+                  ),
+                  @SchemaProperty(
+                      name = "eventId",
+                      schema = @Schema(
+                          type = "string",
+                          description = "ID of the event to update (if it's an update)"
+                      )
+                  )
+              }
           )
-      },
-      responses = {
-        @RestResponse(
-            description = "A new event is created or the event is updated",
-            responseCode = HttpServletResponse.SC_OK
-        ),
-        @RestResponse(
-            description = "No authorization to create or update events",
-            responseCode = HttpServletResponse.SC_UNAUTHORIZED
-        ),
-        @RestResponse(
-            description = "The event to be updated wasn't found",
-            responseCode = HttpServletResponse.SC_NOT_FOUND
-        )
       }
   )
-  public Response createNewEvent(@HeaderParam("Accept") String acceptHeader, @Context HttpServletRequest request) {
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "A new event is created or the event is updated"),
+      @ApiResponse(responseCode = "401", description = "No authorization to create or update events"),
+      @ApiResponse(responseCode = "404", description = "The event to be updated wasn't found")
+  })
+  public Response createNewEvent(
+      @HeaderParam("Accept") String acceptHeader,
+      @Context HttpServletRequest request
+  ) {
     String seriesId = "";
     try {
       String captions = null;
@@ -245,38 +236,20 @@ public class LtiServiceRestEndpoint {
 
   @POST
   @Path("{eventId}/copy")
-  @RestQuery(
-      name = "copyeventtoseries",
-      description = "Copy an event to a different series",
-      returnDescription = "",
-      pathParameters = {
-          @RestParameter(
-              name = "eventId",
-              description = "The event (id) to copy",
-              isRequired = true,
-              type = STRING)
-      },
-      restParameters = {
-          @RestParameter(
-              name = "seriesId",
-              description = "The series (id) to copy into",
-              isRequired = true,
-              type = STRING
-          )
-      },
-      responses = {
-          @RestResponse(
-              description = "The event has been copied.",
-              responseCode = HttpServletResponse.SC_NO_CONTENT
-          ),
-          @RestResponse(
-              description = "The specified event does not exist.",
-              responseCode = HttpServletResponse.SC_NOT_FOUND
-          )
-      }
+  @Operation(
+      summary = "Copy an event to a series",
+      description = "Copy an event to a different series"
   )
-  public Response copyEventToSeries(@PathParam("eventId") final String eventId,
-          @QueryParam("seriesId") final String seriesId) {
+  @ApiResponses({
+      @ApiResponse(responseCode = "204", description = "The event has been copied."),
+      @ApiResponse(responseCode = "404", description = "The specified event does not exist.")
+  })
+  public Response copyEventToSeries(
+      @Parameter(description = "The event (id) to copy", required = true)
+      @PathParam("eventId") final String eventId,
+      @Parameter(description = "The series (id) to copy into", required = true)
+      @QueryParam("seriesId") final String seriesId
+  ) {
     service.copyEventToSeries(eventId, seriesId);
     return Response.noContent().build();
   }
@@ -284,33 +257,19 @@ public class LtiServiceRestEndpoint {
   @POST
   @Path("{eventId}/metadata")
   @Produces(MediaType.APPLICATION_JSON)
-  @RestQuery(
-      name = "seteventmetadata",
-      description = "Set the metadata of an existing event",
-      returnDescription = "",
-      pathParameters = {
-          @RestParameter(name = "eventId", description = "The event id", isRequired = true, type = STRING)
-      },
-      restParameters = {
-          @RestParameter(name = "metadataJson", description = "Event metadata", isRequired = true, type = STRING),
-      },
-      responses = {
-          @RestResponse(
-              description = "The event's metadata has been set",
-              responseCode = HttpServletResponse.SC_OK
-          ),
-          @RestResponse(
-              description = "The event doesn't exist",
-              responseCode = HttpServletResponse.SC_NOT_FOUND
-          ),
-          @RestResponse(
-              description = "The event cannot be accessed",
-              responseCode = HttpServletResponse.SC_UNAUTHORIZED
-          ),
-      }
+  @Operation(
+      summary = "Set the metadata of an event",
+      description = "Set the metadata of an existing event"
   )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The event's metadata has been set"),
+      @ApiResponse(responseCode = "404", description = "The event doesn't exist"),
+      @ApiResponse(responseCode = "401", description = "The event cannot be accessed")
+  })
   public Response setEventMetadataJson(
+      @Parameter(description = "The event id", required = true)
       @PathParam("eventId") final String eventId,
+      @Parameter(description = "Event metadata", required = true)
       @FormParam("metadataJson") final String metadataJson
   ) {
     try {
@@ -326,14 +285,13 @@ public class LtiServiceRestEndpoint {
   @GET
   @Path("new/metadata")
   @Produces(MediaType.APPLICATION_JSON)
-  @RestQuery(
-      name = "getneweventmetadata",
-      description = "Get the metadata of a new event",
-      returnDescription = "The metadata of a new event",
-      responses = {
-          @RestResponse(description = "A new event's metadata", responseCode = HttpServletResponse.SC_OK),
-      }
+  @Operation(
+      summary = "Get the metadata of a new event",
+      description = "Get the metadata of a new event"
   )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "A new event's metadata")
+  })
   public Response getNewEventMetadata() {
     return Response.ok(service.getNewEventMetadata(), MediaType.APPLICATION_JSON).build();
   }
@@ -341,29 +299,19 @@ public class LtiServiceRestEndpoint {
   @GET
   @Path("{eventId}/metadata")
   @Produces(MediaType.APPLICATION_JSON)
-  @RestQuery(
-      name = "geteventmetadata",
-      description = "Get the metadata of an existing event",
-      returnDescription = "The metadata of an existing event",
-      pathParameters = {
-          @RestParameter(name = "eventId", description = "The event id", isRequired = true, type = STRING)
-      },
-      responses = {
-          @RestResponse(
-              description = "Metadata is available and will be returned",
-              responseCode = HttpServletResponse.SC_OK
-          ),
-          @RestResponse(
-              description = "The event doesn't exist",
-              responseCode = HttpServletResponse.SC_NOT_FOUND
-          ),
-          @RestResponse(
-              description = "The event cannot be accessed",
-              responseCode = HttpServletResponse.SC_UNAUTHORIZED
-          ),
-      }
+  @Operation(
+      summary = "Get the metadata of an event",
+      description = "Get the metadata of an existing event"
   )
-  public Response getEventMetadata(@PathParam("eventId") final String eventId) {
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Metadata is available and will be returned"),
+      @ApiResponse(responseCode = "404", description = "The event doesn't exist"),
+      @ApiResponse(responseCode = "401", description = "The event cannot be accessed")
+  })
+  public Response getEventMetadata(
+      @Parameter(description = "The event id", required = true)
+      @PathParam("eventId") final String eventId
+  ) {
     try {
       return Response.ok(service.getEventMetadata(eventId), MediaType.APPLICATION_JSON).build();
     } catch (NotFoundException e) {
@@ -375,25 +323,18 @@ public class LtiServiceRestEndpoint {
 
   @DELETE
   @Path("{eventId}")
-  @RestQuery(
-      name = "deleteevent",
-      description = "Deletes an event.",
-      returnDescription = "",
-      pathParameters = {
-          @RestParameter(name = "eventId", description = "The event id", isRequired = true, type = STRING)
-      },
-      responses = {
-          @RestResponse(
-              description = "The event has been deleted.",
-              responseCode = HttpServletResponse.SC_NO_CONTENT
-          ),
-          @RestResponse(
-              description = "The specified event does not exist.",
-              responseCode = HttpServletResponse.SC_NOT_FOUND
-          )
-      }
+  @Operation(
+      summary = "Delete an event",
+      description = "Deletes an event."
   )
-  public Response deleteEvent(@PathParam("eventId") final String id) {
+  @ApiResponses({
+      @ApiResponse(responseCode = "204", description = "The event has been deleted."),
+      @ApiResponse(responseCode = "404", description = "The specified event does not exist.")
+  })
+  public Response deleteEvent(
+      @Parameter(description = "The event id", required = true)
+      @PathParam("eventId") final String id
+  ) {
     try {
       service.delete(id);
       return Response.noContent().build();
