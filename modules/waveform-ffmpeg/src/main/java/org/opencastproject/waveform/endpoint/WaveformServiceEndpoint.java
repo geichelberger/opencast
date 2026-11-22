@@ -29,10 +29,6 @@ import org.opencastproject.mediapackage.MediaPackageException;
 import org.opencastproject.mediapackage.Track;
 import org.opencastproject.rest.AbstractJobProducerEndpoint;
 import org.opencastproject.serviceregistry.api.ServiceRegistry;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 import org.opencastproject.waveform.api.WaveformService;
 import org.opencastproject.waveform.api.WaveformServiceException;
 
@@ -42,7 +38,6 @@ import org.osgi.service.jaxrs.whiteboard.propertytypes.JaxrsResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.FormParam;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -50,12 +45,17 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 @Path("/waveform")
-@RestService(
-    name = "WaveformServiceEndpoint",
-    title = "Waveform Service REST Endpoint",
-    abstractText = "The Waveform Service generates a waveform image from a media file with at least one audio channel.",
-    notes = { "All paths above are relative to the REST endpoint base (something like http://your.server/waveform)" }
+@Tag(
+    name = "Waveform Service REST Endpoint",
+    description = "The Waveform Service generates a waveform image from a media file with at least one audio channel."
 )
 @Component(
     immediate = true,
@@ -77,33 +77,29 @@ public class WaveformServiceEndpoint extends AbstractJobProducerEndpoint {
   @POST
   @Path("/create")
   @Produces({MediaType.APPLICATION_XML})
-  @RestQuery(name = "create", description = "Create a waveform image from the given track",
-          returnDescription = "Media package attachment for the generated waveform.",
-          restParameters = {
-            @RestParameter(name = "track", type = RestParameter.Type.TEXT,
-                    description = "Track with at least one audio channel.", isRequired = true),
-            @RestParameter(name = "pixelsPerMinute", type = RestParameter.Type.INTEGER,
-                    description = "Width of waveform image in pixels per minute.", isRequired = true),
-            @RestParameter(name = "minWidth", type = RestParameter.Type.INTEGER,
-                    description = "Minimum width of waveform image.", isRequired = true),
-            @RestParameter(name = "maxWidth", type = RestParameter.Type.INTEGER,
-                    description = "Maximum width of waveform image.", isRequired = true),
-            @RestParameter(name = "height", type = RestParameter.Type.INTEGER,
-                    description = "Height of waveform image.", isRequired = true),
-            @RestParameter(name = "color", type = RestParameter.Type.STRING, defaultValue = "black",
-                    description = "Color of waveform image.", isRequired = true)
-          },
-          responses = {
-            @RestResponse(description = "Waveform generation job successfully created.",
-                    responseCode = HttpServletResponse.SC_OK),
-            @RestResponse(description = "The given track can't be parsed.",
-                    responseCode = HttpServletResponse.SC_BAD_REQUEST),
-            @RestResponse(description = "Internal server error.",
-                    responseCode = HttpServletResponse.SC_INTERNAL_SERVER_ERROR)
+  @Operation(
+      summary = "Create a waveform image",
+      description = "Create a waveform image from the given track"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Waveform generation job successfully created."),
+      @ApiResponse(responseCode = "400", description = "The given track can't be parsed."),
+      @ApiResponse(responseCode = "500", description = "Internal server error.")
   })
-  public Response createWaveformImage(@FormParam("track") String track,
-      @FormParam("pixelsPerMinute") int pixelsPerMinute, @FormParam("minWidth") int minWidth,
-      @FormParam("maxWidth") int maxWidth, @FormParam("height") int height, @FormParam("color") String color) {
+  public Response createWaveformImage(
+      @Parameter(description = "Track with at least one audio channel.", required = true)
+      @FormParam("track") String track,
+      @Parameter(description = "Width of waveform image in pixels per minute.", required = true)
+      @FormParam("pixelsPerMinute") int pixelsPerMinute,
+      @Parameter(description = "Minimum width of waveform image.", required = true)
+      @FormParam("minWidth") int minWidth,
+      @Parameter(description = "Maximum width of waveform image.", required = true)
+      @FormParam("maxWidth") int maxWidth,
+      @Parameter(description = "Height of waveform image.", required = true)
+      @FormParam("height") int height,
+      @Parameter(description = "Color of waveform image.", required = true, schema = @Schema(example = "black"))
+      @FormParam("color") String color
+  ) {
     try {
       MediaPackageElement sourceTrack = MediaPackageElementParser.getFromXml(track);
       if (!Track.TYPE.equals(sourceTrack.getElementType())) {
