@@ -39,6 +39,11 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+
 /**
  * Base implementation for job producer REST endpoints.
  */
@@ -52,8 +57,27 @@ public abstract class AbstractJobProducerEndpoint {
    */
   @POST
   @Path("/dispatch")
-  public Response dispatchJob(@FormParam("id") long jobId, @FormParam("operation") String jobOperation)
-          throws ServiceRegistryException {
+  @Operation(
+      summary = "Dispatch a job to this service",
+      description = "Hands a job over to this service. This is used by the service registry to dispatch jobs to "
+          + "the nodes of a cluster and is not meant to be called directly."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "204", description = "The job has been accepted."),
+      @ApiResponse(responseCode = "404", description = "The specified job does not exist."),
+      @ApiResponse(responseCode = "412", description = "The service permanently refused to accept the job."),
+      @ApiResponse(
+          responseCode = "503",
+          description = "The service is not available, not ready to accept jobs with this operation, or "
+              + "temporarily refused to accept the job."
+      )
+  })
+  public Response dispatchJob(
+      @Parameter(description = "The identifier of the job to dispatch", required = true)
+      @FormParam("id") long jobId,
+      @Parameter(description = "The operation of the job to dispatch", required = true)
+      @FormParam("operation") String jobOperation
+  ) throws ServiceRegistryException {
     final JobProducer service = getService();
     if (service == null) {
       throw new WebApplicationException(Status.SERVICE_UNAVAILABLE);
@@ -91,6 +115,14 @@ public abstract class AbstractJobProducerEndpoint {
 
   @HEAD
   @Path("/dispatch")
+  @Operation(
+      summary = "Check whether the service is alive",
+      description = "Heartbeat check used by the service registry to find out whether this service can be "
+          + "reached."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The service is alive.")
+  })
   public Response checkHeartbeat() {
     return Response.ok().build();
   }
