@@ -117,17 +117,20 @@ public class ConfigurablePublicationRestService extends AbstractJobProducerEndpo
       description = "Replace a media package in this publication channel"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "An XML representation of the publication job")
+      @ApiResponse(responseCode = "200", description = "An XML representation of the publication job"),
+      @ApiResponse(responseCode = "400", description = "The publication job could not be created from the request."),
+      @ApiResponse(responseCode = "500", description = "Error publishing or retracting the elements.")
   })
   public Response replace(
       @Parameter(description = "The media package", required = true)
       @FormParam("mediapackage") final String mediaPackageXml,
       @Parameter(description = "The channel name", required = true)
       @FormParam("channel") final String channel,
-      @Parameter(description = "The media package elements to published", required = true)
+      @Parameter(description = "The media package elements to publish as XML", required = true)
       @FormParam("addElements") final String addElementsXml,
       @Parameter(
-          description = "The identifiers of the media package elements to be retracted from the media package",
+          description = "The identifiers of the media package elements to be retracted from the media package as a "
+              + "JSON array",
           required = true
       )
       @FormParam("retractElements") final String retractElements
@@ -159,17 +162,19 @@ public class ConfigurablePublicationRestService extends AbstractJobProducerEndpo
       description = "Synchronously replace a media package in this publication channel"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "An XML representation of the publication")
+      @ApiResponse(responseCode = "200", description = "An XML representation of the publication"),
+      @ApiResponse(responseCode = "500", description = "Error publishing or retracting the elements.")
   })
   public Response replaceSync(
       @Parameter(description = "The media package", required = true)
       @FormParam("mediapackage") final String mediaPackageXml,
       @Parameter(description = "The channel name", required = true)
       @FormParam("channel") final String channel,
-      @Parameter(description = "The media package elements to published", required = true)
+      @Parameter(description = "The media package elements to publish as XML", required = true)
       @FormParam("addElements") final String addElementsXml,
       @Parameter(
-          description = "The identifiers of the media package elements to be retracted from the media package",
+          description = "The identifiers of the media package elements to be retracted from the media package as a "
+              + "JSON array",
           required = true
       )
       @FormParam("retractElements") final String retractElements
