@@ -22,10 +22,6 @@
 package org.opencastproject.helloworld.impl.endpoint;
 
 import org.opencastproject.helloworld.api.HelloWorldService;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
@@ -33,13 +29,18 @@ import org.osgi.service.jaxrs.whiteboard.propertytypes.JaxrsResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.FormParam;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 /**
  * The REST endpoint for the {@link HelloWorldService} service
@@ -55,19 +56,9 @@ import javax.ws.rs.core.Response;
     service = HelloWorldRestEndpoint.class
 )
 @Path("/helloworld")
-@RestService(
-    name = "HelloWorldServiceEndpoint",
-    title = "Hello World Service Endpoint",
-    abstractText = "This is a tutorial service.",
-    notes = {
-        "All paths above are relative to the REST endpoint base (something like http://your.server/files)",
-        "If the service is down or not working it will return a status 503, this means the the "
-            + "underlying service is not working and is either restarting or has failed",
-        "A status code 500 means a general failure has occurred which is not recoverable and was "
-            + "not anticipated. In other words, there is a bug! You should file an error report "
-            + "with your server logs from the time when the error occurred: "
-            + "<a href=\"https://github.com/opencast/opencast/issues\">Opencast Issue Tracker</a>"
-    }
+@Tag(
+    name = "Hello World Service Endpoint",
+    description = "This is a tutorial service."
 )
 @JaxrsResource
 public class HelloWorldRestEndpoint {
@@ -89,21 +80,14 @@ public class HelloWorldRestEndpoint {
   @GET
   @Path("helloworld")
   @Produces(MediaType.TEXT_PLAIN)
-  @RestQuery(
-      name = "helloworld",
-      description = "example service call",
-      responses = {
-          @RestResponse(
-              responseCode = HttpServletResponse.SC_OK,
-              description = "Hello World"
-          ),
-          @RestResponse(
-              responseCode = HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
-              description = "The underlying service could not output something."
-          )
-      },
-      returnDescription = "The text that the service returns."
+  @Operation(
+      summary = "Say hello to the world",
+      description = "example service call"
   )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Hello World"),
+      @ApiResponse(responseCode = "500", description = "The underlying service could not output something.")
+  })
   public Response helloWorld() throws Exception {
     logger.info("REST call for Hello World");
     return Response.ok().entity(helloWorldService.helloWorld()).build();
@@ -120,30 +104,18 @@ public class HelloWorldRestEndpoint {
   @GET
   @Path("helloname")
   @Produces(MediaType.TEXT_PLAIN)
-  @RestQuery(
-      name = "helloname",
-      description = "example service call with parameter",
-      restParameters = {
-          @RestParameter(
-              name = "name",
-              description = "name to output",
-              isRequired = false,
-              type = RestParameter.Type.TEXT
-          )
-      },
-      responses = {
-          @RestResponse(
-              responseCode = HttpServletResponse.SC_OK,
-              description = "Hello or Hello Name"
-          ),
-          @RestResponse(
-              responseCode = HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
-              description = "The underlying service could not output something."
-          )
-      },
-      returnDescription = "The text that the service returns."
+  @Operation(
+      summary = "Say hello to a name",
+      description = "example service call with parameter"
   )
-  public Response helloName(@FormParam("name") String name) throws Exception {
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Hello or Hello Name"),
+      @ApiResponse(responseCode = "500", description = "The underlying service could not output something.")
+  })
+  public Response helloName(
+      @Parameter(description = "name to output")
+      @FormParam("name") String name
+  ) throws Exception {
     logger.info("REST call for Hello Name");
     return Response.ok().entity(helloWorldService.helloName(name)).build();
   }
