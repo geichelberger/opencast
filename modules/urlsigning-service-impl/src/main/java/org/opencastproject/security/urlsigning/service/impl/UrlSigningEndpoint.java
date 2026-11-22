@@ -22,14 +22,9 @@ package org.opencastproject.security.urlsigning.service.impl;
 
 import static javax.servlet.http.HttpServletResponse.SC_BAD_REQUEST;
 import static org.apache.commons.lang3.StringUtils.trimToNull;
-import static org.opencastproject.util.doc.rest.RestParameter.Type.STRING;
 
 import org.opencastproject.security.urlsigning.exception.UrlSigningException;
 import org.opencastproject.security.urlsigning.service.UrlSigningService;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeConstants;
@@ -45,12 +40,16 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 @Path("/signing")
-@RestService(
-    name = "urlsigning",
-    title = "URL Signing Endpoint",
-    notes = "This is a testing endpoint to play around with the URL Signing Service",
-    abstractText = ""
+@Tag(
+    name = "URL Signing Endpoint",
+    description = "This is a testing endpoint to play around with the URL Signing Service"
 )
 @Component(
     immediate = true,
@@ -77,18 +76,17 @@ public class UrlSigningEndpoint {
   @GET
   @Produces({ MediaType.TEXT_PLAIN })
   @Path("accepts")
-  @RestQuery(
-      name = "accepts",
-      description = "Checks if the signing service accepts to sign the URL",
-      restParameters = {
-          @RestParameter(name = "baseUrl", isRequired = true, description = "The URL to sign", type = STRING)
-      },
-      responses = {
-          @RestResponse(description = "'true' or 'false'", responseCode = 200)
-      },
-      returnDescription = ""
+  @Operation(
+      summary = "Check whether a URL can be signed",
+      description = "Checks if the signing service accepts to sign the URL"
   )
-  public Response accepts(@QueryParam("baseUrl") final String baseUrl) {
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "'true' or 'false'")
+  })
+  public Response accepts(
+      @Parameter(description = "The URL to sign", required = true)
+      @QueryParam("baseUrl") final String baseUrl
+  ) {
     if (signingService.accepts(baseUrl)) {
       return Response.ok(Boolean.TRUE.toString()).build();
     } else {
@@ -99,40 +97,25 @@ public class UrlSigningEndpoint {
   @GET
   @Produces({ MediaType.TEXT_PLAIN })
   @Path("sign")
-  @RestQuery(
-      name = "sign",
-      description = "Return a signed URL",
-      restParameters = {
-          @RestParameter(name = "baseUrl", isRequired = true, description = "The URL to sign", type = STRING),
-          @RestParameter(
-              name = "validUntil",
-              isRequired = true,
-              type = RestParameter.Type.INTEGER,
-              defaultValue = "0",
-              description = "The UNIX epoch time until when a signed URL should remain valid"
-          ),
-          @RestParameter(
-              name = "validFrom",
-              isRequired = false,
-              type = RestParameter.Type.INTEGER,
-              defaultValue = "0",
-              description = "The UNIX epoch time from when a signed URL should become valid"
-          ),
-          @RestParameter(
-              name = "ipAddr",
-              isRequired = false,
-              type = STRING,
-              defaultValue = "",
-              description = "The IP addresse of the user that is allowed to access the resource"
-          )
-      },
-      responses = { @RestResponse(description = "A URL", responseCode = 200) },
-      returnDescription = ""
+  @Operation(
+      summary = "Sign a URL",
+      description = "Return a signed URL"
   )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "A URL")
+  })
   public Response sign(
+      @Parameter(description = "The URL to sign", required = true)
       @QueryParam("baseUrl") final String baseUrl,
+      @Parameter(
+          description = "The UNIX epoch time until when a signed URL should remain valid",
+          required = true,
+          example = "0"
+      )
       @QueryParam("validUntil") final long validUntil,
+      @Parameter(description = "The UNIX epoch time from when a signed URL should become valid", example = "0")
       @QueryParam("validFrom") @DefaultValue("0") long validFrom,
+      @Parameter(description = "The IP addresse of the user that is allowed to access the resource", example = "")
       @QueryParam("ipAddr") @DefaultValue("") String ipAddr
   ) {
     try {
