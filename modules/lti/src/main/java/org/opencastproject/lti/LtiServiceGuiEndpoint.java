@@ -24,11 +24,6 @@ import org.opencastproject.lti.service.api.LtiFileUpload;
 import org.opencastproject.lti.service.api.LtiService;
 import org.opencastproject.security.api.UnauthorizedException;
 import org.opencastproject.util.NotFoundException;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestParameter.Type;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 
 import com.google.gson.Gson;
 
@@ -48,7 +43,6 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.FormParam;
@@ -64,15 +58,23 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.media.SchemaProperty;
+import io.swagger.v3.oas.annotations.parameters.RequestBody;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 /**
  * The endpoint for the LTI gui
  */
 @Path("/lti-service-gui")
-@RestService(
-    name = "ltirestserviceguiendpoint",
-    title = "LTI Service",
-    notes = {},
-    abstractText = "Provides operations to LTI clients"
+@Tag(
+    name = "LTI Service GUI",
+    description = "Provides operations to LTI clients"
 )
 @Component(
     immediate = true,
@@ -158,58 +160,49 @@ public class LtiServiceGuiEndpoint {
   @POST
   @Path("/")
   @Consumes(MediaType.MULTIPART_FORM_DATA)
-  @RestQuery(
-      name = "uploadevent",
-      description = "Creates an event in a multipart request.",
-      returnDescription = "",
-      restParameters = {
-          @RestParameter(
-              name = "presenter",
-              description = "Presenter movie track",
-              isRequired = false,
-              type = Type.FILE
-          ),
-          @RestParameter(
-              name = "license",
-              description = "License chosen",
-              isRequired = false,
-              type = Type.STRING
-          ),
-          @RestParameter(
-              name = "seriesName",
-              description = "Series name",
-              isRequired = false,
-              type = Type.STRING
-          ),
-          @RestParameter(
-              name = "isPartOf",
-              description = "Series ID",
-              isRequired = false,
-              type = Type.STRING
-          ),
-          @RestParameter(
-              name = "processing",
-              description = "Processing instructions task configuration",
-              isRequired = false,
-              type = Type.STRING
-          )
-      },
-      responses = {
-          @RestResponse(
-              description = "A new event is created and its identifier is returned in the Location header.",
-              responseCode = HttpServletResponse.SC_CREATED
-          ),
-          @RestResponse(
-              description = "The event could not be created due to a scheduling conflict.",
-              responseCode = HttpServletResponse.SC_CONFLICT
-          ),
-          @RestResponse(
-              description = "The request is invalid or inconsistent..",
-              responseCode = HttpServletResponse.SC_BAD_REQUEST
+  @Operation(
+      summary = "Upload an event",
+      description = "Creates an event in a multipart request."
+  )
+  @RequestBody(
+      content = {
+          @Content(
+              mediaType = MediaType.MULTIPART_FORM_DATA,
+              schema = @Schema(type = "object"),
+              schemaProperties = {
+                  @SchemaProperty(
+                      name = "presenter",
+                      schema = @Schema(
+                          type = "string", format = "binary",
+                          description = "Presenter movie track"
+                      )
+                  ),
+                  @SchemaProperty(name = "license", schema = @Schema(type = "string", description = "License chosen")),
+                  @SchemaProperty(name = "seriesName", schema = @Schema(type = "string", description = "Series name")),
+                  @SchemaProperty(name = "isPartOf", schema = @Schema(type = "string", description = "Series ID")),
+                  @SchemaProperty(
+                      name = "processing",
+                      schema = @Schema(
+                          type = "string",
+                          description = "Processing instructions task configuration"
+                      )
+                  )
+              }
           )
       }
   )
-  public Response createNewEvent(@HeaderParam("Accept") String acceptHeader, @Context HttpServletRequest request) {
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "201",
+          description = "A new event is created and its identifier is returned in the Location header."
+      ),
+      @ApiResponse(responseCode = "409", description = "The event could not be created due to a scheduling conflict."),
+      @ApiResponse(responseCode = "400", description = "The request is invalid or inconsistent..")
+  })
+  public Response createNewEvent(
+      @HeaderParam("Accept") String acceptHeader,
+      @Context HttpServletRequest request
+  ) {
     String seriesId = "";
     try {
       String captions = null;
@@ -267,25 +260,19 @@ public class LtiServiceGuiEndpoint {
 
   @DELETE
   @Path("{eventId}")
-  @RestQuery(
-      name = "deleteevent",
-      description = "Deletes an event.",
-      returnDescription = "",
-      pathParameters = {
-          @RestParameter(name = "eventId", description = "The event id", isRequired = true, type = Type.STRING)
-      },
-      responses = {
-          @RestResponse(
-              description = "The event has been deleted.",
-              responseCode = HttpServletResponse.SC_NO_CONTENT
-          ),
-          @RestResponse(
-              description = "The specified event does not exist.",
-              responseCode = HttpServletResponse.SC_NOT_FOUND
-          )
-      }
+  @Operation(
+      summary = "Delete an event",
+      description = "Deletes an event."
   )
-  public Response deleteEvent(@HeaderParam("Accept") String acceptHeader, @PathParam("eventId") String id) {
+  @ApiResponses({
+      @ApiResponse(responseCode = "204", description = "The event has been deleted."),
+      @ApiResponse(responseCode = "404", description = "The specified event does not exist.")
+  })
+  public Response deleteEvent(
+      @HeaderParam("Accept") String acceptHeader,
+      @Parameter(description = "The event id", required = true)
+      @PathParam("eventId") String id
+  ) {
     try {
       service.delete(id);
       return Response.noContent().build();
