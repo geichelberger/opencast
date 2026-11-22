@@ -29,10 +29,6 @@ import org.opencastproject.opensearch.index.rebuild.IndexRebuildService.Service;
 import org.opencastproject.security.api.SecurityService;
 import org.opencastproject.security.util.SecurityContext;
 import org.opencastproject.util.RestUtil.R;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -49,7 +45,6 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -58,13 +53,20 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 /**
  * The index endpoint allows the management of the opensearch index.
  */
 @Path("/index")
-@RestService(name = "IndexEndpoint", title = "Index Endpoint",
-    abstractText = "Provides operations related to the index that serves both the Admin UI and the External API",
-    notes = {})
+@Tag(
+    name = "Index Endpoint",
+    description = "Provides operations related to the index that serves both the Admin UI and the External API"
+)
 @Component(
         immediate = true,
         property = {
@@ -114,11 +116,14 @@ public class IndexEndpoint {
 
   @POST
   @Path("clear")
-  @RestQuery(name = "clearIndex", description = "Clear the index",
-      returnDescription = "OK if index is cleared", responses = {
-      @RestResponse(description = "Index is cleared", responseCode = HttpServletResponse.SC_OK),
-      @RestResponse(description = "Unable to clear index",
-              responseCode = HttpServletResponse.SC_INTERNAL_SERVER_ERROR) })
+  @Operation(
+      summary = "Clear the index",
+      description = "Clear the index"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Index is cleared"),
+      @ApiResponse(responseCode = "500", description = "Unable to clear index")
+  })
   public Response clearIndex() {
     final SecurityContext securityContext = new SecurityContext(securityService, securityService.getOrganization(),
         securityService.getUser());
@@ -137,16 +142,24 @@ public class IndexEndpoint {
 
   @POST
   @Path("rebuild/{service}")
-  @RestQuery(name = "partiallyRebuildIndex",
-      description = "Repopulates the Index from an specific service",
-      returnDescription = "OK if repopulation has started", pathParameters = {
-      @RestParameter(name = "service", isRequired = true, description = "The service to recreate index from. "
-        + "The available services are: Series, Scheduler, AssetManager, Comments, Workflow and Search. "
-        + "The service order (see above) is very important except for Search! Make sure, you do not run index rebuild"
-        + "for more than one service at a time!",
-        type = RestParameter.Type.STRING) }, responses = {
-      @RestResponse(description = "OK if repopulation has started", responseCode = HttpServletResponse.SC_OK) })
-  public Response partiallyRebuildIndex(@PathParam("service") final String serviceStr) {
+  @Operation(
+      summary = "Rebuild the index from a service",
+      description = "Repopulates the Index from a specific service"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "OK if repopulation has started")
+  })
+  public Response partiallyRebuildIndex(
+      @Parameter(
+          description = "The service to recreate index from. "
+              + "The available services are: Series, Scheduler, AssetManager, Comments, Workflow and Search. "
+              + "The service order (see above) is very important except for Search! Make sure, you do not run index "
+              + "rebuild"
+              + "for more than one service at a time!",
+          required = true
+      )
+      @PathParam("service") final String serviceStr
+  ) {
     Service service = EnumUtils.getEnum(Service.class, serviceStr);
     if (service == null) {
       return R.badRequest("The given path param for service was invalid.");
@@ -168,39 +181,24 @@ public class IndexEndpoint {
 
   @POST
   @Path("rebuild/{service}/{type}")
-  @RestQuery(name = "partiallyRebuildIndexByPart",
+  @Operation(
+      summary = "Rebuild the index from a service for one type of data",
       description = "Repopulates the index for a specific service, but only for a specific type of data "
-        + "in order to save time. "
-        + "Only use this endpoint if you have been explicitly told to or know what you are doing, else you risk "
-        + "inconsistent data in the index!",
-      returnDescription = "OK if repopulation has started",
-      pathParameters = {
-          @RestParameter(
-              name = "service",
-              isRequired = true,
-              description = "The service to recreate index from. The available services are: AssetManager. ",
-              type = RestParameter.Type.STRING
-          ),
-          @RestParameter(
-              name = "type",
-              isRequired = true,
-              description = "The type of data to re-index. The available types are: ACL. ",
-              type = RestParameter.Type.STRING
-          )
-      },
-      responses = {
-        @RestResponse(
-            description = "OK if repopulation has started",
-            responseCode = HttpServletResponse.SC_OK
-        ),
-        @RestResponse(
-            description = "If the given parameters aren't one of the supported values",
-            responseCode = HttpServletResponse.SC_BAD_REQUEST
-        )
-      }
+          + "in order to save time. "
+          + "Only use this endpoint if you have been explicitly told to or know what you are doing, else you risk "
+          + "inconsistent data in the index!"
   )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "OK if repopulation has started"),
+      @ApiResponse(responseCode = "400", description = "If the given parameters aren't one of the supported values")
+  })
   public Response partiallyRebuildIndexByType(
+      @Parameter(
+          description = "The service to recreate index from. The available services are: AssetManager. ",
+          required = true
+      )
       @PathParam("service") final String serviceStr,
+      @Parameter(description = "The type of data to re-index. The available types are: ACL. ", required = true)
       @PathParam("type") final String dataTypeStr
   ) {
     Service service = EnumUtils.getEnum(Service.class, serviceStr);
@@ -229,10 +227,13 @@ public class IndexEndpoint {
 
   @POST
   @Path("rebuild")
-  @RestQuery(name = "rebuild", description = "Clear and repopulates the Index directly from the "
-          + "Services",
-      returnDescription = "OK if repopulation has started", responses = {
-      @RestResponse(description = "OK if repopulation has started", responseCode = HttpServletResponse.SC_OK) })
+  @Operation(
+      summary = "Clear and rebuild the index",
+      description = "Clear and repopulates the Index directly from the Services"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "OK if repopulation has started")
+  })
   public Response rebuildIndex() {
     final SecurityContext securityContext = new SecurityContext(securityService, securityService.getOrganization(),
             securityService.getUser());
@@ -249,17 +250,24 @@ public class IndexEndpoint {
 
   @POST
   @Path("resume/{service}")
-  @RestQuery(name = "resumeIndexRebuild",
-          description = "Starts repopulating the Index from an specific service and will then continue with the rest "
-                  + "of the services that come afterwards",
-          returnDescription = "OK if repopulation has started", pathParameters = {
-          @RestParameter(name = "service", isRequired = true, description = "The service to start recreating the index "
-                  + "from. "
-                  + "The available services are: Series, Scheduler, AssetManager, Comments and Workflow. "
-                  + "All services that come after the specified service in the order above will also run.",
-                  type = RestParameter.Type.STRING) }, responses = {
-          @RestResponse(description = "OK if repopulation has started", responseCode = HttpServletResponse.SC_OK) })
-  public Response resumeIndexRebuild(@PathParam("service") final String serviceStr) {
+  @Operation(
+      summary = "Resume rebuilding the index from a service",
+      description = "Starts repopulating the Index from a specific service and will then continue with the rest "
+          + "of the services that come afterwards"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "OK if repopulation has started")
+  })
+  public Response resumeIndexRebuild(
+      @Parameter(
+          description = "The service to start recreating the index "
+              + "from. "
+              + "The available services are: Series, Scheduler, AssetManager, Comments and Workflow. "
+              + "All services that come after the specified service in the order above will also run.",
+          required = true
+      )
+      @PathParam("service") final String serviceStr
+  ) {
     Service service = EnumUtils.getEnum(Service.class, serviceStr);
     if (service == null) {
       return R.badRequest("The given path param for service was invalid.");
@@ -281,12 +289,13 @@ public class IndexEndpoint {
   @GET
   @Path("rebuild/states.json")
   @Produces(MediaType.APPLICATION_JSON)
-  @RestQuery(name = "getrebuildstates", description = "Returns the index rebuild service"
-          + "repopulation states", returnDescription = "The repopulation states of the index rebuild services",
-          responses = {
-          @RestResponse(description = "Returns the repopulation states of the index rebuild services",
-          responseCode = HttpServletResponse.SC_OK),
-    })
+  @Operation(
+      summary = "Get the index rebuild states",
+      description = "Returns the index rebuild servicerepopulation states"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Returns the repopulation states of the index rebuild services")
+  })
   public Response getRebuildStates() {
     Map<String, String> states = indexRebuildService.getRebuildStates();
     JsonArray statesAsJson = new JsonArray();
