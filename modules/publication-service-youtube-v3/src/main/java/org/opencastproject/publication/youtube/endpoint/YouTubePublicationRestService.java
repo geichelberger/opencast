@@ -21,8 +21,6 @@
 
 package org.opencastproject.publication.youtube.endpoint;
 
-import static javax.servlet.http.HttpServletResponse.SC_BAD_REQUEST;
-import static javax.servlet.http.HttpServletResponse.SC_OK;
 import static org.opencastproject.util.RestUtil.R.badRequest;
 import static org.opencastproject.util.RestUtil.R.serverError;
 
@@ -36,11 +34,6 @@ import org.opencastproject.mediapackage.Track;
 import org.opencastproject.publication.api.YouTubePublicationService;
 import org.opencastproject.rest.AbstractJobProducerEndpoint;
 import org.opencastproject.serviceregistry.api.ServiceRegistry;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestParameter.Type;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 
 import org.apache.commons.lang3.StringUtils;
 import org.osgi.service.component.annotations.Component;
@@ -60,23 +53,17 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 /**
  * Rest endpoint for publishing media to youtube.
  */
 @Path("/youtube")
-@RestService(name = "youtubepublicationservice",
-    title = "YouTube Publication Service",
-    abstractText = "",
-    notes = {
-        "All paths above are relative to the REST endpoint base (something like http://your.server/files)",
-        "If the service is down or not working it will return a status 503, this means the the underlying service is "
-            + "not working and is either restarting or has failed",
-        "A status code 500 means a general failure has occurred which is not recoverable and was "
-            + "not anticipated. In other words, there is a bug! You should file an error report "
-            + "with your server logs from the time when the error occurred: "
-            + "<a href=\"https://github.com/opencast/opencast/issues\">Opencast Issue Tracker</a>"
-    }
-)
+@Tag(name = "YouTube Publication Service")
 @Component(
     immediate = true,
     service = YouTubePublicationRestService.class,
@@ -99,44 +86,22 @@ public class YouTubePublicationRestService extends AbstractJobProducerEndpoint {
   @POST
   @Path("/")
   @Produces(MediaType.TEXT_XML)
-  @RestQuery(name = "publish",
-      description = "Publish a media package element to youtube publication channel",
-      returnDescription = "The job that can be used to track the publication",
-      restParameters = {
-          @RestParameter(
-              name = "mediapackage",
-              isRequired = true,
-              description = "The mediapackage",
-              type = Type.TEXT
-          ),
-          @RestParameter(
-              name = "elementId",
-              isRequired = true,
-              description = "The element to publish",
-              type = Type.STRING
-          ),
-          @RestParameter(
-              name = "thumbnailId",
-              isRequired = false,
-              description = "The optional thumbnail to publish",
-              type = Type.STRING
-          ),
-          @RestParameter(
-              name = "captionIds",
-              isRequired = false,
-              description = "The captions to publish",
-              type = Type.STRING
-          )
-      },
-      responses = {
-          @RestResponse(responseCode = SC_OK, description = "An XML representation of the publication job"),
-          @RestResponse(responseCode = SC_BAD_REQUEST, description = "elementId does not reference a track")
-      }
+  @Operation(
+      summary = "Publish a media package element to YouTube",
+      description = "Publish a media package element to youtube publication channel"
   )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "An XML representation of the publication job"),
+      @ApiResponse(responseCode = "400", description = "elementId does not reference a track")
+  })
   public Response publish(
+      @Parameter(description = "The mediapackage", required = true)
       @FormParam("mediapackage") final String mediaPackageXml,
+      @Parameter(description = "The element to publish", required = true)
       @FormParam("elementId") final String elementId,
+      @Parameter(description = "The optional thumbnail to publish")
       @FormParam("thumbnailId") final String thumbnailId,
+      @Parameter(description = "The captions to publish")
       @FormParam("captionIds") final String captionIds
   ) {
     final Job job;
@@ -168,18 +133,17 @@ public class YouTubePublicationRestService extends AbstractJobProducerEndpoint {
   @POST
   @Path("/retract")
   @Produces(MediaType.TEXT_XML)
-  @RestQuery(
-      name = "retract",
-      description = "Retract a media package from the youtube publication channel",
-      returnDescription = "The job that can be used to track the retraction",
-      restParameters = {
-          @RestParameter(name = "mediapackage", isRequired = true, description = "The mediapackage", type = Type.TEXT)
-      },
-      responses = {
-          @RestResponse(responseCode = SC_OK, description = "An XML representation of the retraction job")
-      }
+  @Operation(
+      summary = "Retract a media package from YouTube",
+      description = "Retract a media package from the youtube publication channel"
   )
-  public Response retract(@FormParam("mediapackage") final String mediaPackageXml) {
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "An XML representation of the retraction job")
+  })
+  public Response retract(
+      @Parameter(description = "The mediapackage", required = true)
+      @FormParam("mediapackage") final String mediaPackageXml
+  ) {
     final Job job;
     try {
       final MediaPackage mediapackage = MediaPackageParser.getFromXml(mediaPackageXml);
