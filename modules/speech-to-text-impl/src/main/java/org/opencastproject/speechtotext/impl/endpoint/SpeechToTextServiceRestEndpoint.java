@@ -21,8 +21,6 @@
 
 package org.opencastproject.speechtotext.impl.endpoint;
 
-import static org.opencastproject.util.doc.rest.RestParameter.Type.BOOLEAN;
-import static org.opencastproject.util.doc.rest.RestParameter.Type.STRING;
 
 import org.opencastproject.job.api.JaxbJob;
 import org.opencastproject.job.api.Job;
@@ -31,10 +29,6 @@ import org.opencastproject.rest.AbstractJobProducerEndpoint;
 import org.opencastproject.serviceregistry.api.ServiceRegistry;
 import org.opencastproject.speechtotext.api.SpeechToTextService;
 import org.opencastproject.speechtotext.api.SpeechToTextServiceException;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 
 import com.google.gson.JsonSyntaxException;
 
@@ -47,7 +41,6 @@ import org.slf4j.LoggerFactory;
 import java.net.URI;
 import java.net.URISyntaxException;
 
-import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.FormParam;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -55,15 +48,20 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 /**
  * A service endpoint to expose the {@link SpeechToTextService} via REST.
  */
 @Path("/speechtotext")
-@RestService(
-    name = "speechtotext",
-    title = "Speech to Text Service",
-    abstractText = "Create subtitles for video or audio clips.",
-    notes = { "The file format is WebVTT (*.vtt)" }
+@Tag(
+    name = "Speech to Text Service",
+    description = "Create subtitles for video or audio clips."
 )
 @Component(
     immediate = true,
@@ -95,28 +93,25 @@ public class SpeechToTextServiceRestEndpoint extends AbstractJobProducerEndpoint
   @POST
   @Produces(MediaType.TEXT_XML)
   @Path("speechtotext")
-  @RestQuery(name = "speechtotext", description = "Generates subtitles for media files with audio.",
-      restParameters = {
-          @RestParameter(name = "mediaFilePath", isRequired = true, type = STRING,
-              description = "Location of to the media file."),
-          @RestParameter(name = "language", isRequired = false, type = STRING,
-              description = "Language of the media file."),
-          @RestParameter(name = "translate", isRequired = false, type = BOOLEAN,
-              description = "Enable translation to english"),
-          @RestParameter(name = "async", isRequired = false, defaultValue = "false", type = BOOLEAN,
-              description = "If job will run outside the scope of a workflow") },
-      responses = {
-          @RestResponse(description = "Subtitles created successfully", responseCode = HttpServletResponse.SC_OK),
-          @RestResponse(description = "Invalid data", responseCode = HttpServletResponse.SC_BAD_REQUEST),
-          @RestResponse(description = "Internal error", responseCode = HttpServletResponse.SC_INTERNAL_SERVER_ERROR)
-      },
-      returnDescription = "Returns the path to the generated subtitles file."
+  @Operation(
+      summary = "Create a speech-to-text job",
+      description = "Generates subtitles for media files with audio."
   )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Subtitles created successfully"),
+      @ApiResponse(responseCode = "400", description = "Invalid data"),
+      @ApiResponse(responseCode = "500", description = "Internal error")
+  })
   public Response speechToText(
-          @FormParam("mediaFilePath") String mediaFilePath,
-          @FormParam("language") String language,
-          @FormParam("translate") Boolean translate,
-          @FormParam("async") Boolean async) {
+      @Parameter(description = "Location of to the media file.", required = true)
+      @FormParam("mediaFilePath") String mediaFilePath,
+      @Parameter(description = "Language of the media file.")
+      @FormParam("language") String language,
+      @Parameter(description = "Enable translation to english")
+      @FormParam("translate") Boolean translate,
+      @Parameter(description = "If job will run outside the scope of a workflow", schema = @Schema(example = "false"))
+      @FormParam("async") Boolean async
+  ) {
     try {
       logger.debug("Starting to generate subtitles.");
       Job job = speechToTextService.transcribe(new URI(mediaFilePath), language, translate, async);
