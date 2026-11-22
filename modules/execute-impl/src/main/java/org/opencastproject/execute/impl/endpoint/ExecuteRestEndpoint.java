@@ -94,9 +94,12 @@ public class ExecuteRestEndpoint extends AbstractJobProducerEndpoint {
       description = "Executes the given command"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "204", description = "XML-encoded Job is returned."),
-      @ApiResponse(responseCode = "503", description = "Service unavailabe or not currently present"),
-      @ApiResponse(responseCode = "400", description = "Incorrect parameters"),
+      @ApiResponse(responseCode = "200", description = "XML-encoded Job is returned."),
+      @ApiResponse(
+          responseCode = "400",
+          description = "Incorrect parameters: the expected type is unknown or missing for an output filename, or "
+              + "not exactly one of the mediapackage and the mediapackage element is given."
+      ),
       @ApiResponse(
           responseCode = "500",
           description = "Problem executing the command or serializing the arguments/results"
@@ -107,7 +110,7 @@ public class ExecuteRestEndpoint extends AbstractJobProducerEndpoint {
       @FormParam(ExecuteService.EXEC_FORM_PARAM) String exec,
       @Parameter(description = "The arguments to the command", required = true)
       @FormParam(ExecuteService.PARAMS_FORM_PARAM) String params,
-      @Parameter(description = "The estimated load placed on the system by this command")
+      @Parameter(description = "The estimated load placed on the system by this command. Defaults to 1.0")
       @FormParam(ExecuteService.LOAD_FORM_PARAM) Float loadParam,
       @Parameter(
           description = "The mediapackage element to apply the command to. Either this or "
