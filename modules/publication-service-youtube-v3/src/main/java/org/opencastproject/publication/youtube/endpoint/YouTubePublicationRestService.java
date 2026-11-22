@@ -92,7 +92,8 @@ public class YouTubePublicationRestService extends AbstractJobProducerEndpoint {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "An XML representation of the publication job"),
-      @ApiResponse(responseCode = "400", description = "elementId does not reference a track")
+      @ApiResponse(responseCode = "400", description = "elementId does not reference a track"),
+      @ApiResponse(responseCode = "500", description = "Error publishing the element to YouTube.")
   })
   public Response publish(
       @Parameter(description = "The mediapackage", required = true)
@@ -101,7 +102,7 @@ public class YouTubePublicationRestService extends AbstractJobProducerEndpoint {
       @FormParam("elementId") final String elementId,
       @Parameter(description = "The optional thumbnail to publish")
       @FormParam("thumbnailId") final String thumbnailId,
-      @Parameter(description = "The captions to publish")
+      @Parameter(description = "The identifiers of the caption tracks to publish, separated by commas")
       @FormParam("captionIds") final String captionIds
   ) {
     final Job job;
@@ -138,7 +139,8 @@ public class YouTubePublicationRestService extends AbstractJobProducerEndpoint {
       description = "Retract a media package from the youtube publication channel"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "An XML representation of the retraction job")
+      @ApiResponse(responseCode = "200", description = "An XML representation of the retraction job"),
+      @ApiResponse(responseCode = "500", description = "Error retracting the media package from YouTube.")
   })
   public Response retract(
       @Parameter(description = "The mediapackage", required = true)
