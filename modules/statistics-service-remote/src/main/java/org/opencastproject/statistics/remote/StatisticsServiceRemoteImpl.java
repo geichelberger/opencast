@@ -34,7 +34,6 @@ import org.opencastproject.statistics.api.StatisticsService;
 import org.opencastproject.statistics.api.TimeSeries;
 import org.opencastproject.statistics.api.TimeSeriesProvider;
 import org.opencastproject.util.GsonUtil;
-import org.opencastproject.util.doc.rest.RestService;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -63,23 +62,15 @@ import java.util.stream.Collectors;
 
 import javax.ws.rs.Path;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 /**
  * A proxy to a remote series service.
  */
 @Path("/statistics")
-@RestService(
-    name = "statisticsservice",
-    title = "Statistics Service Remote",
-    abstractText = "This service provides statistics.",
-    notes = {
-        "All paths above are relative to the REST endpoint base (something like http://your.server/files)",
-        "If the service is down or not working it will return a status 503, this means the the "
-            + "underlying service is not working and is either restarting or has failed",
-        "A status code 500 means a general failure has occurred which is not recoverable and was "
-            + "not anticipated. In other words, there is a bug! You should file an error report "
-            + "with your server logs from the time when the error occurred: "
-            + "<a href=\"https://github.com/opencast/opencast/issues\">Opencast Issue Tracker</a>"
-    }
+@Tag(
+    name = "Statistics Service Remote",
+    description = "This service provides statistics."
 )
 @Component(
     immediate = true,
