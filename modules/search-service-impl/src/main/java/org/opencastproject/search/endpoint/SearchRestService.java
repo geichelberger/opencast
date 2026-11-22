@@ -21,14 +21,10 @@
 
 package org.opencastproject.search.endpoint;
 
-import static javax.servlet.http.HttpServletResponse.SC_FORBIDDEN;
-import static javax.servlet.http.HttpServletResponse.SC_NOT_FOUND;
-import static javax.servlet.http.HttpServletResponse.SC_NO_CONTENT;
 import static org.opencastproject.opensearch.impl.IndexSchema.SEARCH_FIELD_NAME_EXTENSION;
 import static org.opencastproject.util.RestUtil.R.forbidden;
 import static org.opencastproject.util.RestUtil.R.noContent;
 import static org.opencastproject.util.RestUtil.R.notFound;
-import static org.opencastproject.util.doc.rest.RestParameter.Type.STRING;
 
 import org.opencastproject.job.api.JobProducer;
 import org.opencastproject.metadata.dublincore.DublinCore;
@@ -48,10 +44,6 @@ import org.opencastproject.security.urlsigning.utils.UrlSigningServiceOsgiUtil;
 import org.opencastproject.security.util.SecurityUtil;
 import org.opencastproject.serviceregistry.api.ServiceRegistry;
 import org.opencastproject.util.NotFoundException;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 
 import com.google.gson.Gson;
 
@@ -76,7 +68,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.FormParam;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -87,23 +78,19 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 /**
  * The REST endpoint
  */
 @Path("/search")
-@RestService(
-    name = "search",
-    title = "Search Service",
-    abstractText = "This service indexes and queries available (distributed) episodes.",
-    notes = {
-        "All paths above are relative to the REST endpoint base (something like http://your.server/files)",
-        "If the service is down or not working it will return a status 503, this means the the "
-            + "underlying service is not working and is either restarting or has failed",
-        "A status code 500 means a general failure has occurred which is not recoverable and was "
-            + "not anticipated. In other words, there is a bug! You should file an error report "
-            + "with your server logs from the time when the error occurred: "
-            + "<a href=\"https://github.com/opencast/opencast/issues\">Opencast Issue Tracker</a>"
-    }
+@Tag(
+    name = "Search Service",
+    description = "This service indexes and queries available (distributed) episodes."
 )
 @Component(
     immediate = true,
@@ -138,60 +125,31 @@ public class SearchRestService extends AbstractJobProducerEndpoint {
   @GET
   @Path("series.json")
   @Produces(MediaType.APPLICATION_JSON)
-  @RestQuery(
-      name = "get_series",
-      description = "Search for series matching the query parameters.",
-      restParameters = {
-          @RestParameter(
-              name = "id",
-              isRequired = false,
-              type = RestParameter.Type.STRING,
-              description = "The series ID. If the additional boolean parameter \"episodes\" is \"true\", "
-                  + "the result set will include this series episodes."
-          ),
-          @RestParameter(
-              name = "q",
-              isRequired = false,
-              type = RestParameter.Type.STRING,
-              description = "Any series that matches this free-text query."
-          ),
-          @RestParameter(
-              name = "sort",
-              isRequired = false,
-              type = RestParameter.Type.STRING,
-              description = "The sort order.  May include any of the following dublin core metadata: "
+  @Operation(
+      summary = "Search for series",
+      description = "Search for series matching the query parameters."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The request was processed successfully.")
+  })
+  public Response getSeries(
+      @Parameter(
+          description = "The series ID. If the additional boolean parameter \"episodes\" is \"true\", "
+              + "the result set will include this series episodes."
+      )
+      @QueryParam("id") String id,
+      @Parameter(description = "Any series that matches this free-text query.")
+      @QueryParam("q") String text,
+      @Parameter(
+          description = "The sort order.  May include any of the following dublin core metadata: "
               + "identifier, title, contributor, creator, created, modified. "
               + "Add ' asc' or ' desc' to specify the sort order (e.g. 'title desc')."
-          ),
-          @RestParameter(
-              name = "limit",
-              isRequired = false,
-              type = RestParameter.Type.INTEGER,
-              defaultValue = "20",
-              description = "The maximum number of items to return per page."
-          ),
-          @RestParameter(
-              name = "offset",
-              isRequired = false,
-              type = RestParameter.Type.INTEGER,
-              defaultValue = "0",
-              description = "The page number."
-          )
-      },
-      responses = {
-          @RestResponse(
-              description = "The request was processed successfully.",
-              responseCode = HttpServletResponse.SC_OK
-          )
-      },
-      returnDescription = "The search results, formatted as XML or JSON."
-  )
-  public Response getSeries(
-      @QueryParam("id")       String  id,
-      @QueryParam("q")        String  text,
-      @QueryParam("sort")     String  sort,
-      @QueryParam("limit")    String  limit,
-      @QueryParam("offset")   String  offset
+      )
+      @QueryParam("sort") String sort,
+      @Parameter(description = "The maximum number of items to return per page.", example = "20")
+      @QueryParam("limit") String limit,
+      @Parameter(description = "The page number.", example = "0")
+      @QueryParam("offset") String offset
   ) throws SearchException {
 
     final var org = securityService.getOrganization().getId();
@@ -281,88 +239,41 @@ public class SearchRestService extends AbstractJobProducerEndpoint {
   @GET
   @Path("episode.json")
   @Produces(MediaType.APPLICATION_JSON)
-  @RestQuery(
-      name = "search_episodes",
-      description = "Search for episodes matching the query parameters.",
-      restParameters = {
-          @RestParameter(
-              name = "id",
-              isRequired = false,
-              type = RestParameter.Type.STRING,
-              description = "The ID of the single episode to be returned, if it exists."
-          ),
-          @RestParameter(
-              name = "q",
-              isRequired = false,
-              type = RestParameter.Type.STRING,
-              description = "Any episode that matches this free-text query."
-          ),
-          @RestParameter(
-              name = "sid",
-              isRequired = false,
-              type = RestParameter.Type.STRING,
-              description = "Any episode that belongs to specified series id."
-          ),
-          @RestParameter(
-              name = "sname",
-              isRequired = false,
-              type = RestParameter.Type.STRING,
-              description = "Any episode that belongs to specified series name (note that the "
-                  + "specified series name must be unique)."
-          ),
-          @RestParameter(
-              name = "sort",
-              isRequired = false,
-              type = RestParameter.Type.STRING,
-              description = "The sort order.  May include any of the following dublin core metadata: "
-                  + "title, contributor, creator, created, modified. "
-                  + "Add ' asc' or ' desc' to specify the sort order (e.g. 'title desc')."
-          ),
-          @RestParameter(
-              name = "limit",
-              isRequired = false,
-              type = RestParameter.Type.INTEGER,
-              defaultValue = "20",
-              description = "The maximum number of items to return per page. Limited to 250 for non-admins."
-          ),
-          @RestParameter(
-              name = "offset",
-              isRequired = false,
-              type = RestParameter.Type.INTEGER,
-              defaultValue = "0",
-              description = "The page number."
-          ),
-          @RestParameter(
-              name = "sign",
-              isRequired = false,
-              type = RestParameter.Type.BOOLEAN,
-              defaultValue = "true",
-              description = "If results are to be signed"
-          ),
-          @RestParameter(
-              name = "live",
-              isRequired = false,
-              type = RestParameter.Type.BOOLEAN,
-              description = "If the result should only consist of live episodes (true) or not live episodes (false)"
-          )
-      },
-      responses = {
-          @RestResponse(
-              description = "The request was processed successfully.",
-              responseCode = HttpServletResponse.SC_OK
-          )
-      },
-      returnDescription = "The search results, formatted as xml or json."
+  @Operation(
+      summary = "Search for episodes",
+      description = "Search for episodes matching the query parameters."
   )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The request was processed successfully.")
+  })
   public Response getEpisodes(
+      @Parameter(description = "The ID of the single episode to be returned, if it exists.")
       @QueryParam("id") String id,
+      @Parameter(description = "Any episode that matches this free-text query.")
       @QueryParam("q") String text,
+      @Parameter(description = "Any episode that belongs to specified series id.")
       @QueryParam("sid") String seriesId,
+      @Parameter(
+          description = "Any episode that belongs to specified series name (note that the "
+              + "specified series name must be unique)."
+      )
       @QueryParam("sname") String seriesName,
+      @Parameter(
+          description = "The sort order.  May include any of the following dublin core metadata: "
+              + "title, contributor, creator, created, modified. "
+              + "Add ' asc' or ' desc' to specify the sort order (e.g. 'title desc')."
+      )
       @QueryParam("sort") String sort,
+      @Parameter(
+          description = "The maximum number of items to return per page. Limited to 250 for non-admins.",
+          example = "20"
+      )
       @QueryParam("limit") String limit,
+      @Parameter(description = "The page number.", example = "0")
       @QueryParam("offset") String offset,
+      @Parameter(description = "If results are to be signed", example = "true")
       @QueryParam("sign") String sign,
+      @Parameter(description = "If the result should only consist of live episodes (true) or not live episodes (false)")
       @QueryParam("live") Boolean live
   ) throws SearchException {
 
@@ -513,26 +424,19 @@ public class SearchRestService extends AbstractJobProducerEndpoint {
 
   @POST
   @Path("updateIndex")
-  @RestQuery(name = "updateIndex",
-          description = "Trigger search index update for event. The usage of this is limited to global administrators.",
-          restParameters = {
-                  @RestParameter(
-                          name = "id",
-                          isRequired = true,
-                          type = STRING,
-                          description = "The event ID to trigger an index update for.")},
-          responses = {
-                  @RestResponse(
-                          description = "Update successfully triggered.",
-                          responseCode = SC_NO_CONTENT),
-                  @RestResponse(
-                          description = "Not allowed to trigger update.",
-                          responseCode = SC_FORBIDDEN),
-                  @RestResponse(
-                          description = "No such event found.",
-                          responseCode = SC_NOT_FOUND)},
-          returnDescription = "No content is returned.")
-  public Response indexUpdate(@FormParam("id") final String id) {
+  @Operation(
+      summary = "Update the search index of an event",
+      description = "Trigger search index update for event. The usage of this is limited to global administrators."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "204", description = "Update successfully triggered."),
+      @ApiResponse(responseCode = "403", description = "Not allowed to trigger update."),
+      @ApiResponse(responseCode = "404", description = "No such event found.")
+  })
+  public Response indexUpdate(
+      @Parameter(description = "The event ID to trigger an index update for.", required = true)
+      @FormParam("id") final String id
+  ) {
     try {
       searchIndex.indexMediaPackage(id);
       return noContent();
