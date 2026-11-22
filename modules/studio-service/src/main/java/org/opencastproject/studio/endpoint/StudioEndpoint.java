@@ -92,7 +92,9 @@ public class StudioEndpoint {
       description = "Returns all series for which the current user has write permissions."
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "Returns a list of series.")
+      @ApiResponse(responseCode = "200", description = "Returns a list of series."),
+      @ApiResponse(responseCode = "400", description = "A filter is not valid."),
+      @ApiResponse(responseCode = "500", description = "The series could not be retrieved.")
   })
   public Response getSeries(
       @Parameter(
