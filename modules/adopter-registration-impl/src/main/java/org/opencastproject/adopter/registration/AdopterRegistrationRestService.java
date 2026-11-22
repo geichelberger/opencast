@@ -21,18 +21,10 @@
 
 package org.opencastproject.adopter.registration;
 
-import static javax.servlet.http.HttpServletResponse.SC_BAD_REQUEST;
-import static javax.servlet.http.HttpServletResponse.SC_OK;
 import static org.opencastproject.util.RestUtil.R.ok;
 import static org.opencastproject.util.RestUtil.R.serverError;
-import static org.opencastproject.util.doc.rest.RestParameter.Type.BOOLEAN;
-import static org.opencastproject.util.doc.rest.RestParameter.Type.STRING;
 
 import org.opencastproject.adopter.registration.dto.Adopter;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 
 import com.google.gson.Gson;
 
@@ -54,14 +46,20 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 /**
  * The REST endpoint for the adopter statistics service.
  */
 @Path("/admin-ng/adopter")
-@RestService(name = "registrationController",
-        title = "Adopter Statistics Registration Service Endpoint",
-        abstractText = "Rest Endpoint for the registration form.",
-        notes = {"Provides operations regarding the adopter registration form"})
+@Tag(
+    name = "Adopter Statistics Registration Service Endpoint",
+    description = "Rest Endpoint for the registration form."
+)
 @Component(
     immediate = true,
     service = AdopterRegistrationRestService.class,
@@ -96,14 +94,15 @@ public class AdopterRegistrationRestService {
   @GET
   @Path("registration")
   @Produces(MediaType.APPLICATION_JSON)
-  @RestQuery(name = "getregistrationform", description = "GETs the adopter registration data.", responses = {
-          @RestResponse(description = "Retrieved registration data.",
-                        responseCode = HttpServletResponse.SC_OK),
-          @RestResponse(description = "No registration data found.",
-                        responseCode = HttpServletResponse.SC_NOT_FOUND),
-          @RestResponse(description = "Error while retrieving adopter registration data.",
-                        responseCode = HttpServletResponse.SC_INTERNAL_SERVER_ERROR) },
-                        returnDescription = "GETs the adopter registration data.")
+  @Operation(
+      summary = "Get the adopter registration data",
+      description = "GETs the adopter registration data."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Retrieved registration data."),
+      @ApiResponse(responseCode = "404", description = "No registration data found."),
+      @ApiResponse(responseCode = "500", description = "Error while retrieving adopter registration data.")
+  })
   public Response getRegistrationForm() {
     logger.debug("Retrieving adopter registration data.");
     Adopter a = registrationService.get();
@@ -117,14 +116,14 @@ public class AdopterRegistrationRestService {
   @GET
   @Path("statistics")
   @Produces(MediaType.APPLICATION_JSON)
-  @RestQuery(name = "getstatistics", description = "GETs the adopter registration statistics data.",
-      responses = {
-          @RestResponse(description = "Retrieved statistic data.",
-              responseCode = HttpServletResponse.SC_OK),
-          @RestResponse(description = "Error while retrieving adopter statistic data.",
-              responseCode = HttpServletResponse.SC_INTERNAL_SERVER_ERROR)
-      },
-      returnDescription = "GETs the adopter registration statistics data.")
+  @Operation(
+      summary = "Get the adopter registration statistics",
+      description = "GETs the adopter registration statistics data."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Retrieved statistic data."),
+      @ApiResponse(responseCode = "500", description = "Error while retrieving adopter statistic data.")
+  })
   public Response getAdopterStatistics() {
     logger.debug("Retrieving adopter registration statistics data.");
     try {
@@ -136,63 +135,48 @@ public class AdopterRegistrationRestService {
 
   @POST
   @Path("registration")
-  @RestQuery(name = "saveregistrationform",
-          description = "Saves the adopter registration data.",
-          returnDescription = "Status",
-          restParameters = {
-                  @RestParameter(description = "The Name of the organisation.",
-                          isRequired = false, name = "organisationName", type = STRING),
-                  @RestParameter(description = "The Name of the department.",
-                          isRequired = false, name = "departmentName", type = STRING),
-                  @RestParameter(description = "The First name.",
-                          isRequired = false, name = "firstName", type = STRING),
-                  @RestParameter(description = "The Last name.",
-                          isRequired = false, name = "lastName", type = STRING),
-                  @RestParameter(description = "The e-mail address.",
-                          isRequired = false, name = "email", type = STRING),
-                  @RestParameter(description = "The country.",
-                          isRequired = false, name = "country", type = STRING),
-                  @RestParameter(description = "The postal code.",
-                          isRequired = false, name = "postalCode", type = STRING),
-                  @RestParameter(description = "The city.",
-                          isRequired = false, name = "city", type = STRING),
-                  @RestParameter(description = "The street.",
-                          isRequired = false, name = "street", type = STRING),
-                  @RestParameter(description = "The street number.",
-                          isRequired = false, name = "streetNo", type = STRING),
-                  @RestParameter(description = "Does the adopter allows to be contacted.",
-                          isRequired = false, name = "contactMe", type = BOOLEAN),
-                  @RestParameter(description = "Does the adopter agreed to the policy.",
-                          isRequired = false, name = "agreedToPolicy", type = BOOLEAN),
-                  @RestParameter(description = "Does the adopter allow the gathering of error reports.",
-                          isRequired = false, name = "allowsErrorReports", type = BOOLEAN),
-                  @RestParameter(description = "Which type of system is this.",
-                          isRequired = false, name = "systemType", type = STRING),
-                  @RestParameter(description = "Does the adopter allow the gathering of statistic data.",
-                          isRequired = false, name = "allowsStatistics", type = BOOLEAN),
-                  @RestParameter(description = "Is the adopter already registered.",
-                          isRequired = false, name = "registered", type = BOOLEAN)
-          },
-          responses = {
-          @RestResponse(responseCode = SC_OK, description = "Adopter registration data saved."),
-          @RestResponse(responseCode = SC_BAD_REQUEST, description = "Couldn't save adopter registration data.")})
+  @Operation(
+      summary = "Save the adopter registration data",
+      description = "Saves the adopter registration data."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Adopter registration data saved."),
+      @ApiResponse(responseCode = "400", description = "Couldn't save adopter registration data.")
+  })
   public Response register(
-          @FormParam("organisationName") String organisationName,
-          @FormParam("departmentName") String departmentName,
-          @FormParam("firstName") String firstName,
-          @FormParam("lastName") String lastName,
-          @FormParam("email") String email,
-          @FormParam("country") String country,
-          @FormParam("postalCode") String postalCode,
-          @FormParam("city") String city,
-          @FormParam("street") String street,
-          @FormParam("streetNo") String streetNo,
-          @FormParam("contactMe") boolean contactMe,
-          @FormParam("agreedToPolicy") boolean agreedToPolicy,
-          @FormParam("systemType") String systemType,
-          @FormParam("allowsErrorReports") boolean allowsErrorReports,
-          @FormParam("allowsStatistics") boolean allowsStatistics,
-          @FormParam("registered") boolean registered) {
+      @Parameter(description = "The Name of the organisation.")
+      @FormParam("organisationName") String organisationName,
+      @Parameter(description = "The Name of the department.")
+      @FormParam("departmentName") String departmentName,
+      @Parameter(description = "The First name.")
+      @FormParam("firstName") String firstName,
+      @Parameter(description = "The Last name.")
+      @FormParam("lastName") String lastName,
+      @Parameter(description = "The e-mail address.")
+      @FormParam("email") String email,
+      @Parameter(description = "The country.")
+      @FormParam("country") String country,
+      @Parameter(description = "The postal code.")
+      @FormParam("postalCode") String postalCode,
+      @Parameter(description = "The city.")
+      @FormParam("city") String city,
+      @Parameter(description = "The street.")
+      @FormParam("street") String street,
+      @Parameter(description = "The street number.")
+      @FormParam("streetNo") String streetNo,
+      @Parameter(description = "Does the adopter allows to be contacted.")
+      @FormParam("contactMe") boolean contactMe,
+      @Parameter(description = "Does the adopter agreed to the policy.")
+      @FormParam("agreedToPolicy") boolean agreedToPolicy,
+      @Parameter(description = "Which type of system is this.")
+      @FormParam("systemType") String systemType,
+      @Parameter(description = "Does the adopter allow the gathering of error reports.")
+      @FormParam("allowsErrorReports") boolean allowsErrorReports,
+      @Parameter(description = "Does the adopter allow the gathering of statistic data.")
+      @FormParam("allowsStatistics") boolean allowsStatistics,
+      @Parameter(description = "Is the adopter already registered.")
+      @FormParam("registered") boolean registered
+  ) {
     logger.debug("Saving adopter registration data.");
 
     Adopter adopter = new Adopter(organisationName, departmentName, firstName, lastName, email, country, postalCode,
@@ -209,11 +193,13 @@ public class AdopterRegistrationRestService {
 
   @POST
   @Path("registration/finalize")
-  @RestQuery(name = "finalizeRegistration",
-      description = "Finalizes the registration and starts sending data.",
-      returnDescription = "Status",
-      restParameters = {},
-      responses = { @RestResponse(responseCode = SC_OK, description = "Registration finalized.") })
+  @Operation(
+      summary = "Finalize the registration",
+      description = "Finalizes the registration and starts sending data."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Registration finalized.")
+  })
   public Response register() {
     logger.debug("Finalizing adopter registration.");
 
@@ -232,11 +218,13 @@ public class AdopterRegistrationRestService {
   @GET
   @Produces(MediaType.TEXT_PLAIN)
   @Path("isUpToDate")
-  @RestQuery(name = "isUpToDate", description = "Returns true if Opencast has been able to register", responses = {
-      @RestResponse(description = "Registratino status",
-          responseCode = HttpServletResponse.SC_OK)
-      },
-      returnDescription = "true if registration has been updated in the last week, false otherwise")
+  @Operation(
+      summary = "Check whether the registration is up to date",
+      description = "Returns true if Opencast has been able to register"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Registratino status")
+  })
   public Response isUpToDate() {
     Adopter data = (Adopter) registrationService.get();
     Calendar cal = Calendar.getInstance();
@@ -250,12 +238,14 @@ public class AdopterRegistrationRestService {
 
   @DELETE
   @Path("registration")
-  @RestQuery(name = "deleteregistrationform", description = "Deletes the adopter registration data", responses = {
-          @RestResponse(description = "Successful deleted form data.",
-                  responseCode = HttpServletResponse.SC_OK),
-          @RestResponse(description = "Error while deleting adopter registration data.",
-                  responseCode = HttpServletResponse.SC_INTERNAL_SERVER_ERROR) },
-          returnDescription = "DELETEs the adopter registration data.")
+  @Operation(
+      summary = "Delete the adopter registration data",
+      description = "Deletes the adopter registration data"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Successful deleted form data."),
+      @ApiResponse(responseCode = "500", description = "Error while deleting adopter registration data.")
+  })
   public Response deleteRegistrationData() {
     logger.debug("Deleting adopter registration data.");
     try {
@@ -271,9 +261,13 @@ public class AdopterRegistrationRestService {
   @GET
   @Produces(MediaType.TEXT_PLAIN)
   @Path("latestToU")
-  @RestQuery(name = "getLatestTermsOfUse", description = "Gets the latest terms of use version.", responses = {
-      @RestResponse(description = "Retrieved statistic data.", responseCode = HttpServletResponse.SC_OK) },
-      returnDescription = "The latest terms of use version.")
+  @Operation(
+      summary = "Get the latest terms of use version",
+      description = "Gets the latest terms of use version."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Retrieved statistic data.")
+  })
   public String getLatestTermsofUse() {
     return Adopter.getLatestTermsOfUse().name();
   }
