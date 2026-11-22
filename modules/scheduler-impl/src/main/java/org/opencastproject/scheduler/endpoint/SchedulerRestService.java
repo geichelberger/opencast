@@ -881,11 +881,8 @@ public class SchedulerRestService {
       @ApiResponse(responseCode = "201", description = "Event is successfully created"),
       @ApiResponse(
           responseCode = "409",
-          description = "Unable to create event, conflicting events found (ConflicsFound)"
-      ),
-      @ApiResponse(
-          responseCode = "409",
-          description = "Unable to create event, event locked by a transaction  (TransactionLock)"
+          description = "Unable to create event, conflicting events found (ConflictsFound) or event locked by a "
+              + "transaction (TransactionLock)"
       ),
       @ApiResponse(
           responseCode = "401",
@@ -998,11 +995,8 @@ public class SchedulerRestService {
       @ApiResponse(responseCode = "201", description = "Event is successfully created"),
       @ApiResponse(
           responseCode = "409",
-          description = "Unable to create event, conflicting events found (ConflicsFound)"
-      ),
-      @ApiResponse(
-          responseCode = "409",
-          description = "Unable to create event, event locked by a transaction  (TransactionLock)"
+          description = "Unable to create event, conflicting events found (ConflictsFound) or event locked by a "
+              + "transaction (TransactionLock)"
       ),
       @ApiResponse(
           responseCode = "401",
@@ -1141,11 +1135,8 @@ public class SchedulerRestService {
       @ApiResponse(responseCode = "404", description = "Event with specified ID does not exist"),
       @ApiResponse(
           responseCode = "409",
-          description = "Unable to update event, conflicting events found (ConflicsFound)"
-      ),
-      @ApiResponse(
-          responseCode = "409",
-          description = "Unable to update event, event locked by a transaction (TransactionLock)"
+          description = "Unable to update event, conflicting events found (ConflictsFound) or event locked by a "
+              + "transaction (TransactionLock)"
       ),
       @ApiResponse(responseCode = "403", description = "Event with specified ID cannot be updated"),
       @ApiResponse(

@@ -335,10 +335,10 @@ public class ComposerRestService extends AbstractJobProducerEndpoint {
           responseCode = "200",
           description = "Results in an xml document containing the job for the trimming task"
       ),
-      @ApiResponse(responseCode = "400", description = "If the start time is negative or exceeds the track duration"),
       @ApiResponse(
           responseCode = "400",
-          description = "If the duration is negative or, including the new start time, exceeds the track duration"
+          description = "If the start time is negative or exceeds the track duration, or if the duration is "
+              + "negative or, including the new start time, exceeds the track duration"
       )
   })
   public Response trim(

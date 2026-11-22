@@ -122,8 +122,10 @@ public class SmilServiceRest {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "Add par to SMIL successfull."),
-      @ApiResponse(responseCode = "400", description = "SMIL document not valid."),
-      @ApiResponse(responseCode = "400", description = "SMIL document doesn't contain an element with given parentId.")
+      @ApiResponse(
+          responseCode = "400",
+          description = "SMIL document not valid or it doesn't contain an element with given parentId"
+      )
   })
   public Response addParallel(
       @Parameter(description = "SMIL document where to add a par-element.", required = true)
@@ -162,8 +164,10 @@ public class SmilServiceRest {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "Add seq to SMIL successfull"),
-      @ApiResponse(responseCode = "400", description = "SMIL document not valid"),
-      @ApiResponse(responseCode = "400", description = "SMIL document doesn't contain an element with given parentId")
+      @ApiResponse(
+          responseCode = "400",
+          description = "SMIL document not valid or it doesn't contain an element with given parentId"
+      )
   })
   public Response addSequence(
       @Parameter(description = "SMIL document where to add a seq-element.", required = true)
@@ -204,10 +208,11 @@ public class SmilServiceRest {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "Add media element to SMIL successfull."),
-      @ApiResponse(responseCode = "400", description = "SMIL document not valid."),
-      @ApiResponse(responseCode = "400", description = "Track not valid."),
-      @ApiResponse(responseCode = "400", description = "SMIL document doesn't contain an element with given parentId."),
-      @ApiResponse(responseCode = "400", description = "Start plus duration is bigger than Track length.")
+      @ApiResponse(
+          responseCode = "400",
+          description = "SMIL document or track not valid, the SMIL document doesn't contain an element with given "
+              + "parentId, or start plus duration is bigger than the track length"
+      )
   })
   public Response addClip(
       @Parameter(description = "SMIL document where to add new media element.", required = true)
@@ -257,10 +262,11 @@ public class SmilServiceRest {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "Add media elements to SMIL successfull."),
-      @ApiResponse(responseCode = "400", description = "SMIL document not valid."),
-      @ApiResponse(responseCode = "400", description = "Tracks are not valid."),
-      @ApiResponse(responseCode = "400", description = "SMIL document doesn't contain an element with given parentId."),
-      @ApiResponse(responseCode = "400", description = "Start plus duration is bigger than Track length.")
+      @ApiResponse(
+          responseCode = "400",
+          description = "SMIL document or tracks not valid, the SMIL document doesn't contain an element with given "
+              + "parentId, or start plus duration is bigger than the track length"
+      )
   })
   public Response addClips(
       @Parameter(description = "SMIL document where to add new media elements.", required = true)

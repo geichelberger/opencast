@@ -390,8 +390,7 @@ public abstract class AbstractAssetManagerRestEndpoint extends AbstractJobProduc
       description = "Get stored workflow properties for an episode."
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "Media package returned"),
-      @ApiResponse(responseCode = "200", description = "Invalid parameters"),
+      @ApiResponse(responseCode = "200", description = "The workflow properties as JSON"),
       @ApiResponse(responseCode = "404", description = "Not found"),
       @ApiResponse(responseCode = "403", description = "Not allowed to read media package."),
       @ApiResponse(responseCode = "500", description = "There has been an internal error.")
