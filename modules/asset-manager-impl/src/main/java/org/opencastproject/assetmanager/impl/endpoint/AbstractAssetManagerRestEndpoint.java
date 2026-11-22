@@ -20,14 +20,6 @@
  */
 package org.opencastproject.assetmanager.impl.endpoint;
 
-import static javax.servlet.http.HttpServletResponse.SC_BAD_REQUEST;
-import static javax.servlet.http.HttpServletResponse.SC_CREATED;
-import static javax.servlet.http.HttpServletResponse.SC_FORBIDDEN;
-import static javax.servlet.http.HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
-import static javax.servlet.http.HttpServletResponse.SC_NOT_FOUND;
-import static javax.servlet.http.HttpServletResponse.SC_NOT_MODIFIED;
-import static javax.servlet.http.HttpServletResponse.SC_NO_CONTENT;
-import static javax.servlet.http.HttpServletResponse.SC_OK;
 import static org.opencastproject.assetmanager.api.AssetManager.DEFAULT_OWNER;
 import static org.opencastproject.systems.OpencastConstants.WORKFLOW_PROPERTIES_NAMESPACE;
 import static org.opencastproject.util.RestUtil.R.badRequest;
@@ -35,7 +27,6 @@ import static org.opencastproject.util.RestUtil.R.forbidden;
 import static org.opencastproject.util.RestUtil.R.noContent;
 import static org.opencastproject.util.RestUtil.R.notFound;
 import static org.opencastproject.util.RestUtil.R.ok;
-import static org.opencastproject.util.doc.rest.RestParameter.Type.STRING;
 
 import org.opencastproject.assetmanager.api.AssetManager;
 import org.opencastproject.assetmanager.api.Property;
@@ -49,11 +40,6 @@ import org.opencastproject.security.api.UnauthorizedException;
 import org.opencastproject.util.Checksum;
 import org.opencastproject.util.ChecksumType;
 import org.opencastproject.util.NotFoundException;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestParameter.Type;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
@@ -79,6 +65,13 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 /**
  * A base REST endpoint for the {@link AssetManager}.
  * <p>
@@ -86,14 +79,10 @@ import javax.ws.rs.core.Response;
  * <p>
  * No @Path annotation here since this class cannot be created by JAX-RS. Put it on the concrete implementations.
  */
-@RestService(name = "assetManager", title = "AssetManager",
-    notes = {
-        "All paths are relative to the REST endpoint base (something like http://your.server/files)",
-        "If you notice that this service is not working as expected, there might be a bug! "
-            + "You should file an error report with your server logs from the time when the error occurred: "
-            + "<a href=\"http://github.com/opencast/opencast/issues\">Opencast Issue Tracker</a>"
-    },
-    abstractText = "This service indexes and queries available (distributed) episodes.")
+@Tag(
+    name = "AssetManager",
+    description = "This service indexes and queries available (distributed) episodes."
+)
 public abstract class AbstractAssetManagerRestEndpoint extends AbstractJobProducerEndpoint {
   protected static final Logger logger = LoggerFactory.getLogger(AbstractAssetManagerRestEndpoint.class);
 
@@ -108,53 +97,56 @@ public abstract class AbstractAssetManagerRestEndpoint extends AbstractJobProduc
    */
   @POST
   @Path("add")
-  @RestQuery(
-      name = "add",
+  @Operation(
+      summary = "Add a media package (deprecated)",
       description = "Adds a media package to the asset manager. This method is deprecated in "
-          + "favor of method POST 'snapshot'.",
-      restParameters = {
-          @RestParameter(
-              name = "mediapackage",
-              isRequired = true,
-              type = Type.TEXT,
-              description = "The media package to add to the search index.")},
-      responses = {
-          @RestResponse(
-              description = "The media package was added, no content to return.",
-              responseCode = SC_NO_CONTENT),
-          @RestResponse(
-              description = "Not allowed to add a media package.",
-              responseCode = SC_FORBIDDEN),
-          @RestResponse(
-              description = "There has been an internal error and the media package could not be added",
-              responseCode = SC_INTERNAL_SERVER_ERROR)},
-      returnDescription = "No content is returned.")
+          + "favor of method POST 'snapshot'."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "204", description = "The media package was added, no content to return."),
+      @ApiResponse(responseCode = "403", description = "Not allowed to add a media package."),
+      @ApiResponse(
+          responseCode = "500",
+          description = "There has been an internal error and the media package could not be added"
+      )
+  })
   @Deprecated
-  public Response add(@FormParam("mediapackage") final MediaPackageImpl mediaPackage) {
+  public Response add(
+      @Parameter(
+          description = "The media package to add, as XML.",
+          required = true,
+          schema = @Schema(type = "string")
+      )
+      @FormParam("mediapackage") final MediaPackageImpl mediaPackage
+  ) {
     return snapshot(mediaPackage);
   }
 
   @POST
   @Path("snapshot")
-  @RestQuery(name = "snapshot", description = "Take a versioned snapshot of a media package.",
-      restParameters = {
-          @RestParameter(
-              name = "mediapackage",
-              isRequired = true,
-              type = Type.TEXT,
-              description = "The media package to take a snapshot from.")},
-      responses = {
-          @RestResponse(
-              description = "A snapshot of the media package has been taken, no content to return.",
-              responseCode = SC_NO_CONTENT),
-          @RestResponse(
-              description = "Not allowed to take a snapshot.",
-              responseCode = SC_FORBIDDEN),
-          @RestResponse(
-              description = "There has been an internal error and no snapshot could be taken.",
-              responseCode = SC_INTERNAL_SERVER_ERROR)},
-      returnDescription = "No content is returned.")
-  public Response snapshot(@FormParam("mediapackage") final MediaPackageImpl mediaPackage) {
+  @Operation(
+      summary = "Take a snapshot of a media package",
+      description = "Take a versioned snapshot of a media package."
+  )
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "204",
+          description = "A snapshot of the media package has been taken, no content to return."
+      ),
+      @ApiResponse(responseCode = "403", description = "Not allowed to take a snapshot."),
+      @ApiResponse(
+          responseCode = "500",
+          description = "There has been an internal error and no snapshot could be taken."
+      )
+  })
+  public Response snapshot(
+      @Parameter(
+          description = "The media package to take a snapshot from, as XML.",
+          required = true,
+          schema = @Schema(type = "string")
+      )
+      @FormParam("mediapackage") final MediaPackageImpl mediaPackage
+  ) {
     if (mediaPackage == null) {
       return badRequest("Missing mediapackage");
     }
@@ -177,26 +169,19 @@ public abstract class AbstractAssetManagerRestEndpoint extends AbstractJobProduc
 
   @POST
   @Path("updateIndex")
-  @RestQuery(name = "updateIndex",
-      description = "Trigger search index update for event. The usage of this is limited to global administrators.",
-      restParameters = {
-          @RestParameter(
-              name = "id",
-              isRequired = true,
-              type = STRING,
-              description = "The event ID to trigger an index update for.")},
-      responses = {
-          @RestResponse(
-              description = "Update successfully triggered.",
-              responseCode = SC_NO_CONTENT),
-          @RestResponse(
-              description = "Not allowed to trigger update.",
-              responseCode = SC_FORBIDDEN),
-          @RestResponse(
-              description = "No such event found.",
-              responseCode = SC_NOT_FOUND)},
-      returnDescription = "No content is returned.")
-  public Response indexUpdate(@FormParam("id") final String id) {
+  @Operation(
+      summary = "Update the search index of an event",
+      description = "Trigger search index update for event. The usage of this is limited to global administrators."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "204", description = "Update successfully triggered."),
+      @ApiResponse(responseCode = "403", description = "Not allowed to trigger update."),
+      @ApiResponse(responseCode = "404", description = "No such event found.")
+  })
+  public Response indexUpdate(
+      @Parameter(description = "The event ID to trigger an index update for.", required = true)
+      @FormParam("id") final String id
+  ) {
     try {
       getAssetManager().triggerIndexUpdate(id);
       return noContent();
@@ -211,30 +196,30 @@ public abstract class AbstractAssetManagerRestEndpoint extends AbstractJobProduc
 
   @DELETE
   @Path("delete/{id}")
-  @RestQuery(name = "deleteSnapshots",
-      description = "Removes snapshots of an episode, owned by the default owner from the asset manager.",
-      pathParameters = {
-          @RestParameter(
-              name = "id",
-              isRequired = true,
-              type = Type.STRING,
-              description = "The media package ID of the episode whose snapshots shall be removed"
-                  + " from the asset manager.")},
-      responses = {
-          @RestResponse(
-              description = "Snapshots have been removed, no content to return.",
-              responseCode = SC_NO_CONTENT),
-          @RestResponse(
-              description = "The episode does either not exist or no snapshots are owned by the default owner.",
-              responseCode = SC_NOT_FOUND),
-          @RestResponse(
-              description = "Not allowed to delete this episode.",
-              responseCode = SC_FORBIDDEN),
-          @RestResponse(
-              description = "There has been an internal error and the episode could not be deleted.",
-              responseCode = SC_INTERNAL_SERVER_ERROR)},
-      returnDescription = "No content is returned.")
-  public Response delete(@PathParam("id") final String mediaPackageId) {
+  @Operation(
+      summary = "Delete the snapshots of an episode",
+      description = "Removes snapshots of an episode, owned by the default owner from the asset manager."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "204", description = "Snapshots have been removed, no content to return."),
+      @ApiResponse(
+          responseCode = "404",
+          description = "The episode does either not exist or no snapshots are owned by the default owner."
+      ),
+      @ApiResponse(responseCode = "403", description = "Not allowed to delete this episode."),
+      @ApiResponse(
+          responseCode = "500",
+          description = "There has been an internal error and the episode could not be deleted."
+      )
+  })
+  public Response delete(
+      @Parameter(
+          description = "The media package ID of the episode whose snapshots shall be removed"
+              + " from the asset manager.",
+          required = true
+      )
+      @PathParam("id") final String mediaPackageId
+  ) {
     if (StringUtils.isEmpty(mediaPackageId)) {
       return notFound();
     }
@@ -251,23 +236,20 @@ public abstract class AbstractAssetManagerRestEndpoint extends AbstractJobProduc
   @GET
   @Produces(MediaType.TEXT_XML)
   @Path("episode/{mediaPackageID}")
-  @RestQuery(name = "getLatestEpisode",
-      description = "Get the media package from the last snapshot of an episode.",
-      returnDescription = "The media package",
-      pathParameters = {
-          @RestParameter(
-              name = "mediaPackageID",
-              description = "the media package ID",
-              isRequired = true,
-              type = STRING)
-      },
-      responses = {
-          @RestResponse(responseCode = SC_OK, description = "Media package returned"),
-          @RestResponse(responseCode = SC_NOT_FOUND, description = "Not found"),
-          @RestResponse(responseCode = SC_FORBIDDEN, description = "Not allowed to read media package."),
-          @RestResponse(responseCode = SC_INTERNAL_SERVER_ERROR, description = "There has been an internal error.")
-      })
-  public Response getMediaPackage(@PathParam("mediaPackageID") final String mediaPackageId) {
+  @Operation(
+      summary = "Get the latest media package of an episode",
+      description = "Get the media package from the last snapshot of an episode."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Media package returned"),
+      @ApiResponse(responseCode = "404", description = "Not found"),
+      @ApiResponse(responseCode = "403", description = "Not allowed to read media package."),
+      @ApiResponse(responseCode = "500", description = "There has been an internal error.")
+  })
+  public Response getMediaPackage(
+      @Parameter(description = "the media package ID", required = true)
+      @PathParam("mediaPackageID") final String mediaPackageId
+  ) {
 
     try {
       Optional<MediaPackage> mp = getAssetManager().getMediaPackage(mediaPackageId);
@@ -284,51 +266,29 @@ public abstract class AbstractAssetManagerRestEndpoint extends AbstractJobProduc
 
   @GET
   @Path("assets/{mediaPackageID}/{mediaPackageElementID}/{version}/{filename}")
-  @RestQuery(name = "getAsset",
-      description = "Get an asset",
-      returnDescription = "The file",
-      pathParameters = {
-          @RestParameter(
-              name = "mediaPackageID",
-              description = "the media package identifier",
-              isRequired = true,
-              type = STRING),
-          @RestParameter(
-              name = "mediaPackageElementID",
-              description = "the media package element identifier",
-              isRequired = true,
-              type = STRING),
-          @RestParameter(
-              name = "version",
-              description = "the media package version",
-              isRequired = true,
-              type = STRING),
-          @RestParameter(
-              name = "filename",
-              description = "a descriptive filename used as the download filename",
-              isRequired = false,
-              type = STRING)},
-      responses = {
-          @RestResponse(
-              responseCode = SC_OK,
-              description = "File returned"),
-          @RestResponse(
-              responseCode = SC_NOT_FOUND,
-              description = "Not found"),
-          @RestResponse(
-              responseCode = SC_NOT_MODIFIED,
-              description = "If file not modified"),
-          @RestResponse(
-              description = "Not allowed to read assets of this snapshot.",
-              responseCode = SC_FORBIDDEN),
-          @RestResponse(
-              description = "There has been an internal error.",
-              responseCode = SC_INTERNAL_SERVER_ERROR)})
-  public Response getAsset(@PathParam("mediaPackageID") final String mediaPackageID,
-                           @PathParam("mediaPackageElementID") final String mediaPackageElementID,
-                           @PathParam("version") final String version,
-                           @PathParam("filename") String fileName,
-                           @HeaderParam("If-None-Match") String ifNoneMatch) {
+  @Operation(
+      summary = "Get an asset",
+      description = "Get an asset"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "File returned"),
+      @ApiResponse(responseCode = "404", description = "Not found"),
+      @ApiResponse(responseCode = "304", description = "If file not modified"),
+      @ApiResponse(responseCode = "403", description = "Not allowed to read assets of this snapshot."),
+      @ApiResponse(responseCode = "500", description = "There has been an internal error.")
+  })
+  public Response getAsset(
+      @Parameter(description = "the media package identifier", required = true)
+      @PathParam("mediaPackageID") final String mediaPackageID,
+      @Parameter(description = "the media package element identifier", required = true)
+      @PathParam("mediaPackageElementID") final String mediaPackageElementID,
+      @Parameter(description = "the media package version", required = true)
+      @PathParam("version") final String version,
+      @Parameter(description = "a descriptive filename used as the download filename", required = true)
+      @PathParam("filename") String fileName,
+      @Parameter(description = "The digest of the file the client already has. If it matches, 304 is returned")
+      @HeaderParam("If-None-Match") String ifNoneMatch
+  ) {
 
     try {
       final var v = getAssetManager().toVersion(version);
@@ -388,30 +348,22 @@ public abstract class AbstractAssetManagerRestEndpoint extends AbstractJobProduc
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("{mediaPackageID}/properties.json")
-  @RestQuery(name = "getProperties",
-      description = "Get stored properties for an episode.",
-      returnDescription = "Properties as JSON",
-      pathParameters = {
-          @RestParameter(
-              name = "mediaPackageID",
-              description = "the media package ID",
-              isRequired = true,
-              type = STRING)
-      }, restParameters = {
-          @RestParameter(
-              name = "namespace",
-              description = "property namespace",
-              isRequired = false,
-              type = STRING)
-      },
-      responses = {
-          @RestResponse(responseCode = SC_OK, description = "Media package returned"),
-          @RestResponse(responseCode = SC_NOT_FOUND, description = "Not found"),
-          @RestResponse(responseCode = SC_FORBIDDEN, description = "Not allowed to read media package."),
-          @RestResponse(responseCode = SC_INTERNAL_SERVER_ERROR, description = "There has been an internal error.")
-      })
-  public Response getProperties(@PathParam("mediaPackageID") final String mediaPackageId,
-          @QueryParam("namespace") final String namespace) {
+  @Operation(
+      summary = "Get the properties of an episode",
+      description = "Get stored properties for an episode."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Media package returned"),
+      @ApiResponse(responseCode = "404", description = "Not found"),
+      @ApiResponse(responseCode = "403", description = "Not allowed to read media package."),
+      @ApiResponse(responseCode = "500", description = "There has been an internal error.")
+  })
+  public Response getProperties(
+      @Parameter(description = "the media package ID", required = true)
+      @PathParam("mediaPackageID") final String mediaPackageId,
+      @Parameter(description = "property namespace")
+      @QueryParam("namespace") final String namespace
+  ) {
     try {
       getAssetManager().selectProperties(mediaPackageId, namespace);
 
@@ -433,24 +385,21 @@ public abstract class AbstractAssetManagerRestEndpoint extends AbstractJobProduc
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("{mediaPackageID}/workflowProperties.json")
-  @RestQuery(name = "getWorkflowProperties",
-      description = "Get stored workflow properties for an episode.",
-      returnDescription = "Properties as JSON",
-      pathParameters = {
-          @RestParameter(
-              name = "mediaPackageID",
-              description = "the media package ID",
-              isRequired = true,
-              type = STRING)
-      },
-      responses = {
-          @RestResponse(responseCode = SC_OK, description = "Media package returned"),
-          @RestResponse(responseCode = SC_OK, description = "Invalid parameters"),
-          @RestResponse(responseCode = SC_NOT_FOUND, description = "Not found"),
-          @RestResponse(responseCode = SC_FORBIDDEN, description = "Not allowed to read media package."),
-          @RestResponse(responseCode = SC_INTERNAL_SERVER_ERROR, description = "There has been an internal error.")
-      })
-  public Response getWorkflowProperties(@PathParam("mediaPackageID") final String mediaPackageId) {
+  @Operation(
+      summary = "Get the workflow properties of an episode",
+      description = "Get stored workflow properties for an episode."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Media package returned"),
+      @ApiResponse(responseCode = "200", description = "Invalid parameters"),
+      @ApiResponse(responseCode = "404", description = "Not found"),
+      @ApiResponse(responseCode = "403", description = "Not allowed to read media package."),
+      @ApiResponse(responseCode = "500", description = "There has been an internal error.")
+  })
+  public Response getWorkflowProperties(
+      @Parameter(description = "the media package ID", required = true)
+      @PathParam("mediaPackageID") final String mediaPackageId
+  ) {
     try {
       // build map from properties
       HashMap<String, String> properties = new HashMap<>();
@@ -467,29 +416,21 @@ public abstract class AbstractAssetManagerRestEndpoint extends AbstractJobProduc
 
   @POST
   @Path("{mediaPackageID}/workflowProperties")
-  @RestQuery(name = "setWorkflowProperties",
-      description = "Set additional workflow properties",
-      pathParameters = {
-          @RestParameter(
-              name = "mediaPackageID",
-              description = "the media package ID",
-              isRequired = true,
-              type = STRING)
-      },
-      restParameters = {
-          @RestParameter(
-              name = "properties",
-              isRequired = true,
-              type = STRING,
-              description = "JSON object containing new properties")
-      },
-      responses = {
-          @RestResponse(description = "Properties successfully set", responseCode = SC_CREATED),
-          @RestResponse(description = "Invalid data", responseCode = SC_BAD_REQUEST),
-          @RestResponse(description = "Internal error", responseCode = SC_INTERNAL_SERVER_ERROR) },
-      returnDescription = "Returned status code indicates success")
-  public Response setWorkflowProperties(@PathParam("mediaPackageID") final String mediaPackageId,
-          @FormParam("properties") final String propertiesJSON) {
+  @Operation(
+      summary = "Set the workflow properties of an episode",
+      description = "Set additional workflow properties"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "201", description = "Properties successfully set"),
+      @ApiResponse(responseCode = "400", description = "Invalid data"),
+      @ApiResponse(responseCode = "500", description = "Internal error")
+  })
+  public Response setWorkflowProperties(
+      @Parameter(description = "the media package ID", required = true)
+      @PathParam("mediaPackageID") final String mediaPackageId,
+      @Parameter(description = "JSON object containing new properties", required = true)
+      @FormParam("properties") final String propertiesJSON
+  ) {
     Map<String, String> properties;
     try {
       properties = gson.fromJson(propertiesJSON, stringMapType);
