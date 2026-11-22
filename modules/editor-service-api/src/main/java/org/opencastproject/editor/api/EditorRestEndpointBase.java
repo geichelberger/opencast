@@ -21,16 +21,9 @@
 
 package org.opencastproject.editor.api;
 
-import static javax.servlet.http.HttpServletResponse.SC_CONFLICT;
-import static javax.servlet.http.HttpServletResponse.SC_CREATED;
-import static javax.servlet.http.HttpServletResponse.SC_NOT_FOUND;
-import static javax.servlet.http.HttpServletResponse.SC_OK;
 
 import org.opencastproject.security.api.UnauthorizedException;
 import org.opencastproject.util.RestUtil;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
 
 import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
@@ -41,7 +34,6 @@ import java.io.InputStream;
 import java.net.URI;
 
 import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.FormParam;
@@ -53,6 +45,14 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.parameters.RequestBody;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 
 /**
  * The REST endpoint for the {@link EditorService} service
@@ -69,14 +69,18 @@ public abstract class EditorRestEndpointBase {
   @GET
   @Path("{mediaPackageId}/edit.json")
   @Produces(MediaType.APPLICATION_JSON)
-  @RestQuery(name = "getEditorData",
-          description = "Returns all the information required to get the editor tool started",
-          returnDescription = "JSON object",
-          pathParameters = { @RestParameter(name = "mediaPackageId", description = "The id of the media package",
-                  isRequired = true, type = RestParameter.Type.STRING) }, responses = {
-          @RestResponse(description = "Media package found", responseCode = SC_OK),
-          @RestResponse(description = "Media package not found", responseCode = SC_NOT_FOUND) })
-  public Response getEditorData(@PathParam("mediaPackageId") final String mediaPackageId) {
+  @Operation(
+      summary = "Get the data to start the editor",
+      description = "Returns all the information required to get the editor tool started"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Media package found"),
+      @ApiResponse(responseCode = "404", description = "Media package not found")
+  })
+  public Response getEditorData(
+      @Parameter(description = "The id of the media package", required = true)
+      @PathParam("mediaPackageId") final String mediaPackageId
+  ) {
     try {
       EditingData response = editorService.getEditData(mediaPackageId);
       if (response != null) {
@@ -94,32 +98,31 @@ public abstract class EditorRestEndpointBase {
 
   @POST
   @Path("{mediaPackageId}/lock")
-  @RestQuery(name = "lockMediapackage",
-          description = "Creates and updates the lock for a mediapackage in the editor. "
+  @Operation(
+      summary = "Lock a media package for editing",
+      description = "Creates and updates the lock for a mediapackage in the editor. "
           + "Requests will create/refreshen a lock at /editor/{mediapackageId}/lock{uuid} "
           + "(see Location header in response) that will expire after the configured period. "
-          + "Subsequent calls must have the same uuid, which will then freshen the lock.",
-          returnDescription = "The lock is returned in the Location header.",
-          pathParameters = {
-            @RestParameter(name = "mediaPackageId", description = "The id of the media package", isRequired = true,
-                    type = RestParameter.Type.STRING)
-          },
-          restParameters = {
-            @RestParameter(name = "user", isRequired = true,
-                description = "The user requesting to lock this mediapackage",
-                type = RestParameter.Type.STRING, defaultValue = "admin"),
-            @RestParameter(name = "uuid", isRequired = true,
-                description = "The unique identitier of the lock",
-                type = RestParameter.Type.STRING)
-          },
-          responses = {
-            @RestResponse(description = "Lock obtained", responseCode = SC_CREATED),
-            @RestResponse(description = "Lock not obtained", responseCode = SC_CONFLICT),
-            @RestResponse(description = "Mediapackage not found", responseCode = SC_NOT_FOUND)
-          })
-  public Response lockMediapackage(@PathParam("mediaPackageId") final String mediaPackageId,
-         @FormParam("user") final String user, @FormParam("uuid") final String uuid,
-         @Context HttpServletRequest request) {
+          + "Subsequent calls must have the same uuid, which will then freshen the lock."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "201", description = "Lock obtained"),
+      @ApiResponse(responseCode = "409", description = "Lock not obtained"),
+      @ApiResponse(responseCode = "404", description = "Mediapackage not found")
+  })
+  public Response lockMediapackage(
+      @Parameter(description = "The id of the media package", required = true)
+      @PathParam("mediaPackageId") final String mediaPackageId,
+      @Parameter(
+          description = "The user requesting to lock this mediapackage",
+          required = true,
+          schema = @Schema(example = "admin")
+      )
+      @FormParam("user") final String user,
+      @Parameter(description = "The unique identitier of the lock", required = true)
+      @FormParam("uuid") final String uuid,
+      @Context HttpServletRequest request
+  ) {
     try {
       LockData lockData = new LockData(uuid, user);
       editorService.lockMediaPackage(mediaPackageId, lockData);
@@ -134,23 +137,22 @@ public abstract class EditorRestEndpointBase {
 
   @DELETE
   @Path("{mediaPackageId}/lock/{uuid}")
-  @RestQuery(name = "unlockMediapackage",
-          description = "Releases the lock for a mediapackage in the editor",
-          returnDescription = "",
-          pathParameters = {
-            @RestParameter(name = "mediaPackageId", description = "The id of the media package", isRequired = true,
-                    type = RestParameter.Type.STRING),
-            @RestParameter(name = "uuid", description = "Identifier of editor session", isRequired = true,
-                    type = RestParameter.Type.STRING)
-          },
-          responses = {
-            @RestResponse(description = "Lock deleted", responseCode = SC_OK),
-            @RestResponse(description = "Lock not obtained", responseCode = SC_CONFLICT),
-            @RestResponse(description = "Lock not found", responseCode = SC_NOT_FOUND)
-          })
+  @Operation(
+      summary = "Unlock a media package",
+      description = "Releases the lock for a mediapackage in the editor"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Lock deleted"),
+      @ApiResponse(responseCode = "409", description = "Lock not obtained"),
+      @ApiResponse(responseCode = "404", description = "Lock not found")
+  })
 
-  public Response unlockMediapackage(@PathParam("mediaPackageId") final String mediaPackageId,
-          @PathParam("uuid") final String uuid)  {
+  public Response unlockMediapackage(
+      @Parameter(description = "The id of the media package", required = true)
+      @PathParam("mediaPackageId") final String mediaPackageId,
+      @Parameter(description = "Identifier of editor session", required = true)
+      @PathParam("uuid") final String uuid
+  ) {
     try {
       editorService.unlockMediaPackage(mediaPackageId, new LockData(uuid, ""));
       return RestUtil.R.ok();
@@ -162,18 +164,25 @@ public abstract class EditorRestEndpointBase {
   @POST
   @Path("{mediaPackageId}/edit.json")
   @Consumes(MediaType.APPLICATION_JSON)
-  @RestQuery(name = "editVideo", description = "Takes editing information from the client side and processes it",
-          returnDescription = "",
-          pathParameters = {
-          @RestParameter(name = "mediaPackageId", description = "The id of the media package", isRequired = true,
-                  type = RestParameter.Type.STRING) },
-          responses = {
-          @RestResponse(description = "Editing information saved and processed", responseCode = SC_OK),
-          @RestResponse(description = "Media package not found", responseCode = SC_NOT_FOUND),
-          @RestResponse(description = "The editing information cannot be parsed",
-                  responseCode = HttpServletResponse.SC_BAD_REQUEST) })
-  public Response editVideo(@PathParam("mediaPackageId") final String mediaPackageId,
-          @Context HttpServletRequest request) {
+  @Operation(
+      summary = "Save and process the editing information",
+      description = "Takes editing information from the client side and processes it"
+  )
+  @RequestBody(
+      description = "The editing information as JSON",
+      required = true,
+      content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(type = "object"))
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Editing information saved and processed"),
+      @ApiResponse(responseCode = "404", description = "Media package not found"),
+      @ApiResponse(responseCode = "400", description = "The editing information cannot be parsed")
+  })
+  public Response editVideo(
+      @Parameter(description = "The id of the media package", required = true)
+      @PathParam("mediaPackageId") final String mediaPackageId,
+      @Context HttpServletRequest request
+  ) {
     String details = null;
     try {
       details = readInputStream(request);
@@ -226,18 +235,21 @@ public abstract class EditorRestEndpointBase {
   @GET
   @Path("{mediaPackageId}/metadata.json")
   @Produces(MediaType.APPLICATION_JSON)
-  @RestQuery(name = "getMetadata",
-          description = "Returns all the data related to the metadata tab in the event details modal as JSON",
-          returnDescription = "All the data related to the event metadata tab as JSON",
-          pathParameters = {
-          @RestParameter(name = "mediaPackageId", description = "The event id", isRequired = true,
-                  type = RestParameter.Type.STRING) },
-          responses = {
-          @RestResponse(description = "Returns all the data related to the event metadata tab as JSON",
-                  responseCode = HttpServletResponse.SC_OK),
-          @RestResponse(description = "No event with this identifier was found.",
-                  responseCode = HttpServletResponse.SC_NOT_FOUND) })
-  public Response getEventMetadata(@PathParam("mediaPackageId") String eventId) {
+  @Operation(
+      summary = "Get the metadata of an event",
+      description = "Returns all the data related to the metadata tab in the event details modal as JSON"
+  )
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "200",
+          description = "Returns all the data related to the event metadata tab as JSON"
+      ),
+      @ApiResponse(responseCode = "404", description = "No event with this identifier was found.")
+  })
+  public Response getEventMetadata(
+      @Parameter(description = "The event id", required = true)
+      @PathParam("mediaPackageId") String eventId
+  ) {
     try {
       String response = editorService.getMetadata(eventId);
       if (response != null) {

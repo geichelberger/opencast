@@ -23,13 +23,14 @@ package org.opencastproject.editor.remote;
 
 import org.opencastproject.editor.api.EditorRestEndpointBase;
 import org.opencastproject.editor.api.EditorService;
-import org.opencastproject.util.doc.rest.RestService;
 
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.jaxrs.whiteboard.propertytypes.JaxrsResource;
 
 import javax.ws.rs.Path;
+
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 /**
  * The REST endpoint for the {@link EditorService} service
@@ -45,10 +46,10 @@ import javax.ws.rs.Path;
     immediate = true,
     service = EditorServiceRemoteEndpoint.class
 )
-@RestService(name = "EditorServiceEndpoint",
-    title = "Editor Remote Endpoint",
-    abstractText = "This is forwarding requests to the editor service.",
-    notes = { })
+@Tag(
+    name = "Editor Remote Endpoint",
+    description = "This is forwarding requests to the editor service."
+)
 @JaxrsResource
 public class EditorServiceRemoteEndpoint extends EditorRestEndpointBase {
 
