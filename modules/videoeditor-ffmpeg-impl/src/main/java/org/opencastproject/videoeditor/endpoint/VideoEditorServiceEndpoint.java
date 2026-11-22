@@ -28,10 +28,6 @@ import org.opencastproject.rest.AbstractJobProducerEndpoint;
 import org.opencastproject.serviceregistry.api.ServiceRegistry;
 import org.opencastproject.smil.api.SmilService;
 import org.opencastproject.smil.entity.api.Smil;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 import org.opencastproject.videoeditor.api.VideoEditorService;
 
 import org.osgi.service.component.annotations.Component;
@@ -40,7 +36,6 @@ import org.osgi.service.jaxrs.whiteboard.propertytypes.JaxrsResource;
 
 import java.util.List;
 
-import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.FormParam;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -48,15 +43,19 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 /**
  * VideoEditorService REST Endpoint.
  */
 @Path("/videoeditor")
-@RestService(
-    name = "VideoEditorServiceEndpoint",
-    title = "Video Editor Service REST Endpoint",
-    abstractText = "Video Editor Service consumes a smil document and create corresponding video files.",
-    notes = {"All paths above are relative to the REST endpoint base (something like http://your.server/videoeditor)"}
+@Tag(
+    name = "Video Editor Service REST Endpoint",
+    description = "Video Editor Service consumes a smil document and create corresponding video files."
 )
 @Component(
     immediate = true,
@@ -78,30 +77,18 @@ public class VideoEditorServiceEndpoint extends AbstractJobProducerEndpoint {
   @POST
   @Path("/process-smil")
   @Produces({MediaType.APPLICATION_XML})
-  @RestQuery(
-      name = "processsmil",
-      description = "Create smil processing jobs.",
-      returnDescription = "Smil processing jobs.",
-      restParameters = {
-          @RestParameter(
-              name = "smil",
-              type = RestParameter.Type.TEXT,
-              description = "Smil document to process.",
-              isRequired = true
-          )
-      },
-      responses = {
-          @RestResponse(
-              description = "Smil processing jobs created successfully.",
-              responseCode = HttpServletResponse.SC_OK
-          ),
-          @RestResponse(
-              description = "Internal server error.",
-              responseCode = HttpServletResponse.SC_INTERNAL_SERVER_ERROR
-          )
-      }
+  @Operation(
+      summary = "Process a SMIL file",
+      description = "Create smil processing jobs."
   )
-  public Response processSmil(@FormParam("smil") String smilStr) {
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Smil processing jobs created successfully."),
+      @ApiResponse(responseCode = "500", description = "Internal server error.")
+  })
+  public Response processSmil(
+      @Parameter(description = "Smil document to process.", required = true)
+      @FormParam("smil") String smilStr
+  ) {
     Smil smil;
     try {
       smil = smilService.fromXml(smilStr).getSmil();
