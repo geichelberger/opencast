@@ -31,10 +31,6 @@ import org.opencastproject.rest.AbstractJobProducerEndpoint;
 import org.opencastproject.serviceregistry.api.ServiceRegistry;
 import org.opencastproject.timelinepreviews.api.TimelinePreviewsException;
 import org.opencastproject.timelinepreviews.api.TimelinePreviewsService;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 
 import org.apache.commons.lang3.StringUtils;
 import org.osgi.service.component.annotations.Component;
@@ -43,7 +39,6 @@ import org.osgi.service.jaxrs.whiteboard.propertytypes.JaxrsResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.FormParam;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -52,23 +47,19 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 /**
  * The REST endpoint for the {@link TimelinePreviewsService} service
  */
 @Path("/timelinepreviews")
-@RestService(
-    name = "TimelinePreviewsEndpoint",
-    title = "Timeline Previews Service REST Endpoint",
-    abstractText = "This service generates timeline preview images from media files that contain a video.",
-    notes = {
-        "All paths above are relative to the REST endpoint base (something like http://your.server/files)",
-        "If the service is down or not working it will return a status 503, this means the the "
-            + "underlying service is not working and is either restarting or has failed",
-        "A status code 500 means a general failure has occurred which is not recoverable and was "
-            + "not anticipated. In other words, there is a bug! You should file an error report "
-            + "with your server logs from the time when the error occurred: "
-            + "<a href=\"https://github.com/opencast/opencast/issues\">Opencast Issue Tracker</a>"
-    }
+@Tag(
+    name = "Timeline Previews Service REST Endpoint",
+    description = "This service generates timeline preview images from media files that contain a video."
 )
 @Component(
     immediate = true,
@@ -128,25 +119,21 @@ public class TimelinePreviewsRestEndpoint extends AbstractJobProducerEndpoint {
   @POST
   @Path("/create")
   @Produces(MediaType.TEXT_XML)
-  @RestQuery(name = "create", description = "Create preview images from the given track.",
-          restParameters = {
-            @RestParameter(description = "The track to generate timeline preview images for.",
-                    isRequired = true, name = "track", type = RestParameter.Type.FILE),
-            @RestParameter(description = "The number of timeline preview images to generate.",
-                    isRequired = true, name = "imageCount", type = RestParameter.Type.INTEGER)
-          },
-          responses = {
-            @RestResponse(description = "Timeline previews job successfully created",
-                    responseCode = HttpServletResponse.SC_OK),
-            @RestResponse(description = "The given track can't be parsed.",
-                    responseCode = HttpServletResponse.SC_BAD_REQUEST),
-            @RestResponse(description = "Internal server error.",
-                    responseCode = HttpServletResponse.SC_INTERNAL_SERVER_ERROR)
-          },
-          returnDescription = "The job ID to use when polling for the resulting media package attachment, "
-                  + "that contains the generated timeline preview images.")
-  public Response createTimelinePreviews(@FormParam("track") String trackAsXml, @FormParam("imageCount") int imageCount)
-          throws Exception {
+  @Operation(
+      summary = "Create timeline preview images",
+      description = "Create preview images from the given track."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Timeline previews job successfully created"),
+      @ApiResponse(responseCode = "400", description = "The given track can't be parsed."),
+      @ApiResponse(responseCode = "500", description = "Internal server error.")
+  })
+  public Response createTimelinePreviews(
+      @Parameter(description = "The track to generate timeline preview images for.", required = true)
+      @FormParam("track") String trackAsXml,
+      @Parameter(description = "The number of timeline preview images to generate.", required = true)
+      @FormParam("imageCount") int imageCount
+  ) throws Exception {
     // Ensure that the POST parameters are present
     if (StringUtils.isBlank(trackAsXml)) {
       return Response.status(Response.Status.BAD_REQUEST).entity("track must not be null").build();
