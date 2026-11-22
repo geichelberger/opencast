@@ -125,7 +125,7 @@ public class TimelinePreviewsRestEndpoint extends AbstractJobProducerEndpoint {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "Timeline previews job successfully created"),
-      @ApiResponse(responseCode = "400", description = "The given track can't be parsed."),
+      @ApiResponse(responseCode = "400", description = "The track is blank or is not a track."),
       @ApiResponse(responseCode = "500", description = "Internal server error.")
   })
   public Response createTimelinePreviews(
