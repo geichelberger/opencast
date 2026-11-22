@@ -24,7 +24,6 @@ import org.opencastproject.job.api.JobProducer;
 import org.opencastproject.rest.AbstractJobProducerEndpoint;
 import org.opencastproject.serviceregistry.api.ServiceRegistry;
 import org.opencastproject.transcription.amberscript.AmberscriptTranscriptionService;
-import org.opencastproject.util.doc.rest.RestService;
 import org.opencastproject.workingfilerepository.api.WorkingFileRepository;
 
 import org.osgi.service.component.annotations.Activate;
@@ -36,16 +35,13 @@ import org.slf4j.LoggerFactory;
 
 import javax.ws.rs.Path;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 
 @Path("/transcripts/amberscript")
-@RestService(
-    name = "AmberscriptTranscriptionRestService",
-    title = "Transcription Service REST Endpoint (uses Amberscript services)",
-    abstractText = "Uses external service to generate transcriptions of recordings.",
-    notes = {
-        "This service has no endpoints for clients. It only provides the internal endpoints Opencast nodes use to"
-            + " dispatch jobs to each other.",
-    }
+@Tag(
+    name = "Transcription Service REST Endpoint (uses Amberscript services)",
+    description = "Uses external service to generate transcriptions of recordings."
 )
 
 @Component(
