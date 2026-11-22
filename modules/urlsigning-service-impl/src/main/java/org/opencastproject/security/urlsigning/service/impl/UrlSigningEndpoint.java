@@ -102,7 +102,8 @@ public class UrlSigningEndpoint {
       description = "Return a signed URL"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "A URL")
+      @ApiResponse(responseCode = "200", description = "The signed URL."),
+      @ApiResponse(responseCode = "400", description = "The signing service does not accept the URL or signing failed.")
   })
   public Response sign(
       @Parameter(description = "The URL to sign", required = true)
@@ -113,9 +114,17 @@ public class UrlSigningEndpoint {
           example = "0"
       )
       @QueryParam("validUntil") final long validUntil,
-      @Parameter(description = "The UNIX epoch time from when a signed URL should become valid", example = "0")
+      @Parameter(
+          description = "The UNIX epoch time from when a signed URL should become valid. If 0, the URL is valid "
+              + "immediately",
+          example = "0"
+      )
       @QueryParam("validFrom") @DefaultValue("0") long validFrom,
-      @Parameter(description = "The IP addresse of the user that is allowed to access the resource", example = "")
+      @Parameter(
+          description = "The IP address of the user that is allowed to access the resource. If blank, the access "
+              + "is not restricted to an address",
+          example = ""
+      )
       @QueryParam("ipAddr") @DefaultValue("") String ipAddr
   ) {
     try {
