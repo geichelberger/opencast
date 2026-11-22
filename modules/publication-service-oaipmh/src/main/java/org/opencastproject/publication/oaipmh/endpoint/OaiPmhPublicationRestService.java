@@ -20,7 +20,6 @@
  */
 package org.opencastproject.publication.oaipmh.endpoint;
 
-import static javax.servlet.http.HttpServletResponse.SC_OK;
 import static org.opencastproject.publication.api.OaiPmhPublicationService.SEPARATOR;
 
 import org.opencastproject.job.api.JaxbJob;
@@ -36,11 +35,6 @@ import org.opencastproject.mediapackage.Publication;
 import org.opencastproject.publication.api.OaiPmhPublicationService;
 import org.opencastproject.rest.AbstractJobProducerEndpoint;
 import org.opencastproject.serviceregistry.api.ServiceRegistry;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestParameter.Type;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
@@ -62,21 +56,20 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 /**
  * Rest endpoint for publishing media to the OAI-PMH publication channel.
  */
 @Path("/publication/oaipmh")
-@RestService(
-    name = "oaipmhpublicationservice",
-    title = "OAI-PMH Publication Service",
-    abstractText = "This service publishes a media package element to the Opencast OAI-PMH channel.",
-    notes = {
-        "All paths above are relative to the REST endpoint base (something like http://your.server/files). "
-            + "If the service is down or not working it will return a status 503, this means the "
-            + "the underlying service is not working and is either restarting or has failed. "
-            + "A status code 500 means a general failure has occurred which is not recoverable "
-            + "and was not anticipated. In other words, there is a bug!"
-    }
+@Tag(
+    name = "OAI-PMH Publication Service",
+    description = "This service publishes a media package element to the Opencast OAI-PMH channel."
 )
 @Component(
     immediate = true,
@@ -131,52 +124,29 @@ public class OaiPmhPublicationRestService extends AbstractJobProducerEndpoint {
   @POST
   @Path("/")
   @Produces(MediaType.TEXT_XML)
-  @RestQuery(
-      name = "publish",
-      description = "Publish a media package element to this publication channel",
-      returnDescription = "The job that can be used to track the publication",
-      restParameters = {
-          @RestParameter(
-              name = "mediapackage",
-              isRequired = true,
-              description = "The media package",
-              type = Type.TEXT
-          ),
-          @RestParameter(
-              name = "channel",
-              isRequired = true,
-              description = "The channel name",
-              type = Type.STRING
-          ),
-          @RestParameter(
-              name = "downloadElementIds",
-              isRequired = true,
-              description = "The elements to publish to download separated by '" + SEPARATOR + "'",
-              type = Type.STRING
-          ),
-          @RestParameter(
-              name = "streamingElementIds",
-              isRequired = true,
-              description = "The elements to publish to streaming separated by '" + SEPARATOR + "'",
-              type = Type.STRING
-          ),
-          @RestParameter(
-              name = "checkAvailability",
-              isRequired = false,
-              description = "Whether to check for availability",
-              type = Type.BOOLEAN,
-              defaultValue = "true"
-          )
-      },
-      responses = {
-          @RestResponse(responseCode = SC_OK, description = "An XML representation of the publication job")
-      }
+  @Operation(
+      summary = "Publish a media package to an OAI-PMH channel",
+      description = "Publish a media package element to this publication channel"
   )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "An XML representation of the publication job")
+  })
   public Response publish(
+      @Parameter(description = "The media package", required = true)
       @FormParam("mediapackage") String mediaPackageXml,
+      @Parameter(description = "The channel name", required = true)
       @FormParam("channel") String channel,
+      @Parameter(
+          description = "The elements to publish to download separated by '" + SEPARATOR + "'",
+          required = true
+      )
       @FormParam("downloadElementIds") String downloadElementIds,
+      @Parameter(
+          description = "The elements to publish to streaming separated by '" + SEPARATOR + "'",
+          required = true
+      )
       @FormParam("streamingElementIds") String streamingElementIds,
+      @Parameter(description = "Whether to check for availability", schema = @Schema(example = "true"))
       @FormParam("checkAvailability") @DefaultValue("true") boolean checkAvailability
   ) throws Exception {
     final Job job;
@@ -197,74 +167,37 @@ public class OaiPmhPublicationRestService extends AbstractJobProducerEndpoint {
   @POST
   @Path("/replace")
   @Produces(MediaType.TEXT_XML)
-  @RestQuery(
-      name = "replace",
-      description = "Replace a media package in this publication channel",
-      returnDescription = "The job that can be used to track the publication",
-      restParameters = {
-          @RestParameter(
-              name = "mediapackage",
-              isRequired = true,
-              description = "The media package",
-              type = Type.TEXT
-          ),
-          @RestParameter(
-              name = "channel",
-              isRequired = true,
-              description = "The channel name",
-              type = Type.STRING
-          ),
-          @RestParameter(
-              name = "downloadElements",
-              isRequired = true,
-              description = "The additional elements to publish to download",
-              type = Type.STRING
-          ),
-          @RestParameter(
-              name = "streamingElements",
-              isRequired = true,
-              description = "The additional elements to publish to streaming",
-              type = Type.STRING
-          ),
-          @RestParameter(
-              name = "retractDownloadFlavors",
-              isRequired = true,
-              description = "The flavors of the elements to retract from download separated by  '" + SEPARATOR + "'",
-              type = Type.STRING
-          ),
-          @RestParameter(
-              name = "retractStreamingFlavors",
-              isRequired = true,
-              description = "The flavors of the elements to retract from streaming separated by  '" + SEPARATOR + "'",
-              type = Type.STRING
-          ),
-          @RestParameter(
-              name = "publications",
-              isRequired = true,
-              description = "The publications to update",
-              type = Type.STRING
-          ),
-          @RestParameter(
-              name = "checkAvailability",
-              isRequired = false,
-              description = "Whether to check for availability",
-              type = Type.BOOLEAN,
-              defaultValue = "true"
-          )
-      },
-      responses = {
-          @RestResponse(responseCode = SC_OK, description = "An XML representation of the publication job")
-      }
+  @Operation(
+      summary = "Replace a media package in an OAI-PMH channel",
+      description = "Replace a media package in this publication channel"
   )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "An XML representation of the publication job")
+  })
   public Response replace(
-          @FormParam("mediapackage") final String mediaPackageXml,
-          @FormParam("channel") final String channel,
-          @FormParam("downloadElements") final String downloadElementsXml,
-          @FormParam("streamingElements") final String streamingElementsXml,
-          @FormParam("retractDownloadFlavors") final String retractDownloadFlavorsString,
-          @FormParam("retractStreamingFlavors") final String retractStreamingFlavorsString,
-          @FormParam("publications") final String publicationsXml,
-          @FormParam("checkAvailability") @DefaultValue("true") final boolean checkAvailability) {
+      @Parameter(description = "The media package", required = true)
+      @FormParam("mediapackage") final String mediaPackageXml,
+      @Parameter(description = "The channel name", required = true)
+      @FormParam("channel") final String channel,
+      @Parameter(description = "The additional elements to publish to download", required = true)
+      @FormParam("downloadElements") final String downloadElementsXml,
+      @Parameter(description = "The additional elements to publish to streaming", required = true)
+      @FormParam("streamingElements") final String streamingElementsXml,
+      @Parameter(
+          description = "The flavors of the elements to retract from download separated by  '" + SEPARATOR + "'",
+          required = true
+      )
+      @FormParam("retractDownloadFlavors") final String retractDownloadFlavorsString,
+      @Parameter(
+          description = "The flavors of the elements to retract from streaming separated by  '" + SEPARATOR + "'",
+          required = true
+      )
+      @FormParam("retractStreamingFlavors") final String retractStreamingFlavorsString,
+      @Parameter(description = "The publications to update", required = true)
+      @FormParam("publications") final String publicationsXml,
+      @Parameter(description = "Whether to check for availability", schema = @Schema(example = "true"))
+      @FormParam("checkAvailability") @DefaultValue("true") final boolean checkAvailability
+  ) {
     final Job job;
     try {
       final MediaPackage mediaPackage = MediaPackageParser.getFromXml(mediaPackageXml);
@@ -297,73 +230,35 @@ public class OaiPmhPublicationRestService extends AbstractJobProducerEndpoint {
   @POST
   @Path("/replacesync")
   @Produces(MediaType.TEXT_XML)
-  @RestQuery(
-      name = "replacesync",
-      description = "Synchronously Replace a media package in this publication channel",
-      returnDescription = "The publication",
-      restParameters = {
-          @RestParameter(
-              name = "mediapackage",
-              isRequired = true,
-              description = "The media package",
-              type = Type.TEXT
-          ),
-          @RestParameter(
-              name = "channel",
-              isRequired = true,
-              description = "The channel name",
-              type = Type.STRING
-          ),
-          @RestParameter(
-              name = "downloadElements",
-              isRequired = true,
-              description = "The additional elements to publish to download",
-              type = Type.STRING
-          ),
-          @RestParameter(
-              name = "streamingElements",
-              isRequired = true,
-              description = "The additional elements to publish to streaming",
-              type = Type.STRING
-          ),
-          @RestParameter(
-              name = "retractDownloadFlavors",
-              isRequired = true,
-              description = "The flavors of the elements to retract from download separated by  '" + SEPARATOR + "'",
-              type = Type.STRING
-          ),
-          @RestParameter(
-              name = "retractStreamingFlavors",
-              isRequired = true,
-              description = "The flavors of the elements to retract from streaming separated by  '" + SEPARATOR + "'",
-              type = Type.STRING
-          ),
-          @RestParameter(
-              name = "publications",
-              isRequired = true,
-              description = "The publications to update",
-              type = Type.STRING
-          ),
-          @RestParameter(
-              name = "checkAvailability",
-              isRequired = false,
-              description = "Whether to check for availability",
-              type = Type.BOOLEAN,
-              defaultValue = "true"
-          )
-      },
-      responses = {
-          @RestResponse(responseCode = SC_OK, description = "An XML representation of the publication")
-      }
+  @Operation(
+      summary = "Replace a media package in an OAI-PMH channel synchronously",
+      description = "Synchronously Replace a media package in this publication channel"
   )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "An XML representation of the publication")
+  })
   public Response replaceSync(
+      @Parameter(description = "The media package", required = true)
       @FormParam("mediapackage") final String mediaPackageXml,
+      @Parameter(description = "The channel name", required = true)
       @FormParam("channel") final String channel,
+      @Parameter(description = "The additional elements to publish to download", required = true)
       @FormParam("downloadElements") final String downloadElementsXml,
+      @Parameter(description = "The additional elements to publish to streaming", required = true)
       @FormParam("streamingElements") final String streamingElementsXml,
+      @Parameter(
+          description = "The flavors of the elements to retract from download separated by  '" + SEPARATOR + "'",
+          required = true
+      )
       @FormParam("retractDownloadFlavors") final String retractDownloadFlavorsString,
+      @Parameter(
+          description = "The flavors of the elements to retract from streaming separated by  '" + SEPARATOR + "'",
+          required = true
+      )
       @FormParam("retractStreamingFlavors") final String retractStreamingFlavorsString,
+      @Parameter(description = "The publications to update", required = true)
       @FormParam("publications") final String publicationsXml,
+      @Parameter(description = "Whether to check for availability", schema = @Schema(example = "true"))
       @FormParam("checkAvailability") @DefaultValue("true") final boolean checkAvailability
   ) throws MediaPackageException {
     final Publication publication;
@@ -395,30 +290,17 @@ public class OaiPmhPublicationRestService extends AbstractJobProducerEndpoint {
   @POST
   @Path("/retract")
   @Produces(MediaType.TEXT_XML)
-  @RestQuery(
-      name = "retract",
-      description = "Retract a media package element from this publication channel",
-      returnDescription = "The job that can be used to track the retraction",
-      restParameters = {
-          @RestParameter(
-              name = "mediapackage",
-              isRequired = true,
-              description = "The media package",
-              type = Type.TEXT
-          ),
-          @RestParameter(
-              name = "channel",
-              isRequired = true,
-              description = "The OAI-PMH channel to retract from",
-              type = Type.STRING
-          )
-      },
-      responses = {
-          @RestResponse(responseCode = SC_OK, description = "An XML representation of the retraction job")
-      }
+  @Operation(
+      summary = "Retract a media package from an OAI-PMH channel",
+      description = "Retract a media package element from this publication channel"
   )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "An XML representation of the retraction job")
+  })
   public Response retract(
+      @Parameter(description = "The media package", required = true)
       @FormParam("mediapackage") String mediaPackageXml,
+      @Parameter(description = "The OAI-PMH channel to retract from", required = true)
       @FormParam("channel") String channel
   ) throws Exception {
     Job job = null;
@@ -440,54 +322,31 @@ public class OaiPmhPublicationRestService extends AbstractJobProducerEndpoint {
   @POST
   @Path("/updateMetadata")
   @Produces(MediaType.TEXT_XML)
-  @RestQuery(
-      name = "update",
+  @Operation(
+      summary = "Update the metadata of a published media package",
       description = "Update metadata of an published media package. "
           + "This endpoint does not update any media files. If you want to update the whole media package, use the "
-          + "publish endpoint.",
-      returnDescription = "The job that can be used to update the metadata of an media package",
-      restParameters = {
-          @RestParameter(
-              name = "mediapackage",
-              isRequired = true,
-              description = "The updated media package",
-              type = Type.TEXT
-          ),
-          @RestParameter(
-              name = "channel",
-              isRequired = true,
-              description = "The channel name",
-              type = Type.STRING
-          ),
-          @RestParameter(
-              name = "flavors",
-              isRequired = true,
-              description = "The element flavors to be updated, separated by '" + SEPARATOR + "'",
-              type = Type.STRING
-          ),
-          @RestParameter(
-              name = "tags",
-              isRequired = true,
-              description = "The element tags to be updated, separated by '" + SEPARATOR + "'",
-              type = Type.STRING
-          ),
-          @RestParameter(
-              name = "checkAvailability",
-              isRequired = false,
-              description = "Whether to check for availability",
-              type = Type.BOOLEAN,
-              defaultValue = "true"
-          )
-      },
-      responses = {
-          @RestResponse(responseCode = SC_OK, description = "An XML representation of the publication job")
-      }
+          + "publish endpoint."
   )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "An XML representation of the publication job")
+  })
   public Response updateMetadata(
+      @Parameter(description = "The updated media package", required = true)
       @FormParam("mediapackage") String mediaPackageXml,
+      @Parameter(description = "The channel name", required = true)
       @FormParam("channel") String channel,
+      @Parameter(
+          description = "The element flavors to be updated, separated by '" + SEPARATOR + "'",
+          required = true
+      )
       @FormParam("flavors") String flavors,
+      @Parameter(
+          description = "The element tags to be updated, separated by '" + SEPARATOR + "'",
+          required = true
+      )
       @FormParam("tags") String tags,
+      @Parameter(description = "Whether to check for availability", schema = @Schema(example = "true"))
       @FormParam("checkAvailability") @DefaultValue("true") boolean checkAvailability
   ) throws Exception {
     final Job job;
