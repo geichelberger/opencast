@@ -29,9 +29,6 @@ import org.opencastproject.serviceregistry.api.ServiceRegistry;
 import org.opencastproject.serviceregistry.api.ServiceState;
 import org.opencastproject.serviceregistry.api.SystemLoad;
 import org.opencastproject.storage.StorageUsage;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.Version;
@@ -51,7 +48,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -62,6 +58,10 @@ import io.prometheus.client.Counter;
 import io.prometheus.client.Gauge;
 import io.prometheus.client.exporter.common.TextFormat;
 import io.prometheus.client.hotspot.DefaultExports;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 /**
  * Opencast metrics endpoint
@@ -77,14 +77,9 @@ import io.prometheus.client.hotspot.DefaultExports;
     immediate = true,
     service = MetricsExporter.class
 )
-@RestService(
-    name = "MetricsEndpoint",
-    title = "Metrics Endpoint",
-    abstractText = "Opencast metrics endpoint.",
-    notes = {
-        "The endpoints supports the <a href=https://openmetrics.io>OpenMetrics format</a>",
-        "This can be used by <a href=https://prometheus.io>Prometheus</a>"
-    }
+@Tag(
+    name = "Metrics Endpoint",
+    description = "Opencast metrics endpoint."
 )
 @JaxrsResource
 public class MetricsExporter {
@@ -157,10 +152,13 @@ public class MetricsExporter {
   @GET
   @Path("/")
   @Produces(TextFormat.CONTENT_TYPE_OPENMETRICS_100)
-  @RestQuery(name = "metrics",
-      description = "Metrics about Opencast",
-      responses = {@RestResponse(description = "Metrics", responseCode = HttpServletResponse.SC_OK)},
-      returnDescription = "OpenMetrics about Opencast.")
+  @Operation(
+      summary = "Get metrics about Opencast",
+      description = "Metrics about Opencast"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Metrics")
+  })
   public Response metrics() throws Exception {
     // track requests
     requests.inc();
