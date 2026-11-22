@@ -25,7 +25,6 @@ import org.opencastproject.job.api.JobProducer;
 import org.opencastproject.rest.AbstractJobProducerEndpoint;
 import org.opencastproject.serviceregistry.api.ServiceRegistry;
 import org.opencastproject.transcription.microsoft.azure.MicrosoftAzureTranscriptionService;
-import org.opencastproject.util.doc.rest.RestService;
 
 import org.osgi.service.component.ComponentContext;
 import org.osgi.service.component.annotations.Activate;
@@ -37,15 +36,12 @@ import org.slf4j.LoggerFactory;
 
 import javax.ws.rs.Path;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 @Path("/transcripts/azure")
-@RestService(
-    name = "MicrosoftAzureTranscriptionRestService",
-    title = "Transcription Service REST Endpoint (uses Microsoft Azure Speech services)",
-    abstractText = "Uses external service to generate transcriptions of recordings.",
-    notes = {
-        "This service has no endpoints for clients. It only provides the internal endpoints Opencast nodes use to"
-            + " dispatch jobs to each other.",
-    }
+@Tag(
+    name = "Transcription Service REST Endpoint (uses Microsoft Azure Speech services)",
+    description = "Uses external service to generate transcriptions of recordings."
 )
 @Component(
     immediate = true,
