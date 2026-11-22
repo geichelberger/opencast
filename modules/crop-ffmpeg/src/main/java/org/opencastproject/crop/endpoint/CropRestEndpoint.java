@@ -31,10 +31,6 @@ import org.opencastproject.mediapackage.MediaPackageElementParser;
 import org.opencastproject.mediapackage.Track;
 import org.opencastproject.rest.AbstractJobProducerEndpoint;
 import org.opencastproject.serviceregistry.api.ServiceRegistry;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 
 import org.apache.commons.lang3.StringUtils;
 import org.osgi.service.component.annotations.Component;
@@ -43,7 +39,6 @@ import org.osgi.service.jaxrs.whiteboard.propertytypes.JaxrsResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.FormParam;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -52,15 +47,19 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 /**
  * The REST endpoint for the {@link CropService} service.
  */
 @Path("/crop")
-@RestService(
-    name = "crop",
-    title = "Video CROP Service",
-    abstractText = "This service is not ready",
-    notes = "This is a note"
+@Tag(
+    name = "Video CROP Service",
+    description = "This service is not ready"
 )
 @Component(
     immediate = true,
@@ -117,34 +116,22 @@ public class CropRestEndpoint extends AbstractJobProducerEndpoint {
   @POST
   @Path("")
   @Produces(MediaType.TEXT_XML)
-  @RestQuery(
-      name = "crop",
-      description = "Submit a track for cropping",
-      restParameters = {
-          @RestParameter(
-              description = "The track to crop.",
-              isRequired = true,
-              name = "track",
-              type = RestParameter.Type.FILE
-          )
-      },
-      responses = {
-          @RestResponse(
-              description = "The job ID to use when polling for the resulting mpeg7 catalog.",
-              responseCode = HttpServletResponse.SC_OK
-          ),
-          @RestResponse(
-              description = "The \"crop\" is NULL or not a valid track type.",
-              responseCode = HttpServletResponse.SC_BAD_REQUEST
-          ),
-          @RestResponse(
-              description = "The underlying service could not crop the video.",
-              responseCode = HttpServletResponse.SC_INTERNAL_SERVER_ERROR
-          )
-      },
-      returnDescription = "The job ID to use when polling for the resulting mpeg7 catalog."
+  @Operation(
+      summary = "Crop a track",
+      description = "Submit a track for cropping"
   )
-  public Response crop(@FormParam("track") String trackAsXml) throws Exception {
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "200",
+          description = "The job ID to use when polling for the resulting mpeg7 catalog."
+      ),
+      @ApiResponse(responseCode = "400", description = "The \"crop\" is NULL or not a valid track type."),
+      @ApiResponse(responseCode = "500", description = "The underlying service could not crop the video.")
+  })
+  public Response crop(
+      @Parameter(description = "The track to crop.", required = true)
+      @FormParam("track") String trackAsXml
+  ) throws Exception {
     if (StringUtils.isBlank(trackAsXml)) {
       return Response.status(Response.Status.BAD_REQUEST)
           .entity("track must not be null")
