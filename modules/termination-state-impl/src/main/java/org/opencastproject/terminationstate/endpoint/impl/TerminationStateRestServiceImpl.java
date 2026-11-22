@@ -102,13 +102,13 @@ public class TerminationStateRestServiceImpl implements TerminationStateRestServ
       description = "Set the termination state. The only permissable values are 'none', 'wait' or 'ready'"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "204", description = "The node is preparing to terminate"),
+      @ApiResponse(responseCode = "204", description = "The termination state has been set"),
       @ApiResponse(responseCode = "400", description = "The state was not valid"),
       @ApiResponse(responseCode = "503", description = "The Termination State Service is disabled or unavailable")
   })
   public Response setState(
       @Parameter(
-          description = "The termination state, the only valid value is 'wait'",
+          description = "The termination state, one of 'none', 'wait' or 'ready'",
           required = true,
           schema = @Schema(example = "wait")
       )
