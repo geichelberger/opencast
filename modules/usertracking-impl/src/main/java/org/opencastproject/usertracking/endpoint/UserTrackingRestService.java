@@ -527,6 +527,14 @@ public class UserTrackingRestService {
   @GET
   @Produces(MediaType.TEXT_PLAIN)
   @Path("/detailenabled")
+  @Operation(
+      summary = "Check whether detailed user tracking is enabled",
+      description = "Returns whether detailed user information is gathered. Turning detailed user tracking off "
+          + "does not disable the gathering of footprints."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "true if detailed user tracking is enabled, false otherwise.")
+  })
   public Response getUserTrackingEnabled() {
     return Response.ok(usertrackingService.getUserTrackingEnabled()).build();
   }

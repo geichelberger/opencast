@@ -93,6 +93,10 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 /**
@@ -253,7 +257,20 @@ public class SeriesServiceRemoteImpl extends RemoteBase implements SeriesService
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("{seriesID:.+}.json")
-  public Response getSeriesJSON(@PathParam("seriesID") String seriesID) throws UnauthorizedException {
+  @Operation(
+      summary = "Get a series as JSON",
+      description = "Returns the Dublin Core metadata of a series as JSON."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The series metadata as JSON."),
+      @ApiResponse(responseCode = "401", description = "The user is not allowed to access the series."),
+      @ApiResponse(responseCode = "404", description = "The specified series does not exist."),
+      @ApiResponse(responseCode = "500", description = "The series could not be retrieved.")
+  })
+  public Response getSeriesJSON(
+      @Parameter(description = "The series identifier", required = true)
+      @PathParam("seriesID") String seriesID
+  ) throws UnauthorizedException {
     logger.debug("Series Lookup: {}", seriesID);
     try {
       DublinCoreCatalog dc = getSeries(seriesID);
@@ -271,7 +288,19 @@ public class SeriesServiceRemoteImpl extends RemoteBase implements SeriesService
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/{seriesID:.+}/acl.json")
-  public Response getSeriesAccessControlListJson(@PathParam("seriesID") String seriesID) {
+  @Operation(
+      summary = "Get the ACL of a series as JSON",
+      description = "Returns the access control list of a series as JSON."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The access control list as JSON."),
+      @ApiResponse(responseCode = "404", description = "The specified series does not exist."),
+      @ApiResponse(responseCode = "500", description = "The access control list could not be retrieved.")
+  })
+  public Response getSeriesAccessControlListJson(
+      @Parameter(description = "The series identifier", required = true)
+      @PathParam("seriesID") String seriesID
+  ) {
     logger.debug("Series ACL lookup: {}", seriesID);
     try {
       AccessControlList acl = getSeriesAccessControl(seriesID);

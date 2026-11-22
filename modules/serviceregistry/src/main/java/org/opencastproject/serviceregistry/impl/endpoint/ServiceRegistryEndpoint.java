@@ -844,8 +844,19 @@ public class ServiceRegistryEndpoint {
   @GET
   @Path("jobs.xml")
   @Produces(MediaType.TEXT_XML)
-  public JaxbJobList getJobsAsXml(@QueryParam("serviceType") String serviceType,
-      @QueryParam("status") Job.Status status) {
+  @Operation(
+      summary = "Get jobs as XML",
+      description = "Returns the jobs matching the query parameters as XML."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Jobs found.")
+  })
+  public JaxbJobList getJobsAsXml(
+      @Parameter(description = "The service type identifier")
+      @QueryParam("serviceType") String serviceType,
+      @Parameter(description = "The job status")
+      @QueryParam("status") Job.Status status
+  ) {
     try {
       return new JaxbJobList(serviceRegistry.getJobs(serviceType, status));
     } catch (ServiceRegistryException e) {

@@ -88,6 +88,7 @@ import javax.ws.rs.core.Response.Status;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -308,11 +309,15 @@ public class IncidentServiceEndpoint {
       @FormParam("date") String date,
       @Parameter(description = "The incident error code", required = true)
       @FormParam("code") String code,
-      @Parameter(description = "The incident error code", required = true)
+      @Parameter(
+          description = "The incident severity",
+          required = true,
+          schema = @Schema(allowableValues = {"INFO", "WARNING", "FAILURE"})
+      )
       @FormParam("severity") String severityString,
       @Parameter(description = "The incident details")
       @FormParam("details") String details,
-      @Parameter(description = "The incident parameters")
+      @Parameter(description = "The incident parameters", schema = @Schema(type = "string"))
       @FormParam("params") LocalHashMap params
   ) {
     Job job;

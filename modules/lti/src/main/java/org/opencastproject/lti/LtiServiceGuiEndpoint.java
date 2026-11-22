@@ -99,6 +99,13 @@ public class LtiServiceGuiEndpoint {
   @GET
   @Path("/new/metadata")
   @Produces(MediaType.APPLICATION_JSON)
+  @Operation(
+      summary = "Get the metadata fields for a new event",
+      description = "Returns the list of metadata fields, with empty values, that can be set for a new event."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The metadata fields as JSON.")
+  })
   public Response getNewEventMetadata() {
     return Response.ok(this.service.getNewEventMetadata(), MediaType.APPLICATION_JSON).build();
   }
@@ -106,7 +113,19 @@ public class LtiServiceGuiEndpoint {
   @GET
   @Path("/{eventId}/metadata")
   @Produces(MediaType.APPLICATION_JSON)
-  public Response getEventMetadata(@PathParam("eventId") final String eventId) {
+  @Operation(
+      summary = "Get the metadata of an event",
+      description = "Returns the list of metadata fields of an event, including their current values."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The metadata of the event as JSON."),
+      @ApiResponse(responseCode = "401", description = "The user is not allowed to access the event."),
+      @ApiResponse(responseCode = "404", description = "The specified event does not exist.")
+  })
+  public Response getEventMetadata(
+      @Parameter(description = "The event identifier", required = true)
+      @PathParam("eventId") final String eventId
+  ) {
     try {
       return Response.ok(this.service.getEventMetadata(eventId), MediaType.APPLICATION_JSON).build();
     } catch (NotFoundException e) {
@@ -119,8 +138,19 @@ public class LtiServiceGuiEndpoint {
   @POST
   @Path("/{eventId}/metadata")
   @Produces(MediaType.APPLICATION_JSON)
+  @Operation(
+      summary = "Update the metadata of an event",
+      description = "Replaces the metadata of an event with the given metadata."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The metadata has been updated."),
+      @ApiResponse(responseCode = "401", description = "The user is not allowed to access the event."),
+      @ApiResponse(responseCode = "404", description = "The specified event does not exist.")
+  })
   public Response setEventMetadata(
+      @Parameter(description = "The event identifier", required = true)
       @PathParam("eventId") final String eventId,
+      @Parameter(description = "The new metadata of the event as JSON", required = true)
       @FormParam("metadataJson") final String metadataJson
   ) {
     try {
@@ -136,8 +166,17 @@ public class LtiServiceGuiEndpoint {
   @POST
   @Path("/{eventId}/copy")
   @Produces(MediaType.APPLICATION_JSON)
+  @Operation(
+      summary = "Copy an event to a series",
+      description = "Copies an event into a different series."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The event has been copied.")
+  })
   public Response copyEventToSeries(
+      @Parameter(description = "The identifier of the event to copy", required = true)
       @PathParam("eventId") final String eventId,
+      @Parameter(description = "The identifier of the series to copy the event into", required = true)
       @QueryParam("target_series") final String targetSeries
   ) {
     this.service.copyEventToSeries(eventId, targetSeries);
@@ -147,7 +186,18 @@ public class LtiServiceGuiEndpoint {
   @GET
   @Path("/jobs")
   @Produces(MediaType.APPLICATION_JSON)
-  public Response listJobs(@QueryParam("seriesId") String seriesId) {
+  @Operation(
+      summary = "List the running jobs of a series",
+      description = "Returns the currently running jobs of a series as a JSON list of objects with the "
+          + "fields title and status."
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The list of jobs as JSON.")
+  })
+  public Response listJobs(
+      @Parameter(description = "The series identifier", required = true)
+      @QueryParam("seriesId") String seriesId
+  ) {
     final List<Map<String, String>> results = service.listJobs(seriesId).stream().map(e -> {
       Map<String, String> eventMap = new HashMap<>();
       eventMap.put("title", e.getTitle());
