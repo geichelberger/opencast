@@ -140,13 +140,14 @@ public class MediaInspectionRestEndpoint extends AbstractJobProducerEndpoint {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "XML encoded receipt is returned."),
-      @ApiResponse(responseCode = "503", description = "Service unavailabe or not currently present"),
       @ApiResponse(responseCode = "500", description = "Problem retrieving media file or invalid media file or URL.")
   })
   public Response inspectTrack(
       @Parameter(description = "Location of the media file.")
       @QueryParam("uri") URI uri,
-      @Parameter(description = "Options passed to media inspection service")
+      @Parameter(
+          description = "Options passed to the media inspection service as a JSON object with string values"
+      )
       @QueryParam("options") String options
   ) {
     checkNotNull(service);
@@ -168,15 +169,20 @@ public class MediaInspectionRestEndpoint extends AbstractJobProducerEndpoint {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "XML encoded receipt is returned."),
-      @ApiResponse(responseCode = "503", description = "Service unavailabe or not currently present"),
       @ApiResponse(responseCode = "500", description = "Problem retrieving media file or invalid media file or URL.")
   })
   public Response enrichTrack(
       @Parameter(description = "MediaPackage Element, that should be enriched with metadata ", required = true)
       @FormParam("mediaPackageElement") String mediaPackageElement,
-      @Parameter(description = "Should the existing metadata values remain", required = true)
+      @Parameter(
+          description = "What to do in case of a conflict between existing and newly determined metadata: "
+              + "true uses the new metadata, false keeps the existing metadata",
+          required = true
+      )
       @FormParam("override") boolean override,
-      @Parameter(description = "Options passed to media inspection service")
+      @Parameter(
+          description = "Options passed to the media inspection service as a JSON object with string values"
+      )
       @FormParam("options") String options
   ) {
     checkNotNull(service);
