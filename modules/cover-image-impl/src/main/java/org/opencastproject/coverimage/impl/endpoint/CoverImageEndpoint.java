@@ -107,7 +107,7 @@ public class CoverImageEndpoint extends AbstractJobProducerEndpoint {
           responseCode = "200",
           description = "Results in an xml document containing the job for the cover image generation task"
       ),
-      @ApiResponse(responseCode = "400", description = "If required parameters aren't set or not valid")
+      @ApiResponse(responseCode = "500", description = "The cover image job could not be created.")
   })
   public Response generateCoverImage(
       @Parameter(description = "Metadata XML")
