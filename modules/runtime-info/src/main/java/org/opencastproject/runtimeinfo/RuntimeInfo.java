@@ -34,9 +34,6 @@ import org.opencastproject.serviceregistry.api.ServiceRegistryException;
 import org.opencastproject.systems.OpencastConstants;
 import org.opencastproject.userdirectory.UserIdRoleProvider;
 import org.opencastproject.util.UrlSupport;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 
 import com.google.gson.Gson;
 
@@ -91,13 +88,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
  * opencast project with the contents of the getRuntimeInfo() json feed.
  */
 @Path("/info")
-@RestService(
-    name = "RuntimeInfo",
-    title = "Runtime Information",
-    abstractText = "This service provides information about the runtime environment, including the services that are "
-      + "deployed and the current user context.",
-    notes = {}
-)
 @Tag(name = "Runtime Information", description = "This service provides information about the runtime environment, "
     + "including the services that are deployed and the current user context.")
 @Component(
@@ -193,14 +183,9 @@ public class RuntimeInfo {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("components.json")
-  @RestQuery(
-      name = "services",
-      description = "List the REST services and user interfaces running on this host",
-      responses = {
-          @RestResponse(description = "The components running on this host", responseCode = HttpServletResponse.SC_OK)
-      },
-      returnDescription = ""
-  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The components running on this host")
+  })
   @Operation(
       summary = "List the REST services and user interfaces running on this host",
       description = "List the REST services and user interfaces running on this host"
@@ -209,8 +194,9 @@ public class RuntimeInfo {
       responseCode = "200",
       description = "The components running on this host"
   )
-  public String getRuntimeInfo(@Context HttpServletRequest request) throws MalformedURLException,
-          InvalidSyntaxException {
+  public String getRuntimeInfo(
+      @Context HttpServletRequest request
+  ) throws MalformedURLException, InvalidSyntaxException {
     final Organization organization = securityService.getOrganization();
 
     // Get request protocol and port
@@ -266,19 +252,11 @@ public class RuntimeInfo {
   @GET
   @Path("me.json")
   @Produces(MediaType.APPLICATION_JSON)
-  @RestQuery(
-      name = "me",
-      description = "Information about the curent user",
-      responses = {
-          @RestResponse(
-              description = "Returns information about the current user",
-              responseCode = HttpServletResponse.SC_OK
-          ),
-      },
-      returnDescription = ""
-  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Returns information about the current user")
+  })
   @Operation(
-      summary = "Information about the curent user",
+      summary = "Information about the current user",
       description = "Returns information about the current user"
   )
   @ApiResponse(
@@ -321,22 +299,6 @@ public class RuntimeInfo {
   @GET
   @Path("health")
   @Produces("application/health+json")
-  @RestQuery(
-      name = "health",
-      description = "Opencast node health check. Implements this internet-draft health check api "
-          + "https://inadarei.github.io/rfc-healthcheck",
-      responses = {
-          @RestResponse(
-              responseCode = HttpServletResponse.SC_OK,
-              description = "Node is running, check reponse for details"
-          ),
-          @RestResponse(
-              responseCode = HttpServletResponse.SC_SERVICE_UNAVAILABLE,
-              description = "Node is offline or unresponsive, check response for details"
-          ),
-      },
-      returnDescription = "Details of the Opencast node's health status"
-  )
   @Operation(
       summary = "Opencast node health check",
       description = "Implements this internet-draft health check api "
@@ -354,7 +316,9 @@ public class RuntimeInfo {
           )
       }
   )
-  public String getHealth(@Context HttpServletResponse response) {
+  public String getHealth(
+      @Context HttpServletResponse response
+  ) {
     /* Response implements https://inadarei.github.io/rfc-healthcheck
      * Example reponse
     {
