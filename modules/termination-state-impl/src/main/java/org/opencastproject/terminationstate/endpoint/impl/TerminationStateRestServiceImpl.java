@@ -20,18 +20,9 @@
  */
 package org.opencastproject.terminationstate.endpoint.impl;
 
-import static javax.servlet.http.HttpServletResponse.SC_BAD_REQUEST;
-import static javax.servlet.http.HttpServletResponse.SC_NO_CONTENT;
-import static javax.servlet.http.HttpServletResponse.SC_OK;
-import static javax.servlet.http.HttpServletResponse.SC_SERVICE_UNAVAILABLE;
 
 import org.opencastproject.terminationstate.api.TerminationStateService;
 import org.opencastproject.terminationstate.endpoint.api.TerminationStateRestService;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestParameter.Type;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 
 import com.google.gson.JsonObject;
 
@@ -49,18 +40,20 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 @Path("/termination")
-@RestService(name = "terminationstateservice", title = "Termination State Service",
-        abstractText = "When put into a termination 'wait' state, this service stops the node accepting further jobs,"
+@Tag(
+    name = "Termination State Service",
+    description = "When put into a termination 'wait' state, this service stops the node accepting further jobs,"
         + " and once any running jobs complete will change termination to 'ready'."
-        + " NOTE: The service does not actually shut down the node or instance.",
-        notes = {
-          "All paths above are relative to the REST endpoint base (something like http://your.server/termination/)",
-          "If the service is down or not working it will return a status 503, this means the the underlying service is "
-          + "not working and is either restarting or has failed",
-          "A status code 500 means a general failure has occurred which is not recoverable and was not anticipated. In "
-          + "other words, there is a bug! You should file an error report with your server logs from the time when the "
-          + "error occurred: <a href=\"https://github.com/opencast/opencast/issues\">Opencast Issue Tracker</a>"})
+        + " NOTE: The service does not actually shut down the node or instance."
+)
 @Component(
     immediate = true,
     service = TerminationStateRestServiceImpl.class,
@@ -81,21 +74,14 @@ public class TerminationStateRestServiceImpl implements TerminationStateRestServ
   @GET
   @Path("/state")
   @Produces(MediaType.APPLICATION_JSON)
-  @RestQuery(
-      name = "stateasjson",
-      description = "Returns the Termination State as JSON. Possible termination states are none, wait and ready.",
-      returnDescription = "A JSON representation of the termination state.",
-      responses = {
-          @RestResponse(
-              responseCode = SC_OK,
-              description = "A JSON representation of the termination state."
-          ),
-          @RestResponse(
-              responseCode = SC_SERVICE_UNAVAILABLE,
-              description = "The Termination State Service is disabled or unavailable"
-          ),
-      }
+  @Operation(
+      summary = "Get the termination state",
+      description = "Returns the Termination State as JSON. Possible termination states are none, wait and ready."
   )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "A JSON representation of the termination state."),
+      @ApiResponse(responseCode = "503", description = "The Termination State Service is disabled or unavailable")
+  })
   public Response getState() {
     if (service != null) {
       JsonObject json = new JsonObject();
@@ -111,35 +97,23 @@ public class TerminationStateRestServiceImpl implements TerminationStateRestServ
   @Override
   @PUT
   @Path("/state")
-  @RestQuery(
-      name = "setstate",
-      description = "Set the termination state. The only permissable values are 'none', 'wait' or 'ready'",
-      returnDescription = "Whether the termination state was set successfully",
-      restParameters = {
-          @RestParameter(
-              name = "state",
-              type = Type.STRING,
-              defaultValue = "wait",
-              description = "The termination state, the only valid value is 'wait'",
-              isRequired = true
-          ),
-      },
-      responses = {
-          @RestResponse(
-              responseCode = SC_NO_CONTENT,
-              description = "The node is preparing to terminate"
-          ),
-          @RestResponse(
-              responseCode = SC_BAD_REQUEST,
-              description = "The state was not valid"
-          ),
-          @RestResponse(
-              responseCode = SC_SERVICE_UNAVAILABLE,
-              description = "The Termination State Service is disabled or unavailable"
-          ),
-      }
+  @Operation(
+      summary = "Set the termination state",
+      description = "Set the termination state. The only permissable values are 'none', 'wait' or 'ready'"
   )
-  public Response setState(@FormParam("state") String state) {
+  @ApiResponses({
+      @ApiResponse(responseCode = "204", description = "The node is preparing to terminate"),
+      @ApiResponse(responseCode = "400", description = "The state was not valid"),
+      @ApiResponse(responseCode = "503", description = "The Termination State Service is disabled or unavailable")
+  })
+  public Response setState(
+      @Parameter(
+          description = "The termination state, the only valid value is 'wait'",
+          required = true,
+          schema = @Schema(example = "wait")
+      )
+      @FormParam("state") String state
+  ) {
     if (service != null) {
       TerminationStateService.TerminationState tState;
       switch (state) {
