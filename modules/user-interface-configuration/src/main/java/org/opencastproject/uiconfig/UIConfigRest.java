@@ -27,10 +27,6 @@ import org.opencastproject.security.api.SecurityService;
 import org.opencastproject.util.ConfigurationException;
 import org.opencastproject.util.MimeTypes;
 import org.opencastproject.util.NotFoundException;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 
 import org.apache.commons.lang3.StringUtils;
 import org.osgi.framework.BundleContext;
@@ -50,7 +46,6 @@ import java.nio.file.AccessDeniedException;
 import java.nio.file.Paths;
 import java.util.Map;
 
-import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -58,22 +53,19 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 /**
  * Serves UI configuration files via REST
  */
 @Path("/ui/config")
-@RestService(name = "UIConfigEndpoint",
-    title = "UI Config Endpoint",
-    abstractText = "Serves the configuration of the UI",
-    notes = {
-        "All paths above are relative to the REST endpoint base (something like http://your.server/files)",
-        "If the service is down or not working it will return a status 503, this means the the "
-            + "underlying service is not working and is either restarting or has failed",
-        "A status code 500 means a general failure has occurred which is not recoverable and was "
-            + "not anticipated.In other words, there is a bug! You should file an error report "
-            + "with your server logs from the timewhen the error occurred: "
-            + "<a href=\"https://github.com/opencast/opencast/issues\">Opencast Issue Tracker</a>"
-    }
+@Tag(
+    name = "UI Config Endpoint",
+    description = "Serves the configuration of the UI"
 )
 @Component(
     property = {
@@ -140,28 +132,20 @@ public class UIConfigRest {
   @GET
   @Path("{component}/{filename : .+}")
   @Produces(MediaType.WILDCARD)
-  @RestQuery(name = "getConfigFile",
-      description = "Returns the requested configuration file (json, css, etc..)",
-      pathParameters = {
-          @RestParameter(description = "Name of the component, which the configuration file belongs to",
-              isRequired = true, name = "component", type = RestParameter.Type.STRING),
-          @RestParameter(description = "Name of the configuration file", isRequired = true,
-              name = "filename", type = RestParameter.Type.STRING)
-      },
-      responses = {
-          @RestResponse(
-              description = "the requested configuration file",
-              responseCode = HttpServletResponse.SC_OK
-          ),
-          @RestResponse(
-              description = "if the configuration file doesn't exist",
-              responseCode = HttpServletResponse.SC_NOT_FOUND
-          ),
-      },
-      returnDescription = ""
+  @Operation(
+      summary = "Get a UI configuration file",
+      description = "Returns the requested configuration file (json, css, etc..)"
   )
-  public Response getConfigFile(@PathParam("component") String component, @PathParam("filename") String filename)
-          throws IOException, NotFoundException {
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "the requested configuration file"),
+      @ApiResponse(responseCode = "404", description = "if the configuration file doesn't exist")
+  })
+  public Response getConfigFile(
+      @Parameter(description = "Name of the component, which the configuration file belongs to", required = true)
+      @PathParam("component") String component,
+      @Parameter(description = "Name of the configuration file", required = true)
+      @PathParam("filename") String filename
+  ) throws IOException, NotFoundException {
     final String orgId = securityService.getOrganization().getId();
     File configFile = Paths.get(uiConfigFolder, orgId, component, filename).toFile();
 
