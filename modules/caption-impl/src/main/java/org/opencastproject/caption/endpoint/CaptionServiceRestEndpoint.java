@@ -165,7 +165,9 @@ public class CaptionServiceRestEndpoint extends AbstractJobProducerEndpoint {
       description = "Convert captions from one format to another."
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "OK, Conversion successfully completed.")
+      @ApiResponse(responseCode = "200", description = "The conversion job as XML."),
+      @ApiResponse(responseCode = "400", description = "The captions could not be parsed or are not a catalog."),
+      @ApiResponse(responseCode = "500", description = "The conversion job could not be created.")
   })
   public Response convert(
       @Parameter(
@@ -181,7 +183,8 @@ public class CaptionServiceRestEndpoint extends AbstractJobProducerEndpoint {
       @Parameter(description = "Captions to be converted.", required = true)
       @FormParam("captions") String catalogAsXml,
       @Parameter(
-          description = "Caption language (for those formats that store such information).",
+          description = "Caption language (for those formats that store such information). If blank, the "
+              + "conversion is done without a language.",
           schema = @Schema(example = "en")
       )
       @FormParam("language") String lang
@@ -228,7 +231,9 @@ public class CaptionServiceRestEndpoint extends AbstractJobProducerEndpoint {
       description = "Get information about languages in caption catalog (if such information is available)."
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "OK, information was extracted and retrieved")
+      @ApiResponse(responseCode = "200", description = "The languages of the catalog as XML."),
+      @ApiResponse(responseCode = "400", description = "The captions are not a catalog."),
+      @ApiResponse(responseCode = "500", description = "The captions could not be parsed or examined.")
   })
   public Response languages(
       @Parameter(
