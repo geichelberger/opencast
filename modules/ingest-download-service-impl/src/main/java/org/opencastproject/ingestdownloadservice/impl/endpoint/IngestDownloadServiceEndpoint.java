@@ -30,10 +30,6 @@ import org.opencastproject.mediapackage.MediaPackageParser;
 import org.opencastproject.rest.AbstractJobProducerEndpoint;
 import org.opencastproject.serviceregistry.api.ServiceRegistry;
 import org.opencastproject.serviceregistry.api.ServiceRegistryException;
-import org.opencastproject.util.doc.rest.RestParameter;
-import org.opencastproject.util.doc.rest.RestQuery;
-import org.opencastproject.util.doc.rest.RestResponse;
-import org.opencastproject.util.doc.rest.RestService;
 
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
@@ -41,7 +37,6 @@ import org.osgi.service.jaxrs.whiteboard.propertytypes.JaxrsResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.FormParam;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -49,14 +44,20 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 /**
  * The REST endpoint for the {@link IngestDownloadService} service
  */
 @Path("/ingestdownload")
-@RestService(name = "IngestDownloadServiceEndpoint",
-    title = "Ingest download REST endpoint",
-    abstractText = "The REST endpoint for the ingest download service.",
-    notes = {})
+@Tag(
+    name = "Ingest download REST endpoint",
+    description = "The REST endpoint for the ingest download service."
+)
 @Component(
     immediate = true,
     service = IngestDownloadServiceEndpoint.class,
@@ -79,30 +80,25 @@ public class IngestDownloadServiceEndpoint extends AbstractJobProducerEndpoint {
   @POST
   @Path("ingestdownload")
   @Produces(MediaType.TEXT_XML)
-  @RestQuery(
-      name = "ingestdownload",
-      description = "Downloads mediapackage elements to workspace",
-      restParameters = {
-          @RestParameter(description = "mediapackage as xml", isRequired = true, name = "mediapackage",
-              type = RestParameter.Type.TEXT),
-          @RestParameter(description = "sourceFlavors as String seperated by , (presenter/source,presentation/source) ",
-              isRequired = false, name = "sourceFlavors", type = RestParameter.Type.STRING),
-          @RestParameter(description = "sourceTags as String seperated by , (archive,download)", isRequired = false,
-              name = "sourceTags", type = RestParameter.Type.STRING),
-          @RestParameter(description = "delete from external workingfile repository: Boolean true / false",
-              isRequired = false, name = "deleteExternal", type = RestParameter.Type.STRING),
-          @RestParameter(description = "select both tags and flavors: Boolean true / false", isRequired = false,
-              name = "tagsAndFlavor", type = RestParameter.Type.STRING),
-      },
-      responses =  {
-          @RestResponse(description = "Mediapackage as xml", responseCode = HttpServletResponse.SC_OK)
-      },
-      returnDescription = "Mediapackage as xml with element urls in workspace.")
-  public Response ingestdownload(@FormParam("mediapackage") String mediapackageString,
-          @FormParam("sourceFlavors") String sourceFlavors,
-          @FormParam("sourceTags") String sourceTags,
-          @FormParam("deleteExternal") String deleteExternal,
-          @FormParam("tagsAndFlavor") String tagsAndFlavor) throws Exception {
+  @Operation(
+      summary = "Download media package elements to the workspace",
+      description = "Downloads mediapackage elements to workspace"
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Mediapackage as xml")
+  })
+  public Response ingestdownload(
+      @Parameter(description = "mediapackage as xml", required = true)
+      @FormParam("mediapackage") String mediapackageString,
+      @Parameter(description = "sourceFlavors as String seperated by , (presenter/source,presentation/source) ")
+      @FormParam("sourceFlavors") String sourceFlavors,
+      @Parameter(description = "sourceTags as String seperated by , (archive,download)")
+      @FormParam("sourceTags") String sourceTags,
+      @Parameter(description = "delete from external workingfile repository: Boolean true / false")
+      @FormParam("deleteExternal") String deleteExternal,
+      @Parameter(description = "select both tags and flavors: Boolean true / false")
+      @FormParam("tagsAndFlavor") String tagsAndFlavor
+  ) throws Exception {
     logger.info("starting ingest-download Service");
     MediaPackage mediapackage = MediaPackageParser.getFromXml(mediapackageString);
     boolean boolTagsAndFlavor = false;
