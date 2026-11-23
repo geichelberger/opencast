@@ -31,6 +31,7 @@ import org.opencastproject.rest.AbstractJobProducerEndpoint;
 import org.opencastproject.serviceregistry.api.ServiceRegistry;
 import org.opencastproject.serviceregistry.api.ServiceRegistryException;
 
+import org.apache.commons.lang3.StringUtils;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.jaxrs.whiteboard.propertytypes.JaxrsResource;
@@ -92,20 +93,20 @@ public class IngestDownloadServiceEndpoint extends AbstractJobProducerEndpoint {
       @Parameter(description = "mediapackage as xml", required = true)
       @FormParam("mediapackage") String mediapackageString,
       @Parameter(
-          description = "The source flavors separated by , (presenter/source,presentation/source). The parameter "
-              + "must be sent, but it can be empty, which selects all flavors (*/*)"
+          description = "The source flavors separated by , (presenter/source,presentation/source). If it is missing "
+              + "or empty, all flavors (*/*) are selected"
       )
       @FormParam("sourceFlavors") String sourceFlavors,
       @Parameter(description = "The source tags separated by , (archive,download)")
       @FormParam("sourceTags") String sourceTags,
       @Parameter(
           description = "Whether to delete the elements from the external working file repository (true or "
-              + "false). The parameter must be sent, but it can be empty, which means false"
+              + "false). If it is missing or empty, it means false"
       )
       @FormParam("deleteExternal") String deleteExternal,
       @Parameter(
           description = "Whether to select only the elements matching both the tags and the flavors (true or "
-              + "false). The parameter must be sent, but it can be empty, which means false"
+              + "false). If it is missing or empty, it means false"
       )
       @FormParam("tagsAndFlavor") String tagsAndFlavor
   ) throws Exception {
@@ -114,14 +115,17 @@ public class IngestDownloadServiceEndpoint extends AbstractJobProducerEndpoint {
     boolean boolTagsAndFlavor = false;
     boolean boolDeleteExternal = false;
     //set Defaults
-    if (sourceFlavors.isEmpty()) {
+    if (StringUtils.isEmpty(sourceFlavors)) {
       sourceFlavors = "*/*";
     }
-    if (!tagsAndFlavor.isEmpty()) {
+    if (StringUtils.isNotEmpty(tagsAndFlavor)) {
       boolTagsAndFlavor = Boolean.parseBoolean(tagsAndFlavor);
     }
-    if (!deleteExternal.isEmpty()) {
+    if (StringUtils.isNotEmpty(deleteExternal)) {
       boolDeleteExternal = Boolean.parseBoolean(deleteExternal);
+    }
+    if (sourceTags == null) {
+      sourceTags = "";
     }
 
     try {
