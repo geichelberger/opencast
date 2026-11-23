@@ -94,14 +94,15 @@ public class UserEndpoint {
       description = "Returns a list of users"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "The user accounts.")
+      @ApiResponse(responseCode = "200", description = "The user accounts."),
+      @ApiResponse(responseCode = "400", description = "The search query is shorter than 3 characters.")
   })
   public Response getUsersAsXml(
       @Parameter(description = "The search query, must be at lest 3 characters long.")
       @QueryParam("query") String queryString,
       @Parameter(description = "The maximum number of items to return per page.", example = "100")
       @QueryParam("limit") int limit,
-      @Parameter(description = "The page number.", example = "0")
+      @Parameter(description = "The index of the first item to return.", example = "0")
       @QueryParam("offset") int offset
   ) throws IOException {
     if (limit < 1) {
@@ -138,7 +139,7 @@ public class UserEndpoint {
       @QueryParam("query") String queryString,
       @Parameter(description = "The maximum number of items to return per page.", example = "100")
       @QueryParam("limit") int limit,
-      @Parameter(description = "The page number.", example = "0")
+      @Parameter(description = "The index of the first item to return.", example = "0")
       @QueryParam("offset") int offset
   ) throws IOException {
     return getUsersAsXml(queryString, limit, offset);

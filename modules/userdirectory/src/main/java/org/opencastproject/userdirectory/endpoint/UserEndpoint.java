@@ -169,7 +169,7 @@ public class UserEndpoint {
   public JaxbUserList getUsersAsJson(
       @Parameter(description = "The maximum number of items to return per page.", example = "100")
       @QueryParam("limit") int limit,
-      @Parameter(description = "The page number.", example = "0")
+      @Parameter(description = "The index of the first item to return.", example = "0")
       @QueryParam("offset") int offset
   ) throws IOException {
 
@@ -323,12 +323,14 @@ public class UserEndpoint {
   @Path("{username}.json")
   @Operation(
       summary = "Update a user",
-      description = "Update a user"
+      description = "Updates a user. If no user with the given username exists, the user is created instead."
   )
   @ApiResponses({
       @ApiResponse(responseCode = "400", description = "Malformed request syntax."),
       @ApiResponse(responseCode = "403", description = "Not enough permissions to update a user with the admin role."),
-      @ApiResponse(responseCode = "200", description = "User has been updated.")
+      @ApiResponse(responseCode = "200", description = "User has been updated."),
+      @ApiResponse(responseCode = "201", description = "The user did not exist and has been created."),
+      @ApiResponse(responseCode = "404", description = "The user does not exist anymore.")
   })
   public Response setUser(
       @Parameter(description = "The username", required = true)
@@ -377,7 +379,8 @@ public class UserEndpoint {
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "User has been deleted."),
       @ApiResponse(responseCode = "403", description = "Not enough permissions to delete a user with the admin role."),
-      @ApiResponse(responseCode = "404", description = "User not found.")
+      @ApiResponse(responseCode = "404", description = "User not found."),
+      @ApiResponse(responseCode = "500", description = "The user could not be deleted.")
   })
   public Response deleteUser(
       @Parameter(description = "The username", required = true)

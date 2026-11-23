@@ -112,14 +112,15 @@ public class GroupRoleEndpoint {
       description = "Returns a list of groups"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "The groups.")
+      @ApiResponse(responseCode = "200", description = "The groups."),
+      @ApiResponse(responseCode = "500", description = "The groups could not be retrieved.")
   })
   public Response getGroupsAsJsonOrXml(
       @Parameter(description = "The output format (json or xml) of the response body.", required = true)
       @PathParam("format") String format,
       @Parameter(description = "The maximum number of items to return per page.", example = "100")
       @QueryParam("limit") int limit,
-      @Parameter(description = "The page number.", example = "0")
+      @Parameter(description = "The index of the first item to return.", example = "0")
       @QueryParam("offset") int offset
   ) {
     try {
@@ -139,10 +140,10 @@ public class GroupRoleEndpoint {
       description = "Remove a group"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "Group deleted"),
       @ApiResponse(responseCode = "403", description = "Not enough permissions to remove a group with the admin role."),
       @ApiResponse(responseCode = "404", description = "Group not found."),
-      @ApiResponse(responseCode = "500", description = "An internal server error occured.")
+      @ApiResponse(responseCode = "500", description = "An internal server error occured."),
+      @ApiResponse(responseCode = "204", description = "Group deleted.")
   })
   public Response removeGroup(
       @Parameter(description = "The group identifier", required = true)
