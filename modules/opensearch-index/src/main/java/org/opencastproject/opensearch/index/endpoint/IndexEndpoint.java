@@ -147,7 +147,8 @@ public class IndexEndpoint {
       description = "Repopulates the Index from a specific service"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "OK if repopulation has started")
+      @ApiResponse(responseCode = "200", description = "OK if repopulation has started"),
+      @ApiResponse(responseCode = "400", description = "The given service is invalid.")
   })
   public Response partiallyRebuildIndex(
       @Parameter(
@@ -256,7 +257,8 @@ public class IndexEndpoint {
           + "of the services that come afterwards"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "OK if repopulation has started")
+      @ApiResponse(responseCode = "200", description = "OK if repopulation has started"),
+      @ApiResponse(responseCode = "400", description = "The given service is invalid.")
   })
   public Response resumeIndexRebuild(
       @Parameter(
