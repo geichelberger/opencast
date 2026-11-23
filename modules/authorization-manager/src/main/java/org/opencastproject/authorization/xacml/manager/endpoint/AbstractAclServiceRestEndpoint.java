@@ -247,13 +247,13 @@ public abstract class AbstractAclServiceRestEndpoint {
       description = "Delete an ACL"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "The ACL has successfully been deleted"),
       @ApiResponse(responseCode = "404", description = "The ACL has not been found"),
       @ApiResponse(
           responseCode = "409",
           description = "The ACL could not be deleted, there are still references on it"
       ),
-      @ApiResponse(responseCode = "500", description = "Error during deleting the ACL")
+      @ApiResponse(responseCode = "500", description = "Error during deleting the ACL"),
+      @ApiResponse(responseCode = "204", description = "The ACL has successfully been deleted.")
   })
   public Response deleteAcl(
       @Parameter(description = "The ACL identifier", required = true)
