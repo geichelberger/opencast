@@ -40,7 +40,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.ws.rs.FormParam;
-import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -76,9 +75,6 @@ public class TimelinePreviewsRestEndpoint extends AbstractJobProducerEndpoint {
 
   /** The logger */
   private static final Logger logger = LoggerFactory.getLogger(TimelinePreviewsRestEndpoint.class);
-
-  /** The rest docs */
-  protected String docs;
 
   /** The timeline previews service */
   protected TimelinePreviewsService service;
@@ -152,21 +148,6 @@ public class TimelinePreviewsRestEndpoint extends AbstractJobProducerEndpoint {
       logger.warn("Generation of timeline preview images failed: " + e.getMessage());
       return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
     }
-  }
-
-  @GET
-  @Produces(MediaType.TEXT_HTML)
-  @Path("docs")
-  @Operation(
-      summary = "Get the legacy REST documentation",
-      description = "Requests to this path are answered by the REST servlet with a redirect to the legacy REST "
-          + "documentation page of the service. Prefer the OpenAPI documentation."
-  )
-  @ApiResponses({
-      @ApiResponse(responseCode = "302", description = "Redirect to the legacy REST documentation.")
-  })
-  public String getDocs() {
-    return docs;
   }
 
   @Override

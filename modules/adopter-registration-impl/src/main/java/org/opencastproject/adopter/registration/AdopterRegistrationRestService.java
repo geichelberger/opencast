@@ -79,9 +79,6 @@ public class AdopterRegistrationRestService {
   /** The JSON parser */
   private static final Gson gson = new Gson();
 
-  /** The rest docs */
-  protected String docs;
-
   /** The service that provides methods for the registration */
   protected AdopterRegistrationServiceImpl registrationService;
 
@@ -262,7 +259,6 @@ public class AdopterRegistrationRestService {
     }
   }
 
-
   @GET
   @Produces(MediaType.TEXT_PLAIN)
   @Path("latestToU")
@@ -275,22 +271,6 @@ public class AdopterRegistrationRestService {
   })
   public String getLatestTermsofUse() {
     return Adopter.getLatestTermsOfUse().name();
-  }
-
-
-  @GET
-  @Produces(MediaType.TEXT_HTML)
-  @Path("docs")
-  @Operation(
-      summary = "Get the legacy REST documentation",
-      description = "Requests to this path are answered by the REST servlet with a redirect to the legacy REST "
-          + "documentation page of the service. Prefer the OpenAPI documentation."
-  )
-  @ApiResponses({
-      @ApiResponse(responseCode = "302", description = "Redirect to the legacy REST documentation.")
-  })
-  public String getDocs() {
-    return docs;
   }
 
 }

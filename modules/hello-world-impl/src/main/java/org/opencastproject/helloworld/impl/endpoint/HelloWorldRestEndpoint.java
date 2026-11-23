@@ -65,9 +65,6 @@ public class HelloWorldRestEndpoint {
   /** The logger */
   private static final Logger logger = LoggerFactory.getLogger(HelloWorldRestEndpoint.class);
 
-  /** The rest docs */
-  protected String docs;
-
   /** The service */
   protected HelloWorldService helloWorldService;
 
@@ -118,21 +115,6 @@ public class HelloWorldRestEndpoint {
   ) throws Exception {
     logger.info("REST call for Hello Name");
     return Response.ok().entity(helloWorldService.helloName(name)).build();
-  }
-
-  @GET
-  @Produces(MediaType.TEXT_HTML)
-  @Path("docs")
-  @Operation(
-      summary = "Get the legacy REST documentation",
-      description = "Requests to this path are answered by the REST servlet with a redirect to the legacy REST "
-          + "documentation page of the service. Prefer the OpenAPI documentation."
-  )
-  @ApiResponses({
-      @ApiResponse(responseCode = "302", description = "Redirect to the legacy REST documentation.")
-  })
-  public String getDocs() {
-    return docs;
   }
 
   @Reference
