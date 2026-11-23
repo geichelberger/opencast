@@ -318,7 +318,8 @@ public class SeriesEndpoint {
           description = "The required form params were missing in the request."
       ),
       @ApiResponse(responseCode = "404", description = "If the series has not been found."),
-      @ApiResponse(responseCode = "200", description = "The access information ")
+      @ApiResponse(responseCode = "200", description = "The access information "),
+      @ApiResponse(responseCode = "500", description = "The access information could not be retrieved.")
   })
   public Response getSeriesAccessInformation(
       @Parameter(description = "The series identifier", required = true)
@@ -502,7 +503,9 @@ public class SeriesEndpoint {
       @ApiResponse(
           responseCode = "401",
           description = "If the current user is not authorized to perform this action"
-      )
+      ),
+      @ApiResponse(responseCode = "400", description = "The metadata is invalid."),
+      @ApiResponse(responseCode = "500", description = "The metadata could not be updated.")
   })
   public Response updateSeriesMetadata(
       @Parameter(description = "The series identifier", required = true)
@@ -609,7 +612,8 @@ public class SeriesEndpoint {
       ),
       @ApiResponse(responseCode = "404", description = "Nonexistent `path`"),
       @ApiResponse(responseCode = "400", description = "missing `path`"),
-      @ApiResponse(responseCode = "503", description = "Tobira is not configured (correctly)")
+      @ApiResponse(responseCode = "503", description = "Tobira is not configured (correctly)"),
+      @ApiResponse(responseCode = "500", description = "The Tobira page could not be retrieved.")
   })
   public Response getTobiraPage(
       @Parameter(description = "The path of the page you want information about", required = true)
@@ -652,7 +656,8 @@ public class SeriesEndpoint {
       @ApiResponse(
           responseCode = "401",
           description = "If user doesn't have rights to create the series"
-      )
+      ),
+      @ApiResponse(responseCode = "500", description = "The series could not be created.")
   })
   public Response createNewSeries(
       @Parameter(description = "The metadata as JSON", required = true)
@@ -733,7 +738,8 @@ public class SeriesEndpoint {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "The series has been deleted."),
-      @ApiResponse(responseCode = "404", description = "The series could not be found.")
+      @ApiResponse(responseCode = "404", description = "The series could not be found."),
+      @ApiResponse(responseCode = "500", description = "The series could not be deleted.")
   })
   public Response deleteSeries(
       @Parameter(description = "The id of the series to delete.", required = true)
@@ -806,7 +812,9 @@ public class SeriesEndpoint {
       @ApiResponse(
           responseCode = "401",
           description = "If the current user is not authorized to perform this action"
-      )
+      ),
+      @ApiResponse(responseCode = "400", description = "A filter, a sort criterion or a date range is invalid."),
+      @ApiResponse(responseCode = "500", description = "The series could not be retrieved.")
   })
   public Response getSeries(
       @Parameter(
@@ -993,7 +1001,8 @@ public class SeriesEndpoint {
       @ApiResponse(
           responseCode = "401",
           description = "If the current user is not authorized to perform this action"
-      )
+      ),
+      @ApiResponse(responseCode = "500", description = "The properties could not be retrieved.")
   })
   public Response getSeriesPropertiesAsJson(
       @Parameter(description = "ID of series", required = true)
@@ -1034,7 +1043,8 @@ public class SeriesEndpoint {
       @ApiResponse(
           responseCode = "401",
           description = "If the current user is not authorized to perform this action"
-      )
+      ),
+      @ApiResponse(responseCode = "500", description = "The property could not be retrieved.")
   })
   public Response getSeriesProperty(
       @Parameter(description = "ID of series", required = true)
@@ -1079,7 +1089,8 @@ public class SeriesEndpoint {
       @ApiResponse(
           responseCode = "400",
           description = "The required path or form params were missing in the request."
-      )
+      ),
+      @ApiResponse(responseCode = "500", description = "The property could not be updated.")
   })
   public Response updateSeriesProperty(
       @Parameter(description = "The series identifier", required = true)
@@ -1124,7 +1135,8 @@ public class SeriesEndpoint {
       @ApiResponse(
           responseCode = "401",
           description = "If the current user is not authorized to perform this action"
-      )
+      ),
+      @ApiResponse(responseCode = "500", description = "The property could not be deleted.")
   })
   public Response deleteSeriesProperty(
       @Parameter(description = "ID of series", required = true)
@@ -1173,7 +1185,11 @@ public class SeriesEndpoint {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "The series theme id and name as JSON."),
-      @ApiResponse(responseCode = "404", description = "The series or theme has not been found")
+      @ApiResponse(responseCode = "404", description = "The series or theme has not been found"),
+      @ApiResponse(
+          responseCode = "400",
+          description = "The series could not be retrieved because the request was rejected."
+      )
   })
   public Response getSeriesTheme(
       @Parameter(description = "The series identifier", required = true)
@@ -1325,7 +1341,8 @@ public Response getSeriesHostPages(
           description = "The path of the series has successfully been updated in Tobira."
       ),
       @ApiResponse(responseCode = "404", description = "Tobira doesn't know about the given series"),
-      @ApiResponse(responseCode = "503", description = "Tobira is not configured (correctly)")
+      @ApiResponse(responseCode = "503", description = "Tobira is not configured (correctly)"),
+      @ApiResponse(responseCode = "500", description = "The Tobira path could not be updated.")
   })
   public Response updateSeriesTobiraPath(
       @Parameter(description = "The series id", required = true)
@@ -1387,7 +1404,8 @@ public Response getSeriesHostPages(
           description = "The path of the series has successfully been removed in Tobira."
       ),
       @ApiResponse(responseCode = "404", description = "Tobira doesn't know about the given series"),
-      @ApiResponse(responseCode = "503", description = "Tobira is not configured (correctly)")
+      @ApiResponse(responseCode = "503", description = "Tobira is not configured (correctly)"),
+      @ApiResponse(responseCode = "500", description = "The Tobira path could not be removed.")
   })
   public Response removeSeriesTobiraPath(
       @Parameter(description = "The series id", required = true)
@@ -1432,7 +1450,9 @@ public Response getSeriesHostPages(
       @ApiResponse(
           responseCode = "401",
           description = "If the current user is not authorized to perform this action"
-      )
+      ),
+      @ApiResponse(responseCode = "403", description = "The user is not allowed to change the ACL of the series."),
+      @ApiResponse(responseCode = "409", description = "Events of the series are currently being processed.")
   })
   public Response applyAclToSeries(
       @Parameter(description = "The series ID", required = true)
@@ -1529,7 +1549,8 @@ public Response getSeriesHostPages(
           description = "The required form params were missing in the request."
       ),
       @ApiResponse(responseCode = "404", description = "If the series has not been found."),
-      @ApiResponse(responseCode = "200", description = "The access information ")
+      @ApiResponse(responseCode = "200", description = "The access information "),
+      @ApiResponse(responseCode = "500", description = "The events could not be retrieved.")
   })
   public Response getSeriesEvents(
       @Parameter(description = "The series identifier", required = true)

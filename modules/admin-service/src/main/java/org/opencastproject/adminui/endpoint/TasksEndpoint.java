@@ -122,7 +122,8 @@ public class TasksEndpoint {
       @ApiResponse(
           responseCode = "200",
           description = "Returns all the data related to the tasks processing tab as JSON"
-      )
+      ),
+      @ApiResponse(responseCode = "500", description = "The processing options could not be retrieved.")
   })
   public Response getProcessing(
       @Parameter(
@@ -163,7 +164,8 @@ public class TasksEndpoint {
   @ApiResponses({
       @ApiResponse(responseCode = "201", description = "Task sucessfully added"),
       @ApiResponse(responseCode = "404", description = "If the workflow definition is not found"),
-      @ApiResponse(responseCode = "400", description = "If the metadata is not set or couldn't be parsed")
+      @ApiResponse(responseCode = "400", description = "If the metadata is not set or couldn't be parsed"),
+      @ApiResponse(responseCode = "500", description = "The task could not be created.")
   })
   public Response createNewTask(
       @Parameter(

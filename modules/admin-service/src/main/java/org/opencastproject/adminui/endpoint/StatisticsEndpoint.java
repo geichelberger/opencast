@@ -144,7 +144,8 @@ public class StatisticsEndpoint {
           description = "Returns the providers for the given resource type as JSON, or all, if the "
               + "resource type is missing"
       ),
-      @ApiResponse(responseCode = "401", description = "If the current user is not authorized to perform this action")
+      @ApiResponse(responseCode = "401", description = "If the current user is not authorized to perform this action"),
+      @ApiResponse(responseCode = "400", description = "The value of resourceType is invalid.")
   })
   public Response getProviders(
       @Parameter(
@@ -215,7 +216,8 @@ public class StatisticsEndpoint {
           responseCode = "200",
           description = "Returns the statistical data for the given resource type as JSON"
       ),
-      @ApiResponse(responseCode = "401", description = "If the current user is not authorized to perform this action")
+      @ApiResponse(responseCode = "401", description = "If the current user is not authorized to perform this action"),
+      @ApiResponse(responseCode = "400", description = "The data parameter is missing, cannot be parsed or is invalid.")
   })
   public Response getProviderData(
       @Parameter(
@@ -270,7 +272,10 @@ public class StatisticsEndpoint {
           responseCode = "200",
           description = "Returns the statistical data for the given resource type as csv"
       ),
-      @ApiResponse(responseCode = "401", description = "If the current user is not authorized to perform this action")
+      @ApiResponse(responseCode = "401", description = "If the current user is not authorized to perform this action"),
+      @ApiResponse(responseCode = "400", description = "The data parameter is invalid or the query was rejected."),
+      @ApiResponse(responseCode = "404", description = "The resource does not exist."),
+      @ApiResponse(responseCode = "500", description = "The CSV data could not be retrieved.")
   })
   public Response getCSVData(
       @Parameter(description = "The provider id", required = true)

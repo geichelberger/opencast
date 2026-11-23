@@ -174,7 +174,7 @@ public class GroupsEndpoint {
               + "Add '_DESC' to reverse the sort order (e.g. NAME_DESC)."
       )
       @QueryParam("sort") String sort,
-      @Parameter(description = "The page number.", example = "0")
+      @Parameter(description = "The index of the first item to return.", example = "0")
       @QueryParam("offset") Integer offset,
       @Parameter(description = "The maximum number of items to return per page.", example = "100")
       @QueryParam("limit") Integer limit
@@ -234,13 +234,13 @@ public class GroupsEndpoint {
       description = "Remove a group"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "Group deleted"),
       @ApiResponse(
           responseCode = "403",
           description = "Not enough permissions to delete the group with admin role."
       ),
       @ApiResponse(responseCode = "404", description = "Group not found."),
-      @ApiResponse(responseCode = "500", description = "An internal server error occured.")
+      @ApiResponse(responseCode = "500", description = "An internal server error occured."),
+      @ApiResponse(responseCode = "204", description = "Group deleted.")
   })
   public Response removeGroup(
       @Parameter(description = "The group identifier", required = true)

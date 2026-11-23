@@ -184,7 +184,7 @@ public class AclEndpoint {
               + "following: NAME. Add '_DESC' to reverse the sort order (e.g. NAME_DESC)."
       )
       @QueryParam("sort") String sort,
-      @Parameter(description = "The page number.", example = "0")
+      @Parameter(description = "The index of the first item to return.", example = "0")
       @QueryParam("offset") int offset,
       @Parameter(description = "The maximum number of items to return per page.", example = "100")
       @QueryParam("limit") int limit
@@ -272,7 +272,7 @@ public class AclEndpoint {
       @QueryParam("query") String query,
       @Parameter(description = "The target of the roles.")
       @QueryParam("target") String target,
-      @Parameter(description = "The page number.", example = "0")
+      @Parameter(description = "The index of the first item to return.", example = "0")
       @QueryParam("offset") int offset,
       @Parameter(description = "The maximum number of items to return per page.", example = "100")
       @QueryParam("limit") int limit,
@@ -333,12 +333,13 @@ public class AclEndpoint {
       description = "Delete an ACL"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "The ACL has successfully been deleted"),
       @ApiResponse(responseCode = "404", description = "The ACL has not been found"),
       @ApiResponse(
           responseCode = "409",
           description = "The ACL could not be deleted, there are still references on it"
-      )
+      ),
+      @ApiResponse(responseCode = "204", description = "The ACL has successfully been deleted."),
+      @ApiResponse(responseCode = "500", description = "The ACL could not be deleted.")
   })
   public Response deleteAcl(
       @Parameter(description = "The ACL identifier", required = true)

@@ -129,12 +129,13 @@ public class CaptureAgentsEndpoint {
       description = "Return all of the known capture agents on the system"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "An XML representation of the agent capabilities")
+      @ApiResponse(responseCode = "200", description = "An XML representation of the agent capabilities"),
+      @ApiResponse(responseCode = "400", description = "A filter value cannot be parsed.")
   })
   public Response getAgents(
       @Parameter(description = "The maximum number of items to return per page.", example = "100")
       @QueryParam("limit") int limit,
-      @Parameter(description = "The page number.", example = "0")
+      @Parameter(description = "The index of the first item to return.", example = "0")
       @QueryParam("offset") int offset,
       @Parameter(
           description = "Define if the inputs should or not returned with the capture agent.",
@@ -250,7 +251,8 @@ public class CaptureAgentsEndpoint {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "{agentName} removed"),
-      @ApiResponse(responseCode = "404", description = "The agent {agentname} does not exist")
+      @ApiResponse(responseCode = "404", description = "The agent {agentname} does not exist"),
+      @ApiResponse(responseCode = "503", description = "The capture agent state service is not available.")
   })
   public Response removeAgent(
       @Parameter(description = "The name of a given capture agent", required = true)
@@ -277,7 +279,8 @@ public class CaptureAgentsEndpoint {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "A JSON representation of the capture agent"),
-      @ApiResponse(responseCode = "404", description = "The agent {name} does not exist in the system")
+      @ApiResponse(responseCode = "404", description = "The agent {name} does not exist in the system"),
+      @ApiResponse(responseCode = "503", description = "The capture agent state service is not available.")
   })
   public Response getAgent(
       @Parameter(description = "Name of the capture agent", required = true)

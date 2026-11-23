@@ -149,7 +149,8 @@ public class JobEndpoint {
       description = "Returns the list of active jobs"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "Returns the list of active jobs from Opencast")
+      @ApiResponse(responseCode = "200", description = "Returns the list of active jobs from Opencast"),
+      @ApiResponse(responseCode = "500", description = "The jobs could not be retrieved.")
   })
   public Response getJobs(
       @Parameter(description = "The maximum number of items to return per page")

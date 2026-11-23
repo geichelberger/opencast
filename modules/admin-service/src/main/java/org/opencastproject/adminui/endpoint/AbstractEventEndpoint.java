@@ -428,7 +428,9 @@ public abstract class AbstractEventEndpoint {
       @ApiResponse(
           responseCode = "401",
           description = "If the current user is not authorized to perform this action"
-      )
+      ),
+      @ApiResponse(responseCode = "404", description = "The event does not exist."),
+      @ApiResponse(responseCode = "500", description = "The event could not be deleted.")
   })
   public Response deleteEvent(
       @Parameter(description = "The id of the event to delete.", required = true)
@@ -475,7 +477,8 @@ public abstract class AbstractEventEndpoint {
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "Events have been deleted"),
       @ApiResponse(responseCode = "400", description = "The list of ids could not be parsed into a json list."),
-      @ApiResponse(responseCode = "401", description = "If the current user is not authorized to perform this action")
+      @ApiResponse(responseCode = "401", description = "If the current user is not authorized to perform this action"),
+      @ApiResponse(responseCode = "500", description = "The events could not be deleted.")
   })
   public Response deleteEvents(
       String eventIdsContent
@@ -679,7 +682,8 @@ public abstract class AbstractEventEndpoint {
           responseCode = "200",
           description = "Returns all the data related to the event scheduling tab as JSON"
       ),
-      @ApiResponse(responseCode = "404", description = "No event with this identifier was found.")
+      @ApiResponse(responseCode = "404", description = "No event with this identifier was found."),
+      @ApiResponse(responseCode = "500", description = "The scheduling information could not be retrieved.")
   })
   public Response getEventScheduling(
       @Parameter(description = "The event id (mediapackage id).", required = true)
@@ -711,7 +715,12 @@ public abstract class AbstractEventEndpoint {
           responseCode = "200",
           description = "Returns all the data related to the event scheduling tab as JSON"
       ),
-      @ApiResponse(responseCode = "404", description = "No event with this identifier was found.")
+      @ApiResponse(responseCode = "404", description = "No event with this identifier was found."),
+      @ApiResponse(
+          responseCode = "400",
+          description = "The list of ids cannot be parsed, or the user is not allowed to access one of the "
+              + "events."
+      )
   })
   public Response getEventsScheduling(
       @Parameter(description = "An array of event IDs (mediapackage id)", required = true)
@@ -756,7 +765,8 @@ public abstract class AbstractEventEndpoint {
           description = "The required params were missing in the request."
       ),
       @ApiResponse(responseCode = "404", description = "If the event has not been found."),
-      @ApiResponse(responseCode = "204", description = "The method doesn't return any content")
+      @ApiResponse(responseCode = "204", description = "The method doesn't return any content"),
+      @ApiResponse(responseCode = "500", description = "The scheduling information could not be updated.")
   })
   public Response updateEventScheduling(
       @Parameter(description = "The event identifier", required = true)
@@ -1061,7 +1071,8 @@ public abstract class AbstractEventEndpoint {
       @ApiResponse(responseCode = "400", description = "Unable to parse the given ACL"),
       @ApiResponse(responseCode = "404", description = "The the event has not been found"),
       @ApiResponse(responseCode = "401", description = "Not authorized to perform this action"),
-      @ApiResponse(responseCode = "500", description = "Internal error")
+      @ApiResponse(responseCode = "500", description = "Internal error"),
+      @ApiResponse(responseCode = "403", description = "The user is not allowed to change the ACL of the event.")
   })
   public Response applyAclToEvent(
       @Parameter(description = "The event ID", required = true)
@@ -1481,7 +1492,9 @@ public abstract class AbstractEventEndpoint {
           responseCode = "200",
           description = "Returns all the data related to the event metadata tab as JSON"
       ),
-      @ApiResponse(responseCode = "404", description = "No event with this identifier was found.")
+      @ApiResponse(responseCode = "404", description = "No event with this identifier was found."),
+      @ApiResponse(responseCode = "403", description = "The user is not allowed to access the event."),
+      @ApiResponse(responseCode = "500", description = "The metadata could not be retrieved.")
   })
   public Response getEventMetadata(
       @Parameter(description = "The event id", required = true)
@@ -1983,7 +1996,9 @@ public abstract class AbstractEventEndpoint {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "Returns the number of assets from each types as JSON"),
-      @ApiResponse(responseCode = "404", description = "No event with this identifier was found.")
+      @ApiResponse(responseCode = "404", description = "No event with this identifier was found."),
+      @ApiResponse(responseCode = "403", description = "The user is not allowed to access the event."),
+      @ApiResponse(responseCode = "500", description = "The assets could not be retrieved.")
   })
   public Response getAssetList(
       @Parameter(description = "The event id", required = true)
@@ -2243,7 +2258,8 @@ public abstract class AbstractEventEndpoint {
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "The Tobira pages containing the given event"),
       @ApiResponse(responseCode = "404", description = "Tobira doesn't know about the given event"),
-      @ApiResponse(responseCode = "503", description = "Tobira is not configured (correctly)")
+      @ApiResponse(responseCode = "503", description = "Tobira is not configured (correctly)"),
+      @ApiResponse(responseCode = "500", description = "The Tobira pages could not be retrieved.")
   })
   public Response getEventHostPages(
       @Parameter(description = "The event identifier", required = true)
@@ -2280,7 +2296,8 @@ public abstract class AbstractEventEndpoint {
           responseCode = "200",
           description = "Returns all the data related to the event workflows tab as JSON"
       ),
-      @ApiResponse(responseCode = "404", description = "No event with this identifier was found.")
+      @ApiResponse(responseCode = "404", description = "No event with this identifier was found."),
+      @ApiResponse(responseCode = "500", description = "The workflows could not be retrieved.")
   })
   public Response getEventWorkflows(
       @Parameter(description = "The event id", required = true)
@@ -2360,7 +2377,13 @@ public abstract class AbstractEventEndpoint {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "204", description = "Request executed succesfully"),
-      @ApiResponse(responseCode = "404", description = "No event with this identifier was found.")
+      @ApiResponse(responseCode = "404", description = "No event with this identifier was found."),
+      @ApiResponse(
+          responseCode = "400",
+          description = "The workflow configuration cannot be parsed, or the recording of the event already "
+              + "started."
+      ),
+      @ApiResponse(responseCode = "500", description = "The workflow could not be updated.")
   })
   public Response updateEventWorkflow(
       @Parameter(description = "The event id", required = true)
@@ -2433,7 +2456,9 @@ public abstract class AbstractEventEndpoint {
           description = "Returns all the data related to the event single workflow tab as JSON"
       ),
       @ApiResponse(responseCode = "400", description = "Unable to parse workflowId"),
-      @ApiResponse(responseCode = "404", description = "No event with this identifier was found.")
+      @ApiResponse(responseCode = "404", description = "No event with this identifier was found."),
+      @ApiResponse(responseCode = "403", description = "The user is not allowed to access the workflow."),
+      @ApiResponse(responseCode = "500", description = "The workflow could not be retrieved.")
   })
   public Response getEventWorkflow(
       @Parameter(description = "The event id", required = true)
@@ -2509,7 +2534,9 @@ public abstract class AbstractEventEndpoint {
           description = "Returns all the data related to the event workflow/operations tab as JSON"
       ),
       @ApiResponse(responseCode = "400", description = "Unable to parse workflowId"),
-      @ApiResponse(responseCode = "404", description = "No event with this identifier was found.")
+      @ApiResponse(responseCode = "404", description = "No event with this identifier was found."),
+      @ApiResponse(responseCode = "403", description = "The user is not allowed to access the workflow."),
+      @ApiResponse(responseCode = "500", description = "The operations could not be retrieved.")
   })
   public Response getEventOperations(
       @Parameter(description = "The event id", required = true)
@@ -2571,7 +2598,9 @@ public abstract class AbstractEventEndpoint {
           description = "Returns all the data related to the event workflow/operation tab as JSON"
       ),
       @ApiResponse(responseCode = "400", description = "Unable to parse workflowId or operationPosition"),
-      @ApiResponse(responseCode = "404", description = "No operation with these identifiers was found.")
+      @ApiResponse(responseCode = "404", description = "No operation with these identifiers was found."),
+      @ApiResponse(responseCode = "403", description = "The user is not allowed to access the workflow."),
+      @ApiResponse(responseCode = "500", description = "The operation could not be retrieved.")
   })
   public Response getEventOperation(
       @Parameter(description = "The event id", required = true)
@@ -2809,9 +2838,10 @@ public abstract class AbstractEventEndpoint {
       }
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "The asset has been added."),
       @ApiResponse(responseCode = "400", description = "Could not add asset, problem with the metadata or files."),
-      @ApiResponse(responseCode = "404", description = "No event with this identifier was found.")
+      @ApiResponse(responseCode = "404", description = "No event with this identifier was found."),
+      @ApiResponse(responseCode = "201", description = "The asset has been added."),
+      @ApiResponse(responseCode = "500", description = "The asset could not be added.")
   })
   public Response updateAssets(
       @Parameter(description = "The event id", required = true)
@@ -2912,7 +2942,8 @@ public abstract class AbstractEventEndpoint {
       @ApiResponse(
           responseCode = "200",
           description = "Returns all the data related to the event processing tab as JSON"
-      )
+      ),
+      @ApiResponse(responseCode = "500", description = "The processing options could not be retrieved.")
   })
   public Response getNewProcessing(
       @Parameter(
@@ -2963,7 +2994,8 @@ public abstract class AbstractEventEndpoint {
       @ApiResponse(
           responseCode = "400",
           description = "Missing or invalid parameters"
-      )
+      ),
+      @ApiResponse(responseCode = "500", description = "The conflicts could not be determined.")
   })
   public Response getNewConflicts(
       @Parameter(description = "The metadata as JSON", required = true)
@@ -3137,7 +3169,8 @@ public abstract class AbstractEventEndpoint {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "201", description = "Event sucessfully added"),
-      @ApiResponse(responseCode = "400", description = "If the metadata is not set or couldn't be parsed")
+      @ApiResponse(responseCode = "400", description = "If the metadata is not set or couldn't be parsed"),
+      @ApiResponse(responseCode = "500", description = "The event could not be created.")
   })
   public Response createNewEvent(
       @Context HttpServletRequest request
@@ -3163,7 +3196,10 @@ public abstract class AbstractEventEndpoint {
       description = "Returns all the events as JSON"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "Returns all events as JSON")
+      @ApiResponse(responseCode = "200", description = "Returns all events as JSON"),
+      @ApiResponse(responseCode = "400", description = "A filter, a sort criterion or a date range is invalid."),
+      @ApiResponse(responseCode = "500", description = "The events could not be retrieved."),
+      @ApiResponse(responseCode = "503", description = "The organization or the user is not available.")
   })
   public Response getEvents(
       @Parameter(description = "Not used. This parameter has no effect.")
@@ -3182,7 +3218,7 @@ public abstract class AbstractEventEndpoint {
               + "in the form '<field name>:(ASC|DESC)'"
       )
       @QueryParam("sort") String sort,
-      @Parameter(description = "The page number.")
+      @Parameter(description = "The index of the first item to return.")
       @QueryParam("offset") Integer offset,
       @Parameter(description = "The maximum number of items to return per page.")
       @QueryParam("limit") Integer limit,
@@ -3733,7 +3769,8 @@ public abstract class AbstractEventEndpoint {
           responseCode = "401",
           description = "You do not have permission to perform the action. Maybe you need to authenticate."
       ),
-      @ApiResponse(responseCode = "500", description = "An exception occurred.")
+      @ApiResponse(responseCode = "500", description = "An exception occurred."),
+      @ApiResponse(responseCode = "403", description = "The user is not allowed to change the workflow.")
   })
   public Response workflowAction(
       @Parameter(description = "The id of the media package", required = true)
@@ -3793,7 +3830,9 @@ public abstract class AbstractEventEndpoint {
           description = "When trying to delete the latest workflow of the event."
       ),
       @ApiResponse(responseCode = "404", description = "If the event or the workflow has not been found."),
-      @ApiResponse(responseCode = "204", description = "The method does not return any content")
+      @ApiResponse(responseCode = "204", description = "The method does not return any content"),
+      @ApiResponse(responseCode = "403", description = "The user is not allowed to delete the workflow."),
+      @ApiResponse(responseCode = "500", description = "The workflow could not be deleted.")
   })
   public Response deleteWorkflow(
       @Parameter(description = "The event identifier", required = true)

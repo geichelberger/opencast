@@ -180,7 +180,8 @@ public class ThemesEndpoint {
       description = "Return all of the known themes on the system"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "A JSON representation of the themes")
+      @ApiResponse(responseCode = "200", description = "A JSON representation of the themes"),
+      @ApiResponse(responseCode = "500", description = "The themes could not be retrieved.")
   })
   public Response getThemes(
       @Parameter(
@@ -190,7 +191,7 @@ public class ThemesEndpoint {
       @QueryParam("filter") String filter,
       @Parameter(description = "The maximum number of items to return per page.", example = "0")
       @QueryParam("limit") int limit,
-      @Parameter(description = "The page number.", example = "0")
+      @Parameter(description = "The index of the first item to return.", example = "0")
       @QueryParam("offset") int offset,
       @Parameter(
           description = "The sort order. May include any of the "
@@ -252,7 +253,8 @@ public class ThemesEndpoint {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "Returns the theme as JSON"),
-      @ApiResponse(responseCode = "404", description = "No theme with this identifier was found.")
+      @ApiResponse(responseCode = "404", description = "No theme with this identifier was found."),
+      @ApiResponse(responseCode = "500", description = "The theme could not be retrieved.")
   })
   public Response getThemeResponse(
       @Parameter(description = "The theme id", required = true)
@@ -278,7 +280,9 @@ public class ThemesEndpoint {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "Returns the theme usage as JSON"),
-      @ApiResponse(responseCode = "404", description = "Theme with the given id does not exist")
+      @ApiResponse(responseCode = "404", description = "Theme with the given id does not exist"),
+      @ApiResponse(responseCode = "400", description = "The query for the series was rejected."),
+      @ApiResponse(responseCode = "500", description = "The usage of the theme could not be retrieved.")
   })
   public Response getThemeUsage(
       @Parameter(description = "The theme id", required = true)
@@ -329,7 +333,8 @@ public class ThemesEndpoint {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "Theme created"),
-      @ApiResponse(responseCode = "400", description = "The theme references a non-existing file")
+      @ApiResponse(responseCode = "400", description = "The theme references a non-existing file"),
+      @ApiResponse(responseCode = "500", description = "The theme could not be created.")
   })
   public Response createTheme(
       @Parameter(description = "Whether the theme is default", required = true)
@@ -403,7 +408,9 @@ public class ThemesEndpoint {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "Theme updated"),
-      @ApiResponse(responseCode = "404", description = "If the theme has not been found.")
+      @ApiResponse(responseCode = "404", description = "If the theme has not been found."),
+      @ApiResponse(responseCode = "400", description = "A file referenced by the theme does not exist."),
+      @ApiResponse(responseCode = "500", description = "The theme could not be updated.")
   })
   public Response updateTheme(
       @Parameter(description = "The theme identifier", required = true)
@@ -532,7 +539,8 @@ public class ThemesEndpoint {
       @ApiResponse(
           responseCode = "401",
           description = "If the current user is not authorized to perform this action"
-      )
+      ),
+      @ApiResponse(responseCode = "500", description = "The theme could not be deleted.")
   })
   public Response deleteTheme(
       @Parameter(description = "The theme identifier", required = true)

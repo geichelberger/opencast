@@ -120,12 +120,13 @@ public class UserSettingsEndpoint {
       description = "Returns a list of the user settings for the current user"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "The user settings.")
+      @ApiResponse(responseCode = "200", description = "The user settings."),
+      @ApiResponse(responseCode = "500", description = "The user settings could not be retrieved.")
   })
   public Response getUserSettings(
       @Parameter(description = "The maximum number of items to return per page.", example = "100")
       @QueryParam("limit") int limit,
-      @Parameter(description = "The page number.", example = "0")
+      @Parameter(description = "The index of the first item to return.", example = "0")
       @QueryParam("offset") int offset
   ) throws IOException {
     if (limit < 1) {
@@ -151,7 +152,8 @@ public class UserSettingsEndpoint {
       description = "Create a new user setting"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "User setting has been created.")
+      @ApiResponse(responseCode = "200", description = "User setting has been created."),
+      @ApiResponse(responseCode = "500", description = "The user setting could not be created.")
   })
   public Response createUserSetting(
       @Parameter(description = "The key used to represent this setting.", required = true)
@@ -179,7 +181,8 @@ public class UserSettingsEndpoint {
       description = "Update a user setting"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "User setting has been created.")
+      @ApiResponse(responseCode = "200", description = "User setting has been created."),
+      @ApiResponse(responseCode = "500", description = "The user setting could not be updated.")
   })
   public Response updateUserSetting(
       @Parameter(description = "The setting's id", required = true)
@@ -206,7 +209,8 @@ public class UserSettingsEndpoint {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "User setting has been deleted."),
-      @ApiResponse(responseCode = "404", description = "User setting not found.")
+      @ApiResponse(responseCode = "404", description = "User setting not found."),
+      @ApiResponse(responseCode = "500", description = "The user setting could not be deleted.")
   })
   public Response deleteUserSetting(
       @Parameter(description = "The id of the user setting.", required = true)

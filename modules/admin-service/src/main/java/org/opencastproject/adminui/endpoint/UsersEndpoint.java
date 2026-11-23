@@ -220,7 +220,7 @@ public class UsersEndpoint {
       @QueryParam("sort") String sort,
       @Parameter(description = "The maximum number of items to return per page.", example = "100")
       @QueryParam("limit") int limit,
-      @Parameter(description = "The page number.", example = "0")
+      @Parameter(description = "The index of the first item to return.", example = "0")
       @QueryParam("offset") int offset
   ) throws IOException {
     if (limit < 1) {
@@ -379,7 +379,11 @@ public class UsersEndpoint {
           responseCode = "403",
           description = "Not enough permissions to create a user with a admin role."
       ),
-      @ApiResponse(responseCode = "409", description = "An user with this username already exist.")
+      @ApiResponse(responseCode = "409", description = "An user with this username already exist."),
+      @ApiResponse(
+          responseCode = "400",
+          description = "The username or the password is missing, or the roles are not valid JSON."
+      )
   })
   public Response createUser(
       @Parameter(description = "The username.", required = true)
@@ -472,7 +476,8 @@ public class UsersEndpoint {
           responseCode = "403",
           description = "Not enough permissions to update a user with admin role."
       ),
-      @ApiResponse(responseCode = "400", description = "Invalid data provided.")
+      @ApiResponse(responseCode = "400", description = "Invalid data provided."),
+      @ApiResponse(responseCode = "500", description = "The user could not be updated.")
   })
   public Response updateUser(
       @Parameter(
@@ -535,7 +540,8 @@ public class UsersEndpoint {
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "User password has been updated."),
       @ApiResponse(responseCode = "403", description = "Not enough permissions to change password."),
-      @ApiResponse(responseCode = "400", description = "Invalid data provided.")
+      @ApiResponse(responseCode = "400", description = "Invalid data provided."),
+      @ApiResponse(responseCode = "500", description = "The password could not be updated.")
   })
   public Response selfUpdatePassword(
       @Parameter(description = "The password.")
@@ -581,7 +587,9 @@ public class UsersEndpoint {
           responseCode = "403",
           description = "Not enough permissions to delete a user with admin role."
       ),
-      @ApiResponse(responseCode = "404", description = "User not found.")
+      @ApiResponse(responseCode = "404", description = "User not found."),
+      @ApiResponse(responseCode = "409", description = "The user still has active workflows."),
+      @ApiResponse(responseCode = "500", description = "The user could not be deleted.")
   })
   public Response deleteUser(
       @Parameter(
