@@ -75,7 +75,10 @@ public abstract class EditorRestEndpointBase {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "Media package found"),
-      @ApiResponse(responseCode = "404", description = "Media package not found")
+      @ApiResponse(responseCode = "404", description = "Media package not found"),
+      @ApiResponse(responseCode = "400", description = "The media package has no internal publication."),
+      @ApiResponse(responseCode = "403", description = "The user has no write access to the event."),
+      @ApiResponse(responseCode = "500", description = "The editing data could not be retrieved.")
   })
   public Response getEditorData(
       @Parameter(description = "The id of the media package", required = true)
@@ -108,7 +111,8 @@ public abstract class EditorRestEndpointBase {
   @ApiResponses({
       @ApiResponse(responseCode = "201", description = "Lock obtained"),
       @ApiResponse(responseCode = "409", description = "Lock not obtained"),
-      @ApiResponse(responseCode = "404", description = "Mediapackage not found")
+      @ApiResponse(responseCode = "404", description = "Mediapackage not found"),
+      @ApiResponse(responseCode = "400", description = "The lock request could not be processed.")
   })
   public Response lockMediapackage(
       @Parameter(description = "The id of the media package", required = true)
@@ -176,7 +180,12 @@ public abstract class EditorRestEndpointBase {
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "Editing information saved and processed"),
       @ApiResponse(responseCode = "404", description = "Media package not found"),
-      @ApiResponse(responseCode = "400", description = "The editing information cannot be parsed")
+      @ApiResponse(responseCode = "400", description = "The editing information cannot be parsed"),
+      @ApiResponse(responseCode = "423", description = "A workflow is active for the media package."),
+      @ApiResponse(
+          responseCode = "500",
+          description = "The editing information could not be saved or the workflow could not be started."
+      )
   })
   public Response editVideo(
       @Parameter(description = "The id of the media package", required = true)
@@ -244,7 +253,8 @@ public abstract class EditorRestEndpointBase {
           responseCode = "200",
           description = "Returns all the data related to the event metadata tab as JSON"
       ),
-      @ApiResponse(responseCode = "404", description = "No event with this identifier was found.")
+      @ApiResponse(responseCode = "404", description = "No event with this identifier was found."),
+      @ApiResponse(responseCode = "500", description = "The metadata of the event could not be retrieved.")
   })
   public Response getEventMetadata(
       @Parameter(description = "The event id", required = true)
