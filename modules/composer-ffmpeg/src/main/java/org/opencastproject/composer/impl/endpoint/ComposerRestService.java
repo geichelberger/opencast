@@ -216,7 +216,8 @@ public class ComposerRestService extends AbstractJobProducerEndpoint {
       @ApiResponse(
           responseCode = "400",
           description = "If required parameters aren't set or if sourceTrack isn't from the type Track"
-      )
+      ),
+      @ApiResponse(responseCode = "500", description = "The encoding job could not be created.")
   })
   public Response encode(
       @Parameter(
@@ -274,7 +275,12 @@ public class ComposerRestService extends AbstractJobProducerEndpoint {
       @ApiResponse(
           responseCode = "200",
           description = "Results in an xml document containing the job for the encoding task"
-      )
+      ),
+      @ApiResponse(
+          responseCode = "400",
+          description = "sourceTrack or profileId is missing, or sourceTrack is not a track."
+      ),
+      @ApiResponse(responseCode = "500", description = "The encoding failed.")
   })
   public Response parallelencode(
       @Parameter(
@@ -339,7 +345,8 @@ public class ComposerRestService extends AbstractJobProducerEndpoint {
           responseCode = "400",
           description = "If the start time is negative or exceeds the track duration, or if the duration is "
               + "negative or, including the new start time, exceeds the track duration"
-      )
+      ),
+      @ApiResponse(responseCode = "500", description = "The trimming job could not be created.")
   })
   public Response trim(
       @Parameter(
@@ -423,7 +430,8 @@ public class ComposerRestService extends AbstractJobProducerEndpoint {
       @ApiResponse(
           responseCode = "400",
           description = "If required parameters aren't set or if the source tracks aren't from the type Track"
-      )
+      ),
+      @ApiResponse(responseCode = "500", description = "The mux job could not be created.")
   })
   public Response mux(
       @Parameter(
@@ -519,7 +527,8 @@ public class ComposerRestService extends AbstractJobProducerEndpoint {
       @ApiResponse(
           responseCode = "400",
           description = "If required parameters aren't set or if sourceTrack isn't from the type Track"
-      )
+      ),
+      @ApiResponse(responseCode = "500", description = "The image extraction job could not be created.")
   })
   public Response image(
       @Parameter(
@@ -609,7 +618,8 @@ public class ComposerRestService extends AbstractJobProducerEndpoint {
       @ApiResponse(
           responseCode = "400",
           description = "If required parameters aren't set or if sourceTrack isn't from the type Track"
-      )
+      ),
+      @ApiResponse(responseCode = "500", description = "The image extraction failed.")
   })
   public Response imageSync(
       @Parameter(
@@ -699,7 +709,8 @@ public class ComposerRestService extends AbstractJobProducerEndpoint {
       @ApiResponse(
           responseCode = "400",
           description = "If required parameters aren't set or if the source elements aren't from the right type"
-      )
+      ),
+      @ApiResponse(responseCode = "500", description = "The compositing job could not be created.")
   })
   public Response composite(
       @Parameter(description = "The resolution size of the resulting video as JSON", required = true)
@@ -801,7 +812,8 @@ public class ComposerRestService extends AbstractJobProducerEndpoint {
           responseCode = "400",
           description = "If required parameters aren't set or if sourceTracks aren't from the type Track "
               + "or not at least two tracks are present"
-      )
+      ),
+      @ApiResponse(responseCode = "500", description = "The concatenation job could not be created.")
   })
   public Response concat(
       @Parameter(description = "The source tracks to concat as XML", required = true)
@@ -884,7 +896,8 @@ public class ComposerRestService extends AbstractJobProducerEndpoint {
       @ApiResponse(
           responseCode = "400",
           description = "If required parameters aren't set or if sourceAttachment isn't from the type Attachment"
-      )
+      ),
+      @ApiResponse(responseCode = "500", description = "The conversion job could not be created.")
   })
   public Response imageToVideo(
       @Parameter(description = "The attachment containing the image to convert", required = true)
@@ -949,7 +962,8 @@ public class ComposerRestService extends AbstractJobProducerEndpoint {
       @ApiResponse(
           responseCode = "400",
           description = "If required parameters aren't set or if sourceImage isn't from the type Attachment"
-      )
+      ),
+      @ApiResponse(responseCode = "500", description = "The image conversion job could not be created.")
   })
   public Response convertImage(
       @Parameter(
@@ -1013,7 +1027,8 @@ public class ComposerRestService extends AbstractJobProducerEndpoint {
       @ApiResponse(
           responseCode = "400",
           description = "If required parameters aren't set or if sourceTrack isn't from the type Track"
-      )
+      ),
+      @ApiResponse(responseCode = "500", description = "The demux job could not be created.")
   })
   public Response demux(
       @Parameter(
@@ -1074,10 +1089,8 @@ public class ComposerRestService extends AbstractJobProducerEndpoint {
           responseCode = "200",
           description = "Results in an xml document containing the job for the encoding task"
       ),
-      @ApiResponse(
-          responseCode = "400",
-          description = "If required parameters aren't set or if sourceTrack isn't from the type Track"
-      )
+      @ApiResponse(responseCode = "400", description = "If required parameters aren't set or the SMIL cannot be read."),
+      @ApiResponse(responseCode = "500", description = "The encoding job could not be created.")
   })
   public Response processSmil(
       @Parameter(description = "The smil containing the tracks and edit points", required = true)
@@ -1132,7 +1145,8 @@ public class ComposerRestService extends AbstractJobProducerEndpoint {
       @ApiResponse(
           responseCode = "400",
           description = "If required parameters aren't set or if sourceTrack isn't from the type Track"
-      )
+      ),
+      @ApiResponse(responseCode = "500", description = "The encoding job could not be created.")
   })
   public Response multiEncode(
       @Parameter(
@@ -1192,7 +1206,8 @@ public class ComposerRestService extends AbstractJobProducerEndpoint {
       @ApiResponse(
           responseCode = "400",
           description = "If required parameters aren't set or if sourceImage isn't from the type attachment"
-      )
+      ),
+      @ApiResponse(responseCode = "500", description = "The image conversion failed.")
   })
   public Response convertImageSync(
       @Parameter(
