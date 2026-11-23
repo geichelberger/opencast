@@ -133,6 +133,10 @@ public abstract class AbstractAssetManagerRestEndpoint extends AbstractJobProduc
           responseCode = "204",
           description = "A snapshot of the media package has been taken, no content to return."
       ),
+      @ApiResponse(
+          responseCode = "400",
+          description = "The media package is missing or has invalid identifiers."
+      ),
       @ApiResponse(responseCode = "403", description = "Not allowed to take a snapshot."),
       @ApiResponse(
           responseCode = "500",
@@ -275,7 +279,8 @@ public abstract class AbstractAssetManagerRestEndpoint extends AbstractJobProduc
       @ApiResponse(responseCode = "404", description = "Not found"),
       @ApiResponse(responseCode = "304", description = "If file not modified"),
       @ApiResponse(responseCode = "403", description = "Not allowed to read assets of this snapshot."),
-      @ApiResponse(responseCode = "500", description = "There has been an internal error.")
+      @ApiResponse(responseCode = "500", description = "There has been an internal error."),
+      @ApiResponse(responseCode = "400", description = "The version is malformed.")
   })
   public Response getAsset(
       @Parameter(description = "the media package identifier", required = true)
@@ -420,9 +425,12 @@ public abstract class AbstractAssetManagerRestEndpoint extends AbstractJobProduc
       description = "Set additional workflow properties"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "201", description = "Properties successfully set"),
-      @ApiResponse(responseCode = "400", description = "Invalid data"),
-      @ApiResponse(responseCode = "500", description = "Internal error")
+      @ApiResponse(responseCode = "400", description = "The properties are not a valid JSON object of strings."),
+      @ApiResponse(
+          responseCode = "204",
+          description = "Properties successfully set. Properties without a value are skipped."
+      ),
+      @ApiResponse(responseCode = "404", description = "The media package does not exist.")
   })
   public Response setWorkflowProperties(
       @Parameter(description = "the media package ID", required = true)
