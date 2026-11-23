@@ -141,7 +141,7 @@ public class AdopterRegistrationRestService {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "Adopter registration data saved."),
-      @ApiResponse(responseCode = "400", description = "Couldn't save adopter registration data.")
+      @ApiResponse(responseCode = "500", description = "Couldn't save adopter registration data.")
   })
   public Response register(
       @Parameter(description = "The Name of the organisation.")
@@ -198,7 +198,8 @@ public class AdopterRegistrationRestService {
       description = "Finalizes the registration and starts sending data."
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "Registration finalized.")
+      @ApiResponse(responseCode = "200", description = "Registration finalized."),
+      @ApiResponse(responseCode = "500", description = "Couldn't save the finalized registration.")
   })
   public Response register() {
     logger.debug("Finalizing adopter registration.");
@@ -220,10 +221,14 @@ public class AdopterRegistrationRestService {
   @Path("isUpToDate")
   @Operation(
       summary = "Check whether the registration is up to date",
-      description = "Returns true if Opencast has been able to register"
+      description = "Returns true if the registration data was modified within the last 7 days, i.e. the "
+          + "registration is up to date"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "Registratino status")
+      @ApiResponse(
+          responseCode = "200",
+          description = "true if the registration data was modified within the last 7 days, false otherwise"
+      )
   })
   public Response isUpToDate() {
     Adopter data = (Adopter) registrationService.get();
@@ -266,7 +271,7 @@ public class AdopterRegistrationRestService {
       description = "Gets the latest terms of use version."
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "Retrieved statistic data.")
+      @ApiResponse(responseCode = "200", description = "The name of the latest terms of use version.")
   })
   public String getLatestTermsofUse() {
     return Adopter.getLatestTermsOfUse().name();
