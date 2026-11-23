@@ -134,7 +134,12 @@ public class DownloadDistributionRestService extends AbstractJobProducerEndpoint
       description = "Distribute a media package element to this distribution channel"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "An XML representation of the distribution job")
+      @ApiResponse(responseCode = "200", description = "An XML representation of the distribution job"),
+      @ApiResponse(
+          responseCode = "400",
+          description = "The request is invalid, for example because an element does not exist in the media package."
+      ),
+      @ApiResponse(responseCode = "500", description = "The operation failed or the request cannot be parsed.")
   })
   public Response distribute(
       @Parameter(description = "The mediapackage", required = true)
@@ -180,7 +185,12 @@ public class DownloadDistributionRestService extends AbstractJobProducerEndpoint
       description = "Synchronously distribute a media package element to this distribution channel"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "An XML representation of the distribution")
+      @ApiResponse(responseCode = "200", description = "An XML representation of the distribution"),
+      @ApiResponse(
+          responseCode = "400",
+          description = "The request is invalid, for example because an element does not exist in the media package."
+      ),
+      @ApiResponse(responseCode = "500", description = "The operation failed or the request cannot be parsed.")
   })
   public Response distributeSync(
       @Parameter(description = "The mediapackage", required = true)
@@ -222,7 +232,12 @@ public class DownloadDistributionRestService extends AbstractJobProducerEndpoint
       description = "Retract a media package element from this distribution channel"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "An XML representation of the retraction job")
+      @ApiResponse(responseCode = "200", description = "An XML representation of the retraction job"),
+      @ApiResponse(
+          responseCode = "400",
+          description = "The request is invalid, for example because an element does not exist in the media package."
+      ),
+      @ApiResponse(responseCode = "500", description = "The operation failed or the request cannot be parsed.")
   })
   public Response retract(
       @Parameter(description = "The mediapackage", required = true)
@@ -258,7 +273,12 @@ public class DownloadDistributionRestService extends AbstractJobProducerEndpoint
       description = "Synchronously retract a media package element from this distribution channel"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "An XML representation of the retraction")
+      @ApiResponse(responseCode = "200", description = "An XML representation of the retraction"),
+      @ApiResponse(
+          responseCode = "400",
+          description = "The request is invalid, for example because an element does not exist in the media package."
+      ),
+      @ApiResponse(responseCode = "500", description = "The operation failed or the request cannot be parsed.")
   })
   public Response retractSync(
       @Parameter(description = "The mediapackage", required = true)
