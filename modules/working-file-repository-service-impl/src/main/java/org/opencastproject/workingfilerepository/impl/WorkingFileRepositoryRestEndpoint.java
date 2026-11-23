@@ -170,7 +170,8 @@ public class WorkingFileRepositoryRestEndpoint extends WorkingFileRepositoryImpl
       }
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "OK, file stored")
+      @ApiResponse(responseCode = "200", description = "OK, file stored"),
+      @ApiResponse(responseCode = "400", description = "The request is not a multipart request or contains no file.")
   })
   public Response restPut(
       @Parameter(description = "the mediapackage identifier", required = true)
@@ -248,7 +249,8 @@ public class WorkingFileRepositoryRestEndpoint extends WorkingFileRepositoryImpl
       }
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "OK, file stored")
+      @ApiResponse(responseCode = "200", description = "OK, file stored"),
+      @ApiResponse(responseCode = "400", description = "The request is not a multipart request or contains no file.")
   })
   public Response restPutInCollection(
       @Parameter(description = "the collection identifier", required = true)
@@ -277,7 +279,8 @@ public class WorkingFileRepositoryRestEndpoint extends WorkingFileRepositoryImpl
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "File deleted"),
-      @ApiResponse(responseCode = "404", description = "File did not exist")
+      @ApiResponse(responseCode = "404", description = "File did not exist"),
+      @ApiResponse(responseCode = "500", description = "The file could not be deleted.")
   })
   public Response restDelete(
       @Parameter(description = "the mediapackage identifier", required = true)
@@ -306,7 +309,8 @@ public class WorkingFileRepositoryRestEndpoint extends WorkingFileRepositoryImpl
   )
   @ApiResponses({
       @ApiResponse(responseCode = "204", description = "File deleted"),
-      @ApiResponse(responseCode = "404", description = "Collection or file not found")
+      @ApiResponse(responseCode = "404", description = "Collection or file not found"),
+      @ApiResponse(responseCode = "500", description = "The file could not be deleted.")
   })
   public Response restDeleteFromCollection(
       @Parameter(description = "the collection identifier", required = true)
@@ -334,7 +338,8 @@ public class WorkingFileRepositoryRestEndpoint extends WorkingFileRepositoryImpl
   )
   @ApiResponses({
       @ApiResponse(responseCode = "204", description = "Files deleted"),
-      @ApiResponse(responseCode = "404", description = "Collection not found")
+      @ApiResponse(responseCode = "404", description = "Collection not found"),
+      @ApiResponse(responseCode = "500", description = "The files could not be deleted.")
   })
   public Response restCleanupOldFilesFromCollection(
       @Parameter(description = "the collection identifier", required = true)
@@ -363,7 +368,8 @@ public class WorkingFileRepositoryRestEndpoint extends WorkingFileRepositoryImpl
           + "older than N days"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "204", description = "Files deleted")
+      @ApiResponse(responseCode = "204", description = "Files deleted"),
+      @ApiResponse(responseCode = "500", description = "The files could not be deleted.")
   })
   public Response restCleanupOldFilesFromMediaPackage(
       @Parameter(description = "files older than this number of days will be deleted", required = true)
@@ -386,7 +392,8 @@ public class WorkingFileRepositoryRestEndpoint extends WorkingFileRepositoryImpl
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "File returned"),
       @ApiResponse(responseCode = "304", description = "If file not modified"),
-      @ApiResponse(responseCode = "404", description = "Not found")
+      @ApiResponse(responseCode = "404", description = "Not found"),
+      @ApiResponse(responseCode = "500", description = "The file could not be read.")
   })
   public Response restGet(
       @Parameter(description = "the mediapackage identifier", required = true)
@@ -438,7 +445,8 @@ public class WorkingFileRepositoryRestEndpoint extends WorkingFileRepositoryImpl
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "File returned"),
-      @ApiResponse(responseCode = "404", description = "Not found")
+      @ApiResponse(responseCode = "404", description = "Not found"),
+      @ApiResponse(responseCode = "500", description = "The file could not be read.")
   })
   public Response restGet(
       @Parameter(description = "the mediapackage identifier", required = true)
@@ -593,7 +601,8 @@ public class WorkingFileRepositoryRestEndpoint extends WorkingFileRepositoryImpl
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "URL returned"),
-      @ApiResponse(responseCode = "404", description = "File to copy not found")
+      @ApiResponse(responseCode = "404", description = "File to copy not found"),
+      @ApiResponse(responseCode = "500", description = "The file could not be copied.")
   })
   public Response restCopyTo(
       @Parameter(description = "the collection identifier hosting the source", required = true)
@@ -628,7 +637,8 @@ public class WorkingFileRepositoryRestEndpoint extends WorkingFileRepositoryImpl
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "URL returned"),
-      @ApiResponse(responseCode = "404", description = "File to move not found")
+      @ApiResponse(responseCode = "404", description = "File to move not found"),
+      @ApiResponse(responseCode = "500", description = "The file could not be moved.")
   })
   public Response restMoveTo(
       @Parameter(description = "the collection identifier hosting the source", required = true)
