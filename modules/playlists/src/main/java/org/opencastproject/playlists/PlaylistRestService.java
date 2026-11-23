@@ -304,7 +304,8 @@ public class PlaylistRestService {
       description = "Get playlists. Playlists that you do not have read access to will not show up."
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "A playlist as XML.")
+      @ApiResponse(responseCode = "200", description = "A playlist as XML."),
+      @ApiResponse(responseCode = "400", description = "A request parameter was illegal.")
   })
   public Response getPlaylistsAsXml(
       @Parameter(description = "The maximum number of results to return for a single request.", example = "100")
@@ -331,7 +332,11 @@ public class PlaylistRestService {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "201", description = "Playlist created."),
-      @ApiResponse(responseCode = "401", description = "Not authorized to perform this action")
+      @ApiResponse(
+          responseCode = "500",
+          description = "The playlist could not be created, for example because the user is not allowed "
+              + "to create playlists."
+      )
   })
   public Response createAsJson(
       @Parameter(description = "Playlist in JSON format", schema = @Schema(example = SAMPLE_PLAYLIST_JSON))
@@ -357,8 +362,12 @@ public class PlaylistRestService {
       description = "Creates a playlist."
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "Playlist updated."),
-      @ApiResponse(responseCode = "401", description = "Not authorized to perform this action")
+      @ApiResponse(responseCode = "200", description = "Playlist created."),
+      @ApiResponse(
+          responseCode = "500",
+          description = "The playlist could not be created, for example because the user is not allowed "
+              + "to create playlists."
+      )
   })
   public Response createAsXml(
       @Parameter(description = "Playlist in XML format", schema = @Schema(example = SAMPLE_PLAYLIST_XML))
@@ -385,7 +394,11 @@ public class PlaylistRestService {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "Playlist updated."),
-      @ApiResponse(responseCode = "401", description = "Not authorized to perform this action")
+      @ApiResponse(
+          responseCode = "500",
+          description = "The playlist could not be updated, for example because it does not exist or the user "
+              + "is not allowed to update it."
+      )
   })
   public Response updateAsJson(
       @Parameter(description = "Playlist identifier", required = true)
@@ -410,7 +423,11 @@ public class PlaylistRestService {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "Playlist updated."),
-      @ApiResponse(responseCode = "401", description = "Not authorized to perform this action")
+      @ApiResponse(
+          responseCode = "500",
+          description = "The playlist could not be updated, for example because it does not exist or the user "
+              + "is not allowed to update it."
+      )
   })
   public Response updateAsXml(
       @Parameter(description = "Playlist identifier", required = true)
@@ -442,8 +459,11 @@ public class PlaylistRestService {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "Playlist removed."),
-      @ApiResponse(responseCode = "404", description = "No playlist with that identifier exists."),
-      @ApiResponse(responseCode = "401", description = "Not authorized to perform this action")
+      @ApiResponse(
+          responseCode = "500",
+          description = "The playlist could not be removed, for example because it does not exist or the user "
+              + "is not allowed to remove it."
+      )
   })
   public Response remove(
       @Parameter(description = "Playlist identifier", required = true)
@@ -467,8 +487,11 @@ public class PlaylistRestService {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "Playlist updated."),
-      @ApiResponse(responseCode = "404", description = "No playlist with that identifier exists."),
-      @ApiResponse(responseCode = "401", description = "Not authorized to perform this action")
+      @ApiResponse(
+          responseCode = "500",
+          description = "The playlist could not be changed, for example because it does not exist or the user "
+              + "is not allowed to change it."
+      )
   })
   public Response addEntry(
       @Parameter(description = "Playlist identifier", required = true)
@@ -497,8 +520,11 @@ public class PlaylistRestService {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "Playlist updated."),
-      @ApiResponse(responseCode = "404", description = "No playlist or entry with that identifier exists."),
-      @ApiResponse(responseCode = "401", description = "Not authorized to perform this action")
+      @ApiResponse(
+          responseCode = "500",
+          description = "The playlist could not be changed, for example because the playlist or the entry does not "
+              + "exist or the user is not allowed to change it."
+      )
   })
   public Response addEntry(
       @Parameter(description = "Identifier of the playlist to delete from", required = true)
