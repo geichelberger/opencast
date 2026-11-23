@@ -716,11 +716,8 @@ public abstract class AbstractEventEndpoint {
           description = "Returns all the data related to the event scheduling tab as JSON"
       ),
       @ApiResponse(responseCode = "404", description = "No event with this identifier was found."),
-      @ApiResponse(
-          responseCode = "400",
-          description = "The list of ids cannot be parsed, or the user is not allowed to access one of the "
-              + "events."
-      )
+      @ApiResponse(responseCode = "400", description = "The scheduler could not provide the scheduling information."),
+      @ApiResponse(responseCode = "403", description = "The user is not allowed to access one of the events.")
   })
   public Response getEventsScheduling(
       @Parameter(description = "An array of event IDs (mediapackage id)", required = true)
@@ -744,7 +741,7 @@ public abstract class AbstractEventEndpoint {
         }
       } catch (final UnauthorizedException e) {
         logger.warn("Unauthorized access to event ID {}", eventId, e);
-        return Response.status(Status.BAD_REQUEST).build();
+        return Response.status(Status.FORBIDDEN).build();
       } catch (final SchedulerException e) {
         logger.warn("Scheduler exception accessing event ID {}", eventId, e);
         return Response.status(Status.BAD_REQUEST).build();
