@@ -141,10 +141,9 @@ public class CaptureAgentStateRestService {
       description = "Return the state of a given capture agent"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "{agentState}"),
-      @ApiResponse(responseCode = "404", description = "The agent {agentName} does not exist"),
-      @ApiResponse(responseCode = "405", description = "If the {format} is not xml or json"),
-      @ApiResponse(responseCode = "503", description = "iCapture agent state service unavailable")
+      @ApiResponse(responseCode = "200", description = "The state of the capture agent."),
+      @ApiResponse(responseCode = "404", description = "The agent does not exist."),
+      @ApiResponse(responseCode = "503", description = "The capture agent state service is not available.")
   })
   public Response getAgentState(
       @Parameter(description = "Name of the capture agent", required = true)
@@ -227,7 +226,8 @@ public class CaptureAgentStateRestService {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "{agentName} removed"),
-      @ApiResponse(responseCode = "404", description = "The agent {agentname} does not exist")
+      @ApiResponse(responseCode = "404", description = "The agent {agentname} does not exist"),
+      @ApiResponse(responseCode = "503", description = "The capture agent state service is not available.")
   })
   public Response removeAgent(
       @Parameter(description = "Name of the capture agent", required = true)
@@ -251,7 +251,8 @@ public class CaptureAgentStateRestService {
       description = "Return all of the known capture agents on the system"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "An XML representation of the agent capabilities")
+      @ApiResponse(responseCode = "200", description = "The known capture agents and their states."),
+      @ApiResponse(responseCode = "503", description = "The capture agent state service is not available.")
   })
   public Response getKnownAgents(
       @Parameter(description = "The Document type", required = true)
@@ -286,7 +287,8 @@ public class CaptureAgentStateRestService {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "An XML representation of the agent capabilities"),
-      @ApiResponse(responseCode = "404", description = "The agent {name} does not exist in the system")
+      @ApiResponse(responseCode = "404", description = "The agent {name} does not exist in the system"),
+      @ApiResponse(responseCode = "503", description = "The capture agent state service is not available.")
   })
   public Response getCapabilities(
       @Parameter(description = "Name of the capture agent", required = true)
@@ -315,7 +317,8 @@ public class CaptureAgentStateRestService {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "An XML or JSON representation of the agent configuration"),
-      @ApiResponse(responseCode = "404", description = "The agent {name} does not exist in the system")
+      @ApiResponse(responseCode = "404", description = "The agent {name} does not exist in the system"),
+      @ApiResponse(responseCode = "503", description = "The capture agent state service is not available.")
   })
   public Response getConfiguration(
       @Parameter(description = "Name of the capture agent", required = true)
@@ -349,7 +352,8 @@ public class CaptureAgentStateRestService {
       @ApiResponse(
           responseCode = "400",
           description = "The configuration format is incorrect OR the agent name is blank or null"
-      )
+      ),
+      @ApiResponse(responseCode = "503", description = "The capture agent state service is not available.")
   })
   public Response setConfiguration(
       @Parameter(description = "Name of the capture agent", required = true)
@@ -420,7 +424,8 @@ public class CaptureAgentStateRestService {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "Returns the state of the recording with the correct id"),
-      @ApiResponse(responseCode = "404", description = "The recording with the specified ID does not exist")
+      @ApiResponse(responseCode = "404", description = "The recording with the specified ID does not exist"),
+      @ApiResponse(responseCode = "500", description = "The state of the recording could not be retrieved.")
   })
   public Response getRecordingState(
       @Parameter(description = "The ID of a given recording", required = true)
@@ -453,7 +458,8 @@ public class CaptureAgentStateRestService {
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "{id} set to {state}"),
       @ApiResponse(responseCode = "400", description = "{id} or {state} is empty or {state} is not known"),
-      @ApiResponse(responseCode = "404", description = "Recording with {id} could not be found")
+      @ApiResponse(responseCode = "404", description = "Recording with {id} could not be found"),
+      @ApiResponse(responseCode = "500", description = "The state of the recording could not be set.")
   })
   public Response setRecordingState(
       @Parameter(description = "The ID of a given recording", required = true)
@@ -491,7 +497,8 @@ public class CaptureAgentStateRestService {
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "{id} removed"),
       @ApiResponse(responseCode = "400", description = "{id} is empty"),
-      @ApiResponse(responseCode = "404", description = "Recording with {id} could not be found")
+      @ApiResponse(responseCode = "404", description = "Recording with {id} could not be found"),
+      @ApiResponse(responseCode = "500", description = "The recording could not be removed.")
   })
   public Response removeRecording(
       @Parameter(description = "The ID of a given recording", required = true)
@@ -518,7 +525,8 @@ public class CaptureAgentStateRestService {
       description = "Return all registered recordings and their state"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "Returns all known recordings.")
+      @ApiResponse(responseCode = "200", description = "Returns all known recordings."),
+      @ApiResponse(responseCode = "500", description = "The recordings could not be retrieved.")
   })
   public List<RecordingStateUpdate> getAllRecordings() {
     try {
