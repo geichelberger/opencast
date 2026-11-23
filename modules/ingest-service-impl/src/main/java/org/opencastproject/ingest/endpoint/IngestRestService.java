@@ -351,7 +351,8 @@ public class IngestRestService extends AbstractJobProducerEndpoint {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "OK"),
-      @ApiResponse(responseCode = "500", description = "Internal server error")
+      @ApiResponse(responseCode = "500", description = "Internal server error"),
+      @ApiResponse(responseCode = "400", description = "The multipart request could not be read.")
   })
   public Response discardMediaPackageAsMultipart(
       @Context HttpServletRequest request
@@ -2340,7 +2341,9 @@ public class IngestRestService extends AbstractJobProducerEndpoint {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "201", description = "Event scheduled"),
-      @ApiResponse(responseCode = "400", description = "Media package not valid")
+      @ApiResponse(responseCode = "400", description = "Media package not valid"),
+      @ApiResponse(responseCode = "409", description = "The event conflicts with another scheduled event."),
+      @ApiResponse(responseCode = "500", description = "The event could not be scheduled.")
   })
   public Response schedule(
       MultivaluedMap<String,
