@@ -131,7 +131,6 @@ import javax.ws.rs.core.Response.Status;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -444,7 +443,7 @@ public class SchedulerRestService {
    * @return media package XML for the event
    */
   @GET
-  @Produces(MediaType.TEXT_XML)
+  @Produces(MediaType.APPLICATION_JSON)
   @Path("{id:.+}/technical.json")
   @Operation(
       summary = "Get the technical metadata of an event",
@@ -453,9 +452,7 @@ public class SchedulerRestService {
   @ApiResponses({
       @ApiResponse(
           responseCode = "200",
-          description = "The technical metadata of the event is in the body of the response. The content type "
-              + "is application/json, although the operation declares text/xml.",
-          content = @Content(mediaType = "application/json")
+          description = "The technical metadata of the event is in the body of the response"
       ),
       @ApiResponse(
           responseCode = "404",
