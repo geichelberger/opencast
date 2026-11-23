@@ -158,7 +158,8 @@ public class ServiceRegistryEndpoint {
       description = "List the service registrations in the cluster, along with some simple statistics"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "A JSON representation of the service statistics")
+      @ApiResponse(responseCode = "200", description = "A JSON representation of the service statistics"),
+      @ApiResponse(responseCode = "500", description = "The statistics could not be retrieved.")
   })
   public Response getStatisticsAsJson() {
     try {
@@ -348,7 +349,8 @@ public class ServiceRegistryEndpoint {
       description = "Removes a server from the cluster."
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "204", description = "The host was removed successfully")
+      @ApiResponse(responseCode = "204", description = "The host was removed successfully"),
+      @ApiResponse(responseCode = "404", description = "The host is not known.")
   })
   public Response unregister(
       @Parameter(description = "The host name, including the http(s) protocol", required = true)
@@ -909,7 +911,8 @@ public class ServiceRegistryEndpoint {
       description = "Returns the number of jobs matching the query parameters as plain text."
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "Job count returned.")
+      @ApiResponse(responseCode = "200", description = "Job count returned."),
+      @ApiResponse(responseCode = "500", description = "The jobs could not be counted.")
   })
   public long count(
       @Parameter(description = "The service type identifier")
@@ -956,7 +959,11 @@ public class ServiceRegistryEndpoint {
           + "total number of jobs the cluster can process concurrently."
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "Maximum number of concurrent jobs returned.")
+      @ApiResponse(
+          responseCode = "301",
+          description = "The maximum number of concurrent jobs is returned by /maxload, the Location header points "
+              + "there."
+      )
   })
   @Deprecated
   public Response getMaximumConcurrentWorkflows() {
