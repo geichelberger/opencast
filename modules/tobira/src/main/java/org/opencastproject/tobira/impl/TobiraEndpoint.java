@@ -232,7 +232,12 @@ public class TobiraEndpoint {
       description = "Harvesting API to get incremental updates about series and events."
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "Event and Series Data")
+      @ApiResponse(responseCode = "200", description = "Event and Series Data"),
+      @ApiResponse(
+          responseCode = "400",
+          description = "The since or preferredAmount parameter is missing or out of range."
+      ),
+      @ApiResponse(responseCode = "500", description = "The data could not be harvested.")
   })
   public Response harvest(
       @Parameter(
@@ -289,7 +294,11 @@ public class TobiraEndpoint {
       description = "Auth callback API to get user information. This is used by Tobira to get user information."
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "User Outcome Data")
+      @ApiResponse(responseCode = "200", description = "The outcome, either user with the user data or no-user."),
+      @ApiResponse(
+          responseCode = "400",
+          description = "The token is invalid, the callback is disabled, or the username header is missing."
+      )
   })
   public Response callback(
       @Parameter(description = "The token to authorize the request.", required = true)
@@ -380,7 +389,8 @@ public class TobiraEndpoint {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "204", description = "Stats parsed, no content is returned"),
-      @ApiResponse(responseCode = "406", description = "The request body is not a JSON object")
+      @ApiResponse(responseCode = "406", description = "The request body is not a JSON object"),
+      @ApiResponse(responseCode = "400", description = "The request body could not be read.")
   })
   public Response acceptStats(
       @Context HttpServletRequest request
