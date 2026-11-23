@@ -332,11 +332,8 @@ public class PlaylistRestService {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "201", description = "Playlist created."),
-      @ApiResponse(
-          responseCode = "500",
-          description = "The playlist could not be created, for example because the user is not allowed "
-              + "to create playlists."
-      )
+      @ApiResponse(responseCode = "401", description = "Not authorized to perform this action"),
+      @ApiResponse(responseCode = "500", description = "The playlist could not be created.")
   })
   public Response createAsJson(
       @Parameter(description = "Playlist in JSON format", schema = @Schema(example = SAMPLE_PLAYLIST_JSON))
@@ -349,6 +346,8 @@ public class PlaylistRestService {
       // Persist
       playlist = service.update(playlist);
       return Response.status(Response.Status.CREATED).entity(new JaxbPlaylist(playlist)).build();
+    } catch (UnauthorizedException e) {
+      throw e;
     } catch (Exception e) {
       return Response.serverError().build();
     }
@@ -363,11 +362,8 @@ public class PlaylistRestService {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "Playlist created."),
-      @ApiResponse(
-          responseCode = "500",
-          description = "The playlist could not be created, for example because the user is not allowed "
-              + "to create playlists."
-      )
+      @ApiResponse(responseCode = "401", description = "Not authorized to perform this action"),
+      @ApiResponse(responseCode = "500", description = "The playlist could not be created.")
   })
   public Response createAsXml(
       @Parameter(description = "Playlist in XML format", schema = @Schema(example = SAMPLE_PLAYLIST_XML))
@@ -380,6 +376,8 @@ public class PlaylistRestService {
       // Persist
       playlist = service.update(playlist);
       return Response.ok().entity(new JaxbPlaylist(playlist)).build();
+    } catch (UnauthorizedException e) {
+      throw e;
     } catch (Exception e) {
       return Response.serverError().build();
     }
@@ -394,11 +392,8 @@ public class PlaylistRestService {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "Playlist updated."),
-      @ApiResponse(
-          responseCode = "500",
-          description = "The playlist could not be updated, for example because it does not exist or the user "
-              + "is not allowed to update it."
-      )
+      @ApiResponse(responseCode = "401", description = "Not authorized to perform this action"),
+      @ApiResponse(responseCode = "500", description = "The playlist could not be updated.")
   })
   public Response updateAsJson(
       @Parameter(description = "Playlist identifier", required = true)
@@ -409,6 +404,8 @@ public class PlaylistRestService {
     try {
       Playlist playlist = service.updateWithJson(id, playlistText);
       return Response.ok().entity(new JaxbPlaylist(playlist)).build();
+    } catch (UnauthorizedException e) {
+      throw e;
     } catch (Exception e) {
       return Response.serverError().build();
     }
@@ -423,11 +420,8 @@ public class PlaylistRestService {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "Playlist updated."),
-      @ApiResponse(
-          responseCode = "500",
-          description = "The playlist could not be updated, for example because it does not exist or the user "
-              + "is not allowed to update it."
-      )
+      @ApiResponse(responseCode = "401", description = "Not authorized to perform this action"),
+      @ApiResponse(responseCode = "500", description = "The playlist could not be updated.")
   })
   public Response updateAsXml(
       @Parameter(description = "Playlist identifier", required = true)
@@ -445,6 +439,8 @@ public class PlaylistRestService {
 
       Playlist playlist = service.updateWithJson(id, json);
       return Response.ok().entity(new JaxbPlaylist(playlist)).build();
+    } catch (UnauthorizedException e) {
+      throw e;
     } catch (Exception e) {
       return Response.serverError().build();
     }
@@ -459,11 +455,9 @@ public class PlaylistRestService {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "Playlist removed."),
-      @ApiResponse(
-          responseCode = "500",
-          description = "The playlist could not be removed, for example because it does not exist or the user "
-              + "is not allowed to remove it."
-      )
+      @ApiResponse(responseCode = "404", description = "No playlist with that identifier exists."),
+      @ApiResponse(responseCode = "401", description = "Not authorized to perform this action"),
+      @ApiResponse(responseCode = "500", description = "The playlist could not be removed.")
   })
   public Response remove(
       @Parameter(description = "Playlist identifier", required = true)
@@ -473,6 +467,8 @@ public class PlaylistRestService {
       // Persist
       Playlist playlist = service.remove(id);
       return Response.ok().entity(new JaxbPlaylist(playlist)).build();
+    } catch (NotFoundException | UnauthorizedException e) {
+      throw e;
     } catch (Exception e) {
       return Response.serverError().build();
     }
@@ -487,11 +483,9 @@ public class PlaylistRestService {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "Playlist updated."),
-      @ApiResponse(
-          responseCode = "500",
-          description = "The playlist could not be changed, for example because it does not exist or the user "
-              + "is not allowed to change it."
-      )
+      @ApiResponse(responseCode = "404", description = "No playlist with that identifier exists."),
+      @ApiResponse(responseCode = "401", description = "Not authorized to perform this action"),
+      @ApiResponse(responseCode = "500", description = "The playlist could not be changed.")
   })
   public Response addEntry(
       @Parameter(description = "Playlist identifier", required = true)
@@ -506,6 +500,8 @@ public class PlaylistRestService {
     try {
       Playlist playlist = service.addEntry(playlistId, contentId, type);
       return Response.ok().entity(new JaxbPlaylist(playlist)).build();
+    } catch (NotFoundException | UnauthorizedException e) {
+      throw e;
     } catch (Exception e) {
       return Response.serverError().build();
     }
@@ -520,11 +516,9 @@ public class PlaylistRestService {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "Playlist updated."),
-      @ApiResponse(
-          responseCode = "500",
-          description = "The playlist could not be changed, for example because the playlist or the entry does not "
-              + "exist or the user is not allowed to change it."
-      )
+      @ApiResponse(responseCode = "404", description = "No playlist or entry with that identifier exists."),
+      @ApiResponse(responseCode = "401", description = "Not authorized to perform this action"),
+      @ApiResponse(responseCode = "500", description = "The playlist could not be changed.")
   })
   public Response addEntry(
       @Parameter(description = "Identifier of the playlist to delete from", required = true)
@@ -535,6 +529,8 @@ public class PlaylistRestService {
     try {
       Playlist playlist = service.removeEntry(playlistId, entryId);
       return Response.ok().entity(new JaxbPlaylist(playlist)).build();
+    } catch (NotFoundException | UnauthorizedException e) {
+      throw e;
     } catch (Exception e) {
       return Response.serverError().build();
     }
