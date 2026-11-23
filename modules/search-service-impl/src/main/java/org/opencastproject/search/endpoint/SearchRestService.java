@@ -130,7 +130,11 @@ public class SearchRestService extends AbstractJobProducerEndpoint {
       description = "Search for series matching the query parameters."
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "The request was processed successfully.")
+      @ApiResponse(responseCode = "200", description = "The request was processed successfully."),
+      @ApiResponse(
+          responseCode = "400",
+          description = "The limit or the offset is negative, or the sort parameter is invalid."
+      )
   })
   public Response getSeries(
       @Parameter(
@@ -148,7 +152,7 @@ public class SearchRestService extends AbstractJobProducerEndpoint {
       @QueryParam("sort") String sort,
       @Parameter(description = "The maximum number of items to return per page.", example = "20")
       @QueryParam("limit") String limit,
-      @Parameter(description = "The page number.", example = "0")
+      @Parameter(description = "The index of the first item to return.", example = "0")
       @QueryParam("offset") String offset
   ) throws SearchException {
 
@@ -244,7 +248,12 @@ public class SearchRestService extends AbstractJobProducerEndpoint {
       description = "Search for episodes matching the query parameters."
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "The request was processed successfully.")
+      @ApiResponse(responseCode = "200", description = "The request was processed successfully."),
+      @ApiResponse(
+          responseCode = "400",
+          description = "Both sid and sname are given, the limit or the offset is negative, a non-admin requests "
+              + "more than 250 items, or the sort parameter is invalid."
+      )
   })
   public Response getEpisodes(
       @Parameter(description = "The ID of the single episode to be returned, if it exists.")
@@ -269,7 +278,7 @@ public class SearchRestService extends AbstractJobProducerEndpoint {
           example = "20"
       )
       @QueryParam("limit") String limit,
-      @Parameter(description = "The page number.", example = "0")
+      @Parameter(description = "The index of the first item to return.", example = "0")
       @QueryParam("offset") String offset,
       @Parameter(description = "If results are to be signed", example = "true")
       @QueryParam("sign") String sign,
@@ -431,7 +440,8 @@ public class SearchRestService extends AbstractJobProducerEndpoint {
   @ApiResponses({
       @ApiResponse(responseCode = "204", description = "Update successfully triggered."),
       @ApiResponse(responseCode = "403", description = "Not allowed to trigger update."),
-      @ApiResponse(responseCode = "404", description = "No such event found.")
+      @ApiResponse(responseCode = "404", description = "No such event found."),
+      @ApiResponse(responseCode = "500", description = "The index update failed.")
   })
   public Response indexUpdate(
       @Parameter(description = "The event ID to trigger an index update for.", required = true)
