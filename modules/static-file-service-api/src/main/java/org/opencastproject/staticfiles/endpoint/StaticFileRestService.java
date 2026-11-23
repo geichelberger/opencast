@@ -221,7 +221,8 @@ public class StaticFileRestService {
       @ApiResponse(
           responseCode = "400",
           description = "No filename or file to upload found, or the upload size is too big"
-      )
+      ),
+      @ApiResponse(responseCode = "500", description = "The file could not be stored.")
   })
   public Response postStaticFile(
       @Context HttpServletRequest request
@@ -300,7 +301,8 @@ public class StaticFileRestService {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "The file has been persisted"),
-      @ApiResponse(responseCode = "404", description = "No file by the given UUID found")
+      @ApiResponse(responseCode = "404", description = "No file by the given UUID found"),
+      @ApiResponse(responseCode = "500", description = "An error occurred while accessing the file.")
   })
   public Response persistFile(
       @Parameter(description = "File UUID", required = true)
@@ -324,7 +326,8 @@ public class StaticFileRestService {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "Returns a static file resource's URL"),
-      @ApiResponse(responseCode = "404", description = "No file by the given uuid found")
+      @ApiResponse(responseCode = "404", description = "No file by the given uuid found"),
+      @ApiResponse(responseCode = "500", description = "An error occurred while accessing the file.")
   })
   public Response getStaticFileUrl(
       @Parameter(description = "Static File Universal Unique Id", required = true)
@@ -348,7 +351,8 @@ public class StaticFileRestService {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "204", description = "File deleted"),
-      @ApiResponse(responseCode = "404", description = "No file by the given uuid found")
+      @ApiResponse(responseCode = "404", description = "No file by the given uuid found"),
+      @ApiResponse(responseCode = "500", description = "An error occurred while accessing the file.")
   })
   public Response deleteStaticFile(
       @Parameter(description = "Static File Universal Unique Id", required = true)
