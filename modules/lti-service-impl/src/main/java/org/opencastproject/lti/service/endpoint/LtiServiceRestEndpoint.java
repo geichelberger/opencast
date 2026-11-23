@@ -123,13 +123,16 @@ public class LtiServiceRestEndpoint {
   @Consumes(MediaType.MULTIPART_FORM_DATA)
   @Operation(
       summary = "Create an event",
-      description = "Creates an event by sending metadata in a multipart request."
+      description = "Creates a new event, or updates an existing one if an event id is given, by sending "
+          + "metadata in a multipart request. A video file is required to create an event. The parts are read in "
+          + "order: all parts except the video file have to come before it, and every part with a name that is "
+          + "not listed is taken as the video file."
   )
   @RequestBody(
       content = {
           @Content(
               mediaType = MediaType.MULTIPART_FORM_DATA,
-              schema = @Schema(type = "object", requiredProperties = {"metadata", "presenter"}),
+              schema = @Schema(type = "object"),
               schemaProperties = {
                   @SchemaProperty(name = "metadata", schema = @Schema(type = "string", description = "Event metadata")),
                   @SchemaProperty(
@@ -174,8 +177,10 @@ public class LtiServiceRestEndpoint {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "A new event is created or the event is updated"),
+      @ApiResponse(responseCode = "400", description = "No video file and no event id to update were given"),
       @ApiResponse(responseCode = "401", description = "No authorization to create or update events"),
-      @ApiResponse(responseCode = "404", description = "The event to be updated wasn't found")
+      @ApiResponse(responseCode = "404", description = "The event to be updated wasn't found"),
+      @ApiResponse(responseCode = "500", description = "The request could not be read")
   })
   public Response createNewEvent(
       @HeaderParam("Accept") String acceptHeader,
@@ -329,6 +334,7 @@ public class LtiServiceRestEndpoint {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "204", description = "The event has been deleted."),
+      @ApiResponse(responseCode = "401", description = "Not allowed to delete the event."),
       @ApiResponse(responseCode = "404", description = "The specified event does not exist.")
   })
   public Response deleteEvent(
