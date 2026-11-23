@@ -116,7 +116,11 @@ public class StatisticsRestService {
       description = "Writes a duration"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "204", description = "Writing worked")
+      @ApiResponse(
+          responseCode = "200",
+          description = "Writing worked. The response body is the text NO_CONTENT instead of an empty response."
+      ),
+      @ApiResponse(responseCode = "500", description = "The duration could not be written.")
   })
   public Response writeDuration(
       @Parameter(description = "Organization ID of the data point")
@@ -153,7 +157,8 @@ public class StatisticsRestService {
       description = "Returns active providers"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "The active providers.")
+      @ApiResponse(responseCode = "200", description = "The active providers."),
+      @ApiResponse(responseCode = "500", description = "The providers could not be retrieved.")
   })
   public Response getProviders() {
     try {
@@ -172,7 +177,8 @@ public class StatisticsRestService {
       description = "Returns the time series data for the given providerId"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "The time series data.")
+      @ApiResponse(responseCode = "200", description = "The time series data."),
+      @ApiResponse(responseCode = "500", description = "The time series data could not be retrieved.")
   })
   public Response getTimeSeriesData(
       @Parameter(description = "The provider identifier", required = true)
