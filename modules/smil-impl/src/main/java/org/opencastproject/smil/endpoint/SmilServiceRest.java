@@ -90,7 +90,7 @@ public class SmilServiceRest {
       description = "Create new SMIL. Add some MediaPackage metadata."
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "Create new SMIL successfull"),
+      @ApiResponse(responseCode = "200", description = "Create new SMIL successful"),
       @ApiResponse(responseCode = "400", description = "Given mediaPackage is not valid")
   })
   public Response createNewSmil(
@@ -121,7 +121,7 @@ public class SmilServiceRest {
       description = "Add a parallel element to SMIL (into SMIL body or an element with given parentId)."
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "Add par to SMIL successfull."),
+      @ApiResponse(responseCode = "200", description = "Add par to SMIL successful."),
       @ApiResponse(
           responseCode = "400",
           description = "SMIL document not valid or it doesn't contain an element with given parentId"
@@ -130,7 +130,7 @@ public class SmilServiceRest {
   public Response addParallel(
       @Parameter(description = "SMIL document where to add a par-element.", required = true)
       @FormParam("smil") String smil,
-      @Parameter(description = "An element Id, were to add new parallel.")
+      @Parameter(description = "An element Id, where to add new parallel.")
       @FormParam("parentId") String parentId
   ) {
     SmilResponse smilResponse = null;
@@ -163,7 +163,7 @@ public class SmilServiceRest {
       description = "Add a sequence element to SMIL (into SMIL body or an element with given parentId)."
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "Add seq to SMIL successfull"),
+      @ApiResponse(responseCode = "200", description = "Add seq to SMIL successful"),
       @ApiResponse(
           responseCode = "400",
           description = "SMIL document not valid or it doesn't contain an element with given parentId"
@@ -172,7 +172,7 @@ public class SmilServiceRest {
   public Response addSequence(
       @Parameter(description = "SMIL document where to add a seq-element.", required = true)
       @FormParam("smil") String smil,
-      @Parameter(description = "An element Id, were to add new sequence.")
+      @Parameter(description = "An element Id, where to add new sequence.")
       @FormParam("parentId") String parentId
   ) {
     SmilResponse smilResponse = null;
@@ -207,7 +207,7 @@ public class SmilServiceRest {
           + "ParentId specifies where to put the new media element."
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "Add media element to SMIL successfull."),
+      @ApiResponse(responseCode = "200", description = "Add media element to SMIL successful."),
       @ApiResponse(
           responseCode = "400",
           description = "SMIL document or track not valid, the SMIL document doesn't contain an element with given "
@@ -217,7 +217,7 @@ public class SmilServiceRest {
   public Response addClip(
       @Parameter(description = "SMIL document where to add new media element.", required = true)
       @FormParam("smil") String smil,
-      @Parameter(description = "An element Id, were to add new media.")
+      @Parameter(description = "An element Id, where to add new media.")
       @FormParam("parentId") String parentId,
       @Parameter(
           description = "Track (MediaPackageElement) to add as media element. "
@@ -261,7 +261,7 @@ public class SmilServiceRest {
           + "ParentId specifies where to put the new media."
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "Add media elements to SMIL successfull."),
+      @ApiResponse(responseCode = "200", description = "Add media elements to SMIL successful."),
       @ApiResponse(
           responseCode = "400",
           description = "SMIL document or tracks not valid, the SMIL document doesn't contain an element with given "
@@ -271,7 +271,7 @@ public class SmilServiceRest {
   public Response addClips(
       @Parameter(description = "SMIL document where to add new media elements.", required = true)
       @FormParam("smil") String smil,
-      @Parameter(description = "An element Id, were to add new media. ")
+      @Parameter(description = "An element Id, where to add new media. ")
       @FormParam("parentId") String parentId,
       @Parameter(
           description = "Tracks (MediaPackageElements) to add as media elements."
@@ -326,7 +326,7 @@ public class SmilServiceRest {
       description = "Add a meta element to SMIL head."
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "Add par to SMIL successfull."),
+      @ApiResponse(responseCode = "200", description = "The meta element has been added to the SMIL."),
       @ApiResponse(responseCode = "400", description = "SMIL document not valid.")
   })
   public Response addMeta(
@@ -355,7 +355,7 @@ public class SmilServiceRest {
       description = "Remove an element with given Id from SMIL."
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "Removing element from SMIL successfull."),
+      @ApiResponse(responseCode = "200", description = "Removing element from SMIL successful."),
       @ApiResponse(responseCode = "400", description = "SMIL document not valid.")
   })
   public Response removeSmilElement(
