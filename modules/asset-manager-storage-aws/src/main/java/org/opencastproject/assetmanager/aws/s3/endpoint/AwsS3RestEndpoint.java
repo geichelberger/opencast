@@ -97,7 +97,9 @@ public class AwsS3RestEndpoint {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "mediapackage found in S3"),
-      @ApiResponse(responseCode = "404", description = "mediapackage not found or has no assets in S3")
+      @ApiResponse(responseCode = "401", description = "The user is not authorized to access the media package"),
+      @ApiResponse(responseCode = "404", description = "mediapackage not found or has no assets in S3"),
+      @ApiResponse(responseCode = "500", description = "An error occurred while accessing the assets")
   })
   public Response getStorageClass(
       @Parameter(description = "The media package indentifier.", required = true)
@@ -145,7 +147,9 @@ public class AwsS3RestEndpoint {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "mediapackage found in S3"),
-      @ApiResponse(responseCode = "404", description = "mediapackage not found or has no assets in S3")
+      @ApiResponse(responseCode = "401", description = "The user is not authorized to access the media package"),
+      @ApiResponse(responseCode = "404", description = "mediapackage not found or has no assets in S3"),
+      @ApiResponse(responseCode = "500", description = "An error occurred while accessing the assets")
   })
   public Response modifyStorageClass(
       @Parameter(description = "The media package indentifier.", required = true)
@@ -200,7 +204,9 @@ public class AwsS3RestEndpoint {
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "mediapackage found in S3 and assets in Glacier"),
       @ApiResponse(responseCode = "204", description = "mediapackage found in S3 but no assets in Glacier"),
-      @ApiResponse(responseCode = "404", description = "mediapackage not found or has no assets in S3")
+      @ApiResponse(responseCode = "401", description = "The user is not authorized to access the media package"),
+      @ApiResponse(responseCode = "404", description = "mediapackage not found or has no assets in S3"),
+      @ApiResponse(responseCode = "500", description = "An error occurred while accessing the assets")
   })
   public Response getAssetRestoreState(
       @Parameter(description = "The media package indentifier.", required = true)
@@ -251,8 +257,13 @@ public class AwsS3RestEndpoint {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "204", description = "restore of assets started"),
-      @ApiResponse(responseCode = "400", description = "invalid restore period, must be greater than zero"),
-      @ApiResponse(responseCode = "404", description = "mediapackage not found or has no assets in S3")
+      @ApiResponse(responseCode = "401", description = "The user is not authorized to access the media package"),
+      @ApiResponse(responseCode = "404", description = "mediapackage not found or has no assets in S3"),
+      @ApiResponse(
+          responseCode = "500",
+          description = "An error occurred while restoring the assets. This includes an invalid restore period (it "
+              + "must be greater than zero), which is not answered with a bad request"
+      )
   })
   public Response restoreAssets(
       @Parameter(description = "The media package indentifier.", required = true)
