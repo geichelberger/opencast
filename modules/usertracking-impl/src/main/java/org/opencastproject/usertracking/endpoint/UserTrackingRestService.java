@@ -153,7 +153,8 @@ public class UserTrackingRestService {
       description = "Get user actions by type and day"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "An XML representation of the user actions")
+      @ApiResponse(responseCode = "200", description = "An XML representation of the user actions"),
+      @ApiResponse(responseCode = "400", description = "The limit or the offset is negative.")
   })
   public UserActionListImpl getUserActionsAsXml(
       @Parameter(description = "The episode identifier. Together with the type, restricts the actions to this episode")
@@ -164,7 +165,7 @@ public class UserTrackingRestService {
       @QueryParam("day") String day,
       @Parameter(description = "The maximum number of items to return per page")
       @QueryParam("limit") int limit,
-      @Parameter(description = "The page number")
+      @Parameter(description = "The index of the first item to return.")
       @QueryParam("offset") int offset
   ) {
 
@@ -205,7 +206,8 @@ public class UserTrackingRestService {
       description = "Get user actions by type and day"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "A JSON representation of the user actions")
+      @ApiResponse(responseCode = "200", description = "A JSON representation of the user actions"),
+      @ApiResponse(responseCode = "400", description = "The limit or the offset is negative.")
   })
   public UserActionListImpl getUserActionsAsJson(
       @Parameter(description = "The episode identifier. Together with the type, restricts the actions to this episode")
@@ -216,7 +218,7 @@ public class UserTrackingRestService {
       @QueryParam("day") String day,
       @Parameter(description = "The maximum number of items to return per page")
       @QueryParam("limit") int limit,
-      @Parameter(description = "The page number")
+      @Parameter(description = "The index of the first item to return.")
       @QueryParam("offset") int offset
   ) {
     return getUserActionsAsXml(id, type, day, limit, offset); // same logic, different @Produces annotation
@@ -275,14 +277,18 @@ public class UserTrackingRestService {
       description = "Get a report for a time range"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "An XML representation of the report")
+      @ApiResponse(responseCode = "200", description = "An XML representation of the report"),
+      @ApiResponse(
+          responseCode = "400",
+          description = "The limit or the offset is negative, or the from or to date cannot be parsed."
+      )
   })
   public ReportImpl reportAsXml(
       @Parameter(description = "The beginning of the time range")
       @QueryParam("from") String from,
       @Parameter(description = "The end of the time range")
       @QueryParam("to") String to,
-      @Parameter(description = "The page number")
+      @Parameter(description = "The index of the first item to return.")
       @QueryParam("offset") int offset,
       @Parameter(description = "The maximum number of items to return per page")
       @QueryParam("limit") int limit
@@ -319,14 +325,18 @@ public class UserTrackingRestService {
       description = "Get a report for a time range"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "A JSON representation of the report")
+      @ApiResponse(responseCode = "200", description = "A JSON representation of the report"),
+      @ApiResponse(
+          responseCode = "400",
+          description = "The limit or the offset is negative, or the from or to date cannot be parsed."
+      )
   })
   public ReportImpl reportAsJson(
       @Parameter(description = "The beginning of the time range")
       @QueryParam("from") String from,
       @Parameter(description = "The end of the time range")
       @QueryParam("to") String to,
-      @Parameter(description = "The page number")
+      @Parameter(description = "The index of the first item to return.")
       @QueryParam("offset") int offset,
       @Parameter(description = "The maximum number of items to return per page")
       @QueryParam("limit") int limit
@@ -487,7 +497,8 @@ public class UserTrackingRestService {
       description = "Gets the 'footprint' action for an episode"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "An XML representation of the footprints")
+      @ApiResponse(responseCode = "200", description = "An XML representation of the footprints"),
+      @ApiResponse(responseCode = "400", description = "The media package id is missing.")
   })
   public FootprintsListImpl getFootprintAsXml(
       @Parameter(description = "The episode identifier", required = true)
@@ -515,7 +526,8 @@ public class UserTrackingRestService {
       description = "Gets the 'footprint' action for an episode"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "A JSON representation of the footprints")
+      @ApiResponse(responseCode = "200", description = "A JSON representation of the footprints"),
+      @ApiResponse(responseCode = "400", description = "The media package id is missing.")
   })
   public FootprintsListImpl getFootprintAsJson(
       @Parameter(description = "The episode identifier", required = true)
