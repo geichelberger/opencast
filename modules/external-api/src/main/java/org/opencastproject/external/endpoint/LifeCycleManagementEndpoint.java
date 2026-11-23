@@ -164,7 +164,8 @@ public class LifeCycleManagementEndpoint {
       @ApiResponse(responseCode = "200", description = "Returns the lifecycle policy."),
       @ApiResponse(responseCode = "404", description = "The specified lifecycle policy instance does not exist."),
       @ApiResponse(responseCode = "403", description = "The user doesn't have the rights to make this request."),
-      @ApiResponse(responseCode = "400", description = "The request is invalid or inconsistent.")
+      @ApiResponse(responseCode = "400", description = "The request is invalid or inconsistent."),
+      @ApiResponse(responseCode = "500", description = "The policy could not be retrieved.")
   })
   public Response getPolicy(
       @HeaderParam("Accept") String acceptHeader,
@@ -375,7 +376,8 @@ public class LifeCycleManagementEndpoint {
   @ApiResponses({
       @ApiResponse(responseCode = "201", description = "Policy created."),
       @ApiResponse(responseCode = "403", description = "The user doesn't have the rights to make this request."),
-      @ApiResponse(responseCode = "400", description = "The request is invalid or inconsistent.")
+      @ApiResponse(responseCode = "400", description = "The request is invalid or inconsistent."),
+      @ApiResponse(responseCode = "500", description = "The policy could not be created.")
   })
   public Response createAsJson(
       @HeaderParam("Accept") String acceptHeader,
@@ -535,7 +537,8 @@ public class LifeCycleManagementEndpoint {
           responseCode = "400",
           description = "The request is invalid or inconsistent. Will also occur if the policy was "
               + "created from configuration."
-      )
+      ),
+      @ApiResponse(responseCode = "500", description = "The policy could not be updated.")
   })
   public Response updateAsJson(
       @HeaderParam("Accept") String acceptHeader,
@@ -683,7 +686,9 @@ public class LifeCycleManagementEndpoint {
       @ApiResponse(
           responseCode = "401",
           description = "Not authorized to perform this action"
-      )
+      ),
+      @ApiResponse(responseCode = "403", description = "The user is not allowed to delete the policy."),
+      @ApiResponse(responseCode = "500", description = "The policy could not be deleted.")
   })
   public Response remove(
       @HeaderParam("Accept") String acceptHeader,

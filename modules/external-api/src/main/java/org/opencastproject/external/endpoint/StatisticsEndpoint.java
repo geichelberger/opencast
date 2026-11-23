@@ -151,7 +151,8 @@ public class StatisticsEndpoint {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "Returns the requested statistics providers as JSON"),
-      @ApiResponse(responseCode = "401", description = "If the current user is not authorized to perform this action")
+      @ApiResponse(responseCode = "401", description = "If the current user is not authorized to perform this action"),
+      @ApiResponse(responseCode = "400", description = "The value of a filter is invalid or the filter is unknown.")
   })
   public Response getProviders(
       @HeaderParam("Accept") String acceptHeader,
@@ -206,7 +207,8 @@ public class StatisticsEndpoint {
       description = "Returns the statistics provider with the specified id"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "Returns the requested statistics provider as JSON")
+      @ApiResponse(responseCode = "200", description = "Returns the requested statistics provider as JSON"),
+      @ApiResponse(responseCode = "400", description = "The provider id is invalid.")
   })
   public Response getProvider(
       @HeaderParam("Accept") String acceptHeader,
@@ -240,7 +242,8 @@ public class StatisticsEndpoint {
           responseCode = "200",
           description = "Returns the statistical data as requested by the query as JSON array"
       ),
-      @ApiResponse(responseCode = "401", description = "If the current user is not authorized to perform this action")
+      @ApiResponse(responseCode = "401", description = "If the current user is not authorized to perform this action"),
+      @ApiResponse(responseCode = "400", description = "The data parameter cannot be parsed.")
   })
   public Response getStatistics(
       @HeaderParam("Accept") String acceptHeader,
@@ -275,7 +278,8 @@ public class StatisticsEndpoint {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "Returns the csv data as requested by the query as plain text"),
-      @ApiResponse(responseCode = "401", description = "If the current user is not authorized to perform this action")
+      @ApiResponse(responseCode = "401", description = "If the current user is not authorized to perform this action"),
+      @ApiResponse(responseCode = "400", description = "The data parameter cannot be parsed.")
   })
   public Response getExportCSV(
       @HeaderParam("Accept") String acceptHeader,

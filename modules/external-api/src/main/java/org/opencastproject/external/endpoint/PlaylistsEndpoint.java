@@ -294,7 +294,8 @@ public class PlaylistsEndpoint {
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "Playlist removed."),
       @ApiResponse(responseCode = "404", description = "No playlist with that identifier exists."),
-      @ApiResponse(responseCode = "401", description = "Not authorized to perform this action")
+      @ApiResponse(responseCode = "401", description = "Not authorized to perform this action"),
+      @ApiResponse(responseCode = "403", description = "The user is not allowed to delete the playlist.")
   })
   public Response remove(
       @HeaderParam("Accept") String acceptHeader,

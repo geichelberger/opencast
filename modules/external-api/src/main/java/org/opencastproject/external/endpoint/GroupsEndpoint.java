@@ -332,7 +332,9 @@ public class GroupsEndpoint {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "204", description = "The group has been deleted."),
-      @ApiResponse(responseCode = "404", description = "The specified group does not exist.")
+      @ApiResponse(responseCode = "404", description = "The specified group does not exist."),
+      @ApiResponse(responseCode = "403", description = "The user is not allowed to delete the group."),
+      @ApiResponse(responseCode = "500", description = "The group could not be deleted.")
   })
   public Response deleteGroup(
       @HeaderParam("Accept") String acceptHeader,
@@ -360,7 +362,8 @@ public class GroupsEndpoint {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "201", description = "The group has been updated."),
-      @ApiResponse(responseCode = "400", description = "The specified group does not exist.")
+      @ApiResponse(responseCode = "400", description = "The specified group does not exist."),
+      @ApiResponse(responseCode = "403", description = "The user is not allowed to update the group.")
   })
   public Response updateGroup(
       @HeaderParam("Accept") String acceptHeader,
@@ -394,7 +397,9 @@ public class GroupsEndpoint {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "201", description = "A new group is created."),
-      @ApiResponse(responseCode = "400", description = "The request is invalid or inconsistent.")
+      @ApiResponse(responseCode = "400", description = "The request is invalid or inconsistent."),
+      @ApiResponse(responseCode = "403", description = "The user is not allowed to create the group."),
+      @ApiResponse(responseCode = "409", description = "A group with this name already exists.")
   })
   public Response createGroup(
       @HeaderParam("Accept") String acceptHeader,
@@ -429,7 +434,9 @@ public class GroupsEndpoint {
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "The member was already member of the group."),
       @ApiResponse(responseCode = "204", description = "The member has been added."),
-      @ApiResponse(responseCode = "404", description = "The specified group does not exist.")
+      @ApiResponse(responseCode = "404", description = "The specified group does not exist."),
+      @ApiResponse(responseCode = "400", description = "The member cannot be added to the group."),
+      @ApiResponse(responseCode = "403", description = "The user is not allowed to change the group.")
   })
   public Response addGroupMember(
       @HeaderParam("Accept") String acceptHeader,
@@ -465,7 +472,9 @@ public class GroupsEndpoint {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "204", description = "The member has been removed."),
-      @ApiResponse(responseCode = "404", description = "The specified group or member does not exist.")
+      @ApiResponse(responseCode = "404", description = "The specified group or member does not exist."),
+      @ApiResponse(responseCode = "400", description = "The member cannot be removed from the group."),
+      @ApiResponse(responseCode = "403", description = "The user is not allowed to change the group.")
   })
   public Response removeGroupMember(
       @HeaderParam("Accept") String acceptHeader,

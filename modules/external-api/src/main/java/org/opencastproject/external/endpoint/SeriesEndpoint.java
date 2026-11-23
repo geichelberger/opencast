@@ -205,7 +205,9 @@ public class SeriesEndpoint {
       description = "Returns a list of series."
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "A (potentially empty) list of series is returned.")
+      @ApiResponse(responseCode = "200", description = "A (potentially empty) list of series is returned."),
+      @ApiResponse(responseCode = "400", description = "A filter, a sort criterion or a date range is invalid."),
+      @ApiResponse(responseCode = "500", description = "The series could not be retrieved.")
   })
   public Response getSeriesList(
       @HeaderParam("Accept") String acceptHeader,
@@ -881,7 +883,11 @@ public class SeriesEndpoint {
           description = "The main metadata catalog dublincore/series cannot be deleted as it has "
               + "mandatory fields."
       ),
-      @ApiResponse(responseCode = "404", description = "The specified series does not exist.")
+      @ApiResponse(responseCode = "404", description = "The specified series does not exist."),
+      @ApiResponse(
+          responseCode = "400",
+          description = "The type of the catalog is missing or cannot be parsed as a flavor."
+      )
   })
   public Response deleteSeriesMetadataByType(
       @HeaderParam("Accept") String acceptHeader,
@@ -998,7 +1004,8 @@ public class SeriesEndpoint {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "204", description = "The series has been deleted."),
-      @ApiResponse(responseCode = "404", description = "The specified series does not exist.")
+      @ApiResponse(responseCode = "404", description = "The specified series does not exist."),
+      @ApiResponse(responseCode = "500", description = "The series could not be deleted.")
   })
   public Response deleteSeries(
       @HeaderParam("Accept") String acceptHeader,
@@ -1025,7 +1032,8 @@ public class SeriesEndpoint {
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "The series' metadata have been updated."),
       @ApiResponse(responseCode = "400", description = "The request is invalid or inconsistent."),
-      @ApiResponse(responseCode = "404", description = "The specified series does not exist.")
+      @ApiResponse(responseCode = "404", description = "The specified series does not exist."),
+      @ApiResponse(responseCode = "500", description = "The metadata could not be updated.")
   })
   public Response updateSeriesMetadata(
       @HeaderParam("Accept") String acceptHeader,
@@ -1061,7 +1069,8 @@ public class SeriesEndpoint {
           description = "A new series is created and its identifier is returned in the Location header."
       ),
       @ApiResponse(responseCode = "400", description = "The request is invalid or inconsistent.."),
-      @ApiResponse(responseCode = "401", description = "The user doesn't have the rights to create the series.")
+      @ApiResponse(responseCode = "401", description = "The user doesn't have the rights to create the series."),
+      @ApiResponse(responseCode = "500", description = "The series could not be created.")
   })
   public Response createNewSeries(
       @HeaderParam("Accept") String acceptHeader,
@@ -1215,7 +1224,8 @@ public class SeriesEndpoint {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "The access control list for the specified series is updated."),
-      @ApiResponse(responseCode = "404", description = "The specified series does not exist.")
+      @ApiResponse(responseCode = "404", description = "The specified series does not exist."),
+      @ApiResponse(responseCode = "400", description = "The acl parameter is missing or cannot be parsed.")
   })
   public Response updateSeriesAcl(
       @HeaderParam("Accept") String acceptHeader,
@@ -1270,7 +1280,8 @@ public class SeriesEndpoint {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "Successfully updated the series' properties."),
-      @ApiResponse(responseCode = "404", description = "The specified series does not exist.")
+      @ApiResponse(responseCode = "404", description = "The specified series does not exist."),
+      @ApiResponse(responseCode = "400", description = "The properties parameter is missing or cannot be parsed.")
   })
   public Response updateSeriesProperties(
       @HeaderParam("Accept") String acceptHeader,
@@ -1307,7 +1318,8 @@ public class SeriesEndpoint {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "The access control list."),
-      @ApiResponse(responseCode = "401", description = "If the current user is not authorized to perform this action")
+      @ApiResponse(responseCode = "401", description = "If the current user is not authorized to perform this action"),
+      @ApiResponse(responseCode = "500", description = "The series could not be retrieved.")
   })
   public Response getSeriesAsJson(
       @Parameter(description = "Free text search")

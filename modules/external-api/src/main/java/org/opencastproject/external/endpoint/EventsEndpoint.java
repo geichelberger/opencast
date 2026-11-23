@@ -548,7 +548,9 @@ public class EventsEndpoint {
   @ApiResponses({
       @ApiResponse(responseCode = "204", description = "The event has been deleted."),
       @ApiResponse(responseCode = "202", description = "The retraction of publications has started."),
-      @ApiResponse(responseCode = "404", description = "The specified event does not exist.")
+      @ApiResponse(responseCode = "401", description = "Not allowed to delete the event."),
+      @ApiResponse(responseCode = "404", description = "The specified event does not exist."),
+      @ApiResponse(responseCode = "500", description = "The event could not be deleted.")
   })
   public Response deleteEvent(
       @HeaderParam("Accept") String acceptHeader,
@@ -653,7 +655,14 @@ public class EventsEndpoint {
   @ApiResponses({
       @ApiResponse(responseCode = "204", description = "The event has been updated."),
       @ApiResponse(responseCode = "409", description = "The event could not be updated due to a scheduling conflict."),
-      @ApiResponse(responseCode = "404", description = "The specified event does not exist.")
+      @ApiResponse(responseCode = "404", description = "The specified event does not exist."),
+      @ApiResponse(
+          responseCode = "400",
+          description = "The metadata is invalid, or processing is updated for an event that is already "
+              + "uploaded."
+      ),
+      @ApiResponse(responseCode = "401", description = "The user is not authorized to update the event."),
+      @ApiResponse(responseCode = "500", description = "The metadata could not be updated.")
   })
   public Response updateEventMetadata(
       @HeaderParam("Accept") String acceptHeader,
@@ -825,7 +834,8 @@ public class EventsEndpoint {
           description = "A new event is created and its identifier is returned in the Location header."
       ),
       @ApiResponse(responseCode = "409", description = "The event could not be created due to a scheduling conflict."),
-      @ApiResponse(responseCode = "400", description = "The request is invalid or inconsistent..")
+      @ApiResponse(responseCode = "400", description = "The request is invalid or inconsistent.."),
+      @ApiResponse(responseCode = "500", description = "The event could not be created.")
   })
   public Response createNewEvent(
       @HeaderParam("Accept") String acceptHeader,
@@ -935,7 +945,8 @@ public class EventsEndpoint {
       @ApiResponse(
           responseCode = "400",
           description = "The request is invalid, for example because the comment resolution is unknown."
-      )
+      ),
+      @ApiResponse(responseCode = "500", description = "The events could not be retrieved.")
   })
   public Response getEvents(
       @HeaderParam("Accept") String acceptHeader,
@@ -1479,7 +1490,9 @@ public class EventsEndpoint {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "204", description = "The access control list for the specified event is updated."),
-      @ApiResponse(responseCode = "404", description = "The specified event does not exist.")
+      @ApiResponse(responseCode = "404", description = "The specified event does not exist."),
+      @ApiResponse(responseCode = "400", description = "The access control list cannot be parsed or is invalid."),
+      @ApiResponse(responseCode = "403", description = "The access control list cannot be applied to the event.")
   })
   public Response updateEventAcl(
       @HeaderParam("Accept") String acceptHeader,
@@ -1523,7 +1536,8 @@ public class EventsEndpoint {
           responseCode = "204",
           description = "The permission has been created in the access control list of the specified event."
       ),
-      @ApiResponse(responseCode = "404", description = "The specified event does not exist.")
+      @ApiResponse(responseCode = "404", description = "The specified event does not exist."),
+      @ApiResponse(responseCode = "403", description = "The access control entry cannot be added to the event.")
   })
   public Response addEventAce(
       @HeaderParam("Accept") String acceptHeader,
@@ -1582,7 +1596,8 @@ public class EventsEndpoint {
           responseCode = "204",
           description = "The permission has been revoked from the access control list of the specified event."
       ),
-      @ApiResponse(responseCode = "404", description = "The specified event does not exist.")
+      @ApiResponse(responseCode = "404", description = "The specified event does not exist."),
+      @ApiResponse(responseCode = "403", description = "The access control entry cannot be removed from the event.")
   })
   public Response deleteEventAce(
       @HeaderParam("Accept") String acceptHeader,
@@ -2074,7 +2089,13 @@ public class EventsEndpoint {
           description = "The main metadata catalog dublincore/episode cannot be deleted as it has "
               + "mandatory fields."
       ),
-      @ApiResponse(responseCode = "404", description = "The specified event does not exist.")
+      @ApiResponse(responseCode = "404", description = "The specified event does not exist."),
+      @ApiResponse(
+          responseCode = "400",
+          description = "The metadata catalog type is unknown or the catalog cannot be removed."
+      ),
+      @ApiResponse(responseCode = "401", description = "The user is not authorized to update the event."),
+      @ApiResponse(responseCode = "500", description = "The metadata catalog could not be removed.")
   })
   public Response deleteEventMetadataByType(
       @HeaderParam("Accept") String acceptHeader,
@@ -2313,7 +2334,8 @@ public class EventsEndpoint {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "The track details are returned."),
-      @ApiResponse(responseCode = "404", description = "The specified event or publication does not exist.")
+      @ApiResponse(responseCode = "404", description = "The specified event or publication does not exist."),
+      @ApiResponse(responseCode = "500", description = "The publication could not be retrieved.")
   })
 
   public Response getEventPublication(
@@ -2499,7 +2521,8 @@ public class EventsEndpoint {
           description = "The scheduling information for the specified event is returned."
       ),
       @ApiResponse(responseCode = "204", description = "The specified event has no scheduling information."),
-      @ApiResponse(responseCode = "404", description = "The specified event does not exist.")
+      @ApiResponse(responseCode = "404", description = "The specified event does not exist."),
+      @ApiResponse(responseCode = "500", description = "The scheduling information could not be retrieved.")
   })
   public Response getEventScheduling(
       @HeaderParam("Accept") String acceptHeader,
@@ -2544,7 +2567,8 @@ public class EventsEndpoint {
           responseCode = "409",
           description = "The scheduling information could not be updated due to a conflict."
       ),
-      @ApiResponse(responseCode = "404", description = "The specified event does not exist.")
+      @ApiResponse(responseCode = "404", description = "The specified event does not exist."),
+      @ApiResponse(responseCode = "400", description = "The scheduling information cannot be parsed.")
   })
   public Response updateEventScheduling(
       @HeaderParam("Accept") String acceptHeader,
@@ -2680,7 +2704,9 @@ public class EventsEndpoint {
   @ApiResponses({
       @ApiResponse(responseCode = "404", description = "The specified event does not exist."),
       @ApiResponse(responseCode = "200", description = "The track has been added to the event."),
-      @ApiResponse(responseCode = "400", description = "The request is invalid or inconsistent.")
+      @ApiResponse(responseCode = "400", description = "The request is invalid or inconsistent."),
+      @ApiResponse(responseCode = "409", description = "A workflow is currently running on the event."),
+      @ApiResponse(responseCode = "500", description = "The track could not be added.")
   })
   public Response updateFlavorWithTrack(
       @HeaderParam("Accept") String acceptHeader,

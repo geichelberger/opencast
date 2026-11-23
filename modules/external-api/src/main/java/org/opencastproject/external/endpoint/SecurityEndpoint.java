@@ -136,7 +136,11 @@ public class SecurityEndpoint {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "The signed URL is returned."),
-      @ApiResponse(responseCode = "401", description = "The caller is not authorized to have the link signed.")
+      @ApiResponse(responseCode = "401", description = "The caller is not authorized to have the link signed."),
+      @ApiResponse(
+          responseCode = "400",
+          description = "The url parameter is missing, or valid-until is not a valid ISO-8601 date."
+      )
   })
   public Response signUrl(
       @HeaderParam("Accept") String acceptHeader,
