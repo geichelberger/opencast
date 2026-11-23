@@ -256,7 +256,8 @@ public class SeriesRestService {
       @ApiResponse(
           responseCode = "401",
           description = "You do not have permission to view this series. Maybe you need to authenticate."
-      )
+      ),
+      @ApiResponse(responseCode = "500", description = "The series could not be retrieved.")
   })
   public Response getSeriesXml(
       @Parameter(description = "The series identifier", required = true)
@@ -291,7 +292,8 @@ public class SeriesRestService {
       @ApiResponse(
           responseCode = "401",
           description = "You do not have permission to view this series. Maybe you need to authenticate."
-      )
+      ),
+      @ApiResponse(responseCode = "500", description = "The series could not be retrieved.")
   })
   public Response getSeriesJSON(
       @Parameter(description = "The series identifier", required = true)
@@ -456,7 +458,8 @@ public class SeriesRestService {
       @ApiResponse(responseCode = "400", description = "The required form params were missing in the request."),
       @ApiResponse(responseCode = "204", description = "The access control list has been updated."),
       @ApiResponse(responseCode = "401", description = "If the current user is not authorized to perform this action"),
-      @ApiResponse(responseCode = "201", description = "The access control list has been created.")
+      @ApiResponse(responseCode = "201", description = "The access control list has been created."),
+      @ApiResponse(responseCode = "500", description = "The series could not be stored.")
   })
   public Response addOrUpdateSeries(
       @Parameter(
@@ -617,7 +620,8 @@ public class SeriesRestService {
       @ApiResponse(responseCode = "204", description = "The access control list has been updated."),
       @ApiResponse(responseCode = "201", description = "The access control list has been created."),
       @ApiResponse(responseCode = "401", description = "If the current user is not authorized to perform this action"),
-      @ApiResponse(responseCode = "400", description = "The required path or form params were missing in the request.")
+      @ApiResponse(responseCode = "400", description = "The required path or form params were missing in the request."),
+      @ApiResponse(responseCode = "500", description = "The access control list could not be updated.")
   })
   public Response updateAccessControl(
       @Parameter(description = "The series identifier", required = true)
@@ -668,7 +672,8 @@ public class SeriesRestService {
   @ApiResponses({
       @ApiResponse(responseCode = "404", description = "No series with this identifier was found."),
       @ApiResponse(responseCode = "401", description = "If the current user is not authorized to perform this action"),
-      @ApiResponse(responseCode = "204", description = "The series was deleted.")
+      @ApiResponse(responseCode = "204", description = "The series was deleted."),
+      @ApiResponse(responseCode = "500", description = "The series could not be deleted.")
   })
   public Response deleteSeries(
       @Parameter(description = "The series identifier", required = true)
@@ -715,7 +720,8 @@ public class SeriesRestService {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "The access control list."),
-      @ApiResponse(responseCode = "401", description = "If the current user is not authorized to perform this action")
+      @ApiResponse(responseCode = "401", description = "If the current user is not authorized to perform this action"),
+      @ApiResponse(responseCode = "500", description = "The properties could not be retrieved.")
   })
   public Response getSeriesPropertiesAsJson(
       @Parameter(description = "ID of series", required = true)
@@ -754,7 +760,8 @@ public class SeriesRestService {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "The access control list."),
-      @ApiResponse(responseCode = "401", description = "If the current user is not authorized to perform this action")
+      @ApiResponse(responseCode = "401", description = "If the current user is not authorized to perform this action"),
+      @ApiResponse(responseCode = "500", description = "The property could not be retrieved.")
   })
   public Response getSeriesProperty(
       @Parameter(description = "ID of series", required = true)
@@ -793,7 +800,8 @@ public class SeriesRestService {
       @ApiResponse(responseCode = "404", description = "No series with this identifier was found."),
       @ApiResponse(responseCode = "204", description = "The access control list has been updated."),
       @ApiResponse(responseCode = "401", description = "If the current user is not authorized to perform this action"),
-      @ApiResponse(responseCode = "400", description = "The required path or form params were missing in the request.")
+      @ApiResponse(responseCode = "400", description = "The required path or form params were missing in the request."),
+      @ApiResponse(responseCode = "500", description = "The property could not be updated.")
   })
   public Response updateSeriesProperty(
       @Parameter(description = "The series identifier", required = true)
@@ -835,7 +843,8 @@ public class SeriesRestService {
   @ApiResponses({
       @ApiResponse(responseCode = "204", description = "The series property has been deleted."),
       @ApiResponse(responseCode = "404", description = "The series or property has not been found."),
-      @ApiResponse(responseCode = "401", description = "If the current user is not authorized to perform this action")
+      @ApiResponse(responseCode = "401", description = "If the current user is not authorized to perform this action"),
+      @ApiResponse(responseCode = "500", description = "The property could not be deleted.")
   })
   public Response deleteSeriesProperty(
       @Parameter(description = "ID of series", required = true)
