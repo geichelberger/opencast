@@ -129,7 +129,13 @@ public class OaiPmhPublicationRestService extends AbstractJobProducerEndpoint {
       description = "Publish a media package element to this publication channel"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "An XML representation of the publication job")
+      @ApiResponse(responseCode = "200", description = "An XML representation of the publication job"),
+      @ApiResponse(
+          responseCode = "400",
+          description = "The request is invalid, for example because a given element does not exist in the "
+              + "media package."
+      ),
+      @ApiResponse(responseCode = "500", description = "The operation failed or the request cannot be parsed.")
   })
   public Response publish(
       @Parameter(description = "The media package", required = true)
@@ -172,7 +178,13 @@ public class OaiPmhPublicationRestService extends AbstractJobProducerEndpoint {
       description = "Replace a media package in this publication channel"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "An XML representation of the publication job")
+      @ApiResponse(responseCode = "200", description = "An XML representation of the publication job"),
+      @ApiResponse(
+          responseCode = "400",
+          description = "The request is invalid, for example because a given element does not exist in the "
+              + "media package."
+      ),
+      @ApiResponse(responseCode = "500", description = "The operation failed or the request cannot be parsed.")
   })
   public Response replace(
       @Parameter(description = "The media package", required = true)
@@ -235,7 +247,8 @@ public class OaiPmhPublicationRestService extends AbstractJobProducerEndpoint {
       description = "Synchronously Replace a media package in this publication channel"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "An XML representation of the publication")
+      @ApiResponse(responseCode = "200", description = "An XML representation of the publication"),
+      @ApiResponse(responseCode = "500", description = "The operation failed or the request cannot be parsed.")
   })
   public Response replaceSync(
       @Parameter(description = "The media package", required = true)
@@ -295,7 +308,9 @@ public class OaiPmhPublicationRestService extends AbstractJobProducerEndpoint {
       description = "Retract a media package element from this publication channel"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "An XML representation of the retraction job")
+      @ApiResponse(responseCode = "200", description = "An XML representation of the retraction job"),
+      @ApiResponse(responseCode = "400", description = "The request is invalid."),
+      @ApiResponse(responseCode = "500", description = "The operation failed or the request cannot be parsed.")
   })
   public Response retract(
       @Parameter(description = "The media package", required = true)
@@ -329,7 +344,13 @@ public class OaiPmhPublicationRestService extends AbstractJobProducerEndpoint {
           + "publish endpoint."
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "An XML representation of the publication job")
+      @ApiResponse(responseCode = "200", description = "An XML representation of the publication job"),
+      @ApiResponse(
+          responseCode = "400",
+          description = "The request is invalid, for example because a given element does not exist in the "
+              + "media package."
+      ),
+      @ApiResponse(responseCode = "500", description = "The operation failed or the request cannot be parsed.")
   })
   public Response updateMetadata(
       @Parameter(description = "The updated media package", required = true)
