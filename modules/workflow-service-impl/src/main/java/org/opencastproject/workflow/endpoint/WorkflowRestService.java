@@ -304,7 +304,8 @@ public class WorkflowRestService extends AbstractJobProducerEndpoint {
       description = "Get the configuration panel for a specific workflow"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "The workflow configuration panel.")
+      @ApiResponse(responseCode = "200", description = "The workflow configuration panel."),
+      @ApiResponse(responseCode = "500", description = "The workflow definition could not be read.")
   })
   public Response getConfigurationPanel(
       @Parameter(description = "The workflow definition identifier")
@@ -327,7 +328,8 @@ public class WorkflowRestService extends AbstractJobProducerEndpoint {
       description = "Returns if a media package has active workflows"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "Whether the media package has active workflows.")
+      @ApiResponse(responseCode = "200", description = "Whether the media package has active workflows."),
+      @ApiResponse(responseCode = "500", description = "The workflows could not be retrieved.")
   })
   public Response mediaPackageHasActiveWorkflows(
       @Parameter(description = "The media package identifier", required = true)
@@ -350,7 +352,8 @@ public class WorkflowRestService extends AbstractJobProducerEndpoint {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "Returns the workflows for a media package."),
-      @ApiResponse(responseCode = "403", description = "Not authorized to access the workflows.")
+      @ApiResponse(responseCode = "403", description = "Not authorized to access the workflows."),
+      @ApiResponse(responseCode = "500", description = "The workflows could not be retrieved.")
   })
   public Response getWorkflowsOfMediaPackage(
       @Parameter(description = "The media package identifier", required = true)
@@ -379,7 +382,8 @@ public class WorkflowRestService extends AbstractJobProducerEndpoint {
       @ApiResponse(responseCode = "200", description = "Returns the workflows for a media package."),
       @ApiResponse(responseCode = "400", description = "Unknown action."),
       @ApiResponse(responseCode = "403", description = "Not authorized to access the workflow."),
-      @ApiResponse(responseCode = "404", description = "Current workflow not found.")
+      @ApiResponse(responseCode = "404", description = "Current workflow not found."),
+      @ApiResponse(responseCode = "500", description = "The workflows could not be retrieved.")
   })
   public Response getRunningWorkflowOfMediaPackage(
       @Parameter(description = "The media package identifier", required = true)
@@ -429,7 +433,8 @@ public class WorkflowRestService extends AbstractJobProducerEndpoint {
       description = "Returns if there are currently workflow(s) running that were started by the given user"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "Whether there are active workflow for the user.")
+      @ApiResponse(responseCode = "200", description = "Whether there are active workflow for the user."),
+      @ApiResponse(responseCode = "500", description = "The workflows could not be retrieved.")
   })
   public Response userHasActiveWorkflows(
       @Parameter(description = "The user identifier", required = true)
@@ -492,7 +497,11 @@ public class WorkflowRestService extends AbstractJobProducerEndpoint {
           responseCode = "401",
           description = "You do not have permission to start the workflow. Maybe you need to authenticate."
       ),
-      @ApiResponse(responseCode = "404", description = "If the parent workflow does not exist")
+      @ApiResponse(responseCode = "404", description = "If the parent workflow does not exist"),
+      @ApiResponse(
+          responseCode = "400",
+          description = "The media package or the workflow definition is missing or cannot be parsed."
+      )
   })
   public JaxbWorkflowInstance start(
       @Parameter(
@@ -713,7 +722,8 @@ public class WorkflowRestService extends AbstractJobProducerEndpoint {
       @ApiResponse(
           responseCode = "401",
           description = "You do not have permission to resume. Maybe you need to authenticate."
-      )
+      ),
+      @ApiResponse(responseCode = "500", description = "The workflow instance could not be resumed.")
   })
   public Response resume(
       @Parameter(description = "The workflow instance identifier", required = true)
