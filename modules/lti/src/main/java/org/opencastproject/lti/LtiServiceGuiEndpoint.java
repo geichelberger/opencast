@@ -212,7 +212,9 @@ public class LtiServiceGuiEndpoint {
   @Consumes(MediaType.MULTIPART_FORM_DATA)
   @Operation(
       summary = "Upload an event",
-      description = "Creates an event in a multipart request."
+      description = "Creates a new event, or updates an existing one if an event id is given, in a multipart "
+          + "request. The parts are read in order: all parts except the video file have to come before it, and "
+          + "every part with a name that is not listed is taken as the video file."
   )
   @RequestBody(
       content = {
@@ -221,33 +223,36 @@ public class LtiServiceGuiEndpoint {
               schema = @Schema(type = "object"),
               schemaProperties = {
                   @SchemaProperty(
-                      name = "presenter",
-                      schema = @Schema(
-                          type = "string", format = "binary",
-                          description = "Presenter movie track"
-                      )
+                      name = "eventId",
+                      schema = @Schema(type = "string", description = "ID of the event to update (if it is an update)")
                   ),
-                  @SchemaProperty(name = "license", schema = @Schema(type = "string", description = "License chosen")),
-                  @SchemaProperty(name = "seriesName", schema = @Schema(type = "string", description = "Series name")),
-                  @SchemaProperty(name = "isPartOf", schema = @Schema(type = "string", description = "Series ID")),
+                  @SchemaProperty(name = "metadata", schema = @Schema(type = "string", description = "Event metadata")),
+                  @SchemaProperty(name = "captions", schema = @Schema(type = "string", description = "Caption file")),
                   @SchemaProperty(
-                      name = "processing",
-                      schema = @Schema(
-                          type = "string",
-                          description = "Processing instructions task configuration"
-                      )
+                      name = "captionFormat",
+                      schema = @Schema(type = "string", description = "Caption file format")
+                  ),
+                  @SchemaProperty(
+                      name = "captionLanguage",
+                      schema = @Schema(type = "string", description = "Caption language")
+                  ),
+                  @SchemaProperty(
+                      name = "seriesId",
+                      schema = @Schema(type = "string", description = "Series id of the event")
+                  ),
+                  @SchemaProperty(
+                      name = "presenter",
+                      schema = @Schema(type = "string", format = "binary", description = "Presenter movie track")
                   )
               }
           )
       }
   )
   @ApiResponses({
-      @ApiResponse(
-          responseCode = "201",
-          description = "A new event is created and its identifier is returned in the Location header."
-      ),
-      @ApiResponse(responseCode = "409", description = "The event could not be created due to a scheduling conflict."),
-      @ApiResponse(responseCode = "400", description = "The request is invalid or inconsistent..")
+      @ApiResponse(responseCode = "200", description = "A new event is created or the event is updated."),
+      @ApiResponse(responseCode = "401", description = "No authorization to create or update the event."),
+      @ApiResponse(responseCode = "404", description = "The event to be updated wasn't found."),
+      @ApiResponse(responseCode = "500", description = "The request could not be read.")
   })
   public Response createNewEvent(
       @HeaderParam("Accept") String acceptHeader,
@@ -316,6 +321,7 @@ public class LtiServiceGuiEndpoint {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "204", description = "The event has been deleted."),
+      @ApiResponse(responseCode = "401", description = "Not allowed to delete the event."),
       @ApiResponse(responseCode = "404", description = "The specified event does not exist.")
   })
   public Response deleteEvent(
