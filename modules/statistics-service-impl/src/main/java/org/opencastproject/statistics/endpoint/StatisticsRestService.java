@@ -116,10 +116,7 @@ public class StatisticsRestService {
       description = "Writes a duration"
   )
   @ApiResponses({
-      @ApiResponse(
-          responseCode = "200",
-          description = "Writing worked. The response body is the text NO_CONTENT instead of an empty response."
-      ),
+      @ApiResponse(responseCode = "204", description = "Writing worked"),
       @ApiResponse(responseCode = "500", description = "The duration could not be written.")
   })
   public Response writeDuration(
@@ -142,7 +139,7 @@ public class StatisticsRestService {
       statisticsService
               .writeDuration(organizationId, measurementName, retentionPolicy, organizationIdResourceName, fieldName,
                       TimeUnit.valueOf(temporalResolution), Duration.parse(duration));
-      return Response.ok(Response.Status.NO_CONTENT).build();
+      return Response.noContent().build();
     } catch (Exception e) {
       logger.error("Could not retrieve providers: {}", e.getMessage());
       throw new WebApplicationException(Response.Status.INTERNAL_SERVER_ERROR);

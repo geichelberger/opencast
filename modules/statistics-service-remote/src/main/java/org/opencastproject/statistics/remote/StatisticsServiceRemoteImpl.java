@@ -22,6 +22,7 @@
 package org.opencastproject.statistics.remote;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static javax.servlet.http.HttpServletResponse.SC_NO_CONTENT;
 import static javax.servlet.http.HttpServletResponse.SC_OK;
 
 import org.opencastproject.security.api.TrustedHttpClient;
@@ -159,9 +160,11 @@ public class StatisticsServiceRemoteImpl extends RemoteBase implements Statistic
     queryStringParams.add(new BasicNameValuePair("duration", duration.toString()));
 
     final HttpGet get = new HttpGet("/writeDuration?" + WWWFormCodec.format(queryStringParams, UTF_8));
-    final ClassicHttpResponse response = getResponse(get, SC_OK);
+    final ClassicHttpResponse response = getResponse(get, SC_NO_CONTENT);
+    if (response == null) {
+      throw new RuntimeException("Unable to write the duration using the remote service");
+    }
     closeConnection(response);
-    throw new RuntimeException("Unable to get time series data from remote service");
   }
 
   private TimeSeries jsonToTimeSeries(String json) {
