@@ -131,6 +131,7 @@ import javax.ws.rs.core.Response.Status;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -304,7 +305,7 @@ public class SchedulerRestService {
   @ApiResponses({
       @ApiResponse(
           responseCode = "200",
-          description = "DublinCore of event is in the body of response"
+          description = "The media package of the event is in the body of the response"
       ),
       @ApiResponse(
           responseCode = "404",
@@ -312,8 +313,9 @@ public class SchedulerRestService {
       ),
       @ApiResponse(
           responseCode = "401",
-          description = "You do not have permission to remove the event. Maybe you need to authenticate."
-      )
+          description = "You do not have permission to read the event. Maybe you need to authenticate."
+      ),
+      @ApiResponse(responseCode = "500", description = "An internal error occurred.")
   })
   public Response getMediaPackageXml(
       @Parameter(
@@ -359,8 +361,9 @@ public class SchedulerRestService {
       ),
       @ApiResponse(
           responseCode = "401",
-          description = "You do not have permission to remove the event. Maybe you need to authenticate."
-      )
+          description = "You do not have permission to read the event. Maybe you need to authenticate."
+      ),
+      @ApiResponse(responseCode = "500", description = "An internal error occurred.")
   })
   public Response getDublinCoreMetadataXml(
       @Parameter(
@@ -408,8 +411,9 @@ public class SchedulerRestService {
       ),
       @ApiResponse(
           responseCode = "401",
-          description = "You do not have permission to remove the event. Maybe you need to authenticate."
-      )
+          description = "You do not have permission to read the event. Maybe you need to authenticate."
+      ),
+      @ApiResponse(responseCode = "500", description = "An internal error occurred.")
   })
   public Response getDublinCoreMetadataJSON(
       @Parameter(
@@ -449,7 +453,9 @@ public class SchedulerRestService {
   @ApiResponses({
       @ApiResponse(
           responseCode = "200",
-          description = "technical metadata of event is in the body of response"
+          description = "The technical metadata of the event is in the body of the response. The content type "
+              + "is application/json, although the operation declares text/xml.",
+          content = @Content(mediaType = "application/json")
       ),
       @ApiResponse(
           responseCode = "404",
@@ -457,8 +463,9 @@ public class SchedulerRestService {
       ),
       @ApiResponse(
           responseCode = "401",
-          description = "You do not have permission to remove the event. Maybe you need to authenticate."
-      )
+          description = "You do not have permission to read the event. Maybe you need to authenticate."
+      ),
+      @ApiResponse(responseCode = "500", description = "An internal error occurred.")
   })
   public Response getTechnicalMetadataJSON(
       @Parameter(
@@ -533,8 +540,9 @@ public class SchedulerRestService {
       ),
       @ApiResponse(
           responseCode = "401",
-          description = "You do not have permission to remove the event. Maybe you need to authenticate."
-      )
+          description = "You do not have permission to read the event. Maybe you need to authenticate."
+      ),
+      @ApiResponse(responseCode = "500", description = "An internal error occurred.")
   })
   public Response getWorkflowConfiguration(
       @Parameter(
@@ -581,8 +589,9 @@ public class SchedulerRestService {
       ),
       @ApiResponse(
           responseCode = "401",
-          description = "You do not have permission to remove the event. Maybe you need to authenticate."
-      )
+          description = "You do not have permission to read the event. Maybe you need to authenticate."
+      ),
+      @ApiResponse(responseCode = "500", description = "An internal error occurred.")
   })
   public Response getCaptureAgentMetadata(
       @Parameter(
@@ -632,7 +641,8 @@ public class SchedulerRestService {
       @ApiResponse(
           responseCode = "409",
           description = "Event with specified ID is locked by a transaction, unable to delete event."
-      )
+      ),
+      @ApiResponse(responseCode = "500", description = "An internal error occurred.")
   })
   public Response deleteEvent(
       @Parameter(description = "Event ID", required = true)
@@ -682,7 +692,8 @@ public class SchedulerRestService {
       @ApiResponse(
           responseCode = "400",
           description = "The cutoff parameter is not a valid number"
-      )
+      ),
+      @ApiResponse(responseCode = "500", description = "An internal error occurred.")
   })
   public Response getCalendar(
       @Parameter(description = "Filter events by capture agent")
@@ -745,7 +756,8 @@ public class SchedulerRestService {
       @ApiResponse(
           responseCode = "200",
           description = "Events were modified, new calendar is in the body"
-      )
+      ),
+      @ApiResponse(responseCode = "500", description = "An internal error occurred.")
   })
   public Response getCalendarJson(
       @Parameter(description = "Filter events by capture agent")
@@ -812,7 +824,8 @@ public class SchedulerRestService {
       @ApiResponse(
           responseCode = "200",
           description = "The last modified hash of agent is in the body of response"
-      )
+      ),
+      @ApiResponse(responseCode = "500", description = "An internal error occurred.")
   })
   public Response getLastModified(
       @Parameter(
@@ -888,7 +901,8 @@ public class SchedulerRestService {
           responseCode = "401",
           description = "You do not have permission to create the event. Maybe you need to authenticate."
       ),
-      @ApiResponse(responseCode = "400", description = "Missing or invalid information for this request")
+      @ApiResponse(responseCode = "400", description = "Missing or invalid information for this request"),
+      @ApiResponse(responseCode = "500", description = "An internal error occurred.")
   })
   public Response addEvent(
       @Parameter(description = "The start date of the event in milliseconds from 1970-01-01T00:00:00Z", required = true)
@@ -1002,7 +1016,8 @@ public class SchedulerRestService {
           responseCode = "401",
           description = "You do not have permission to create the event. Maybe you need to authenticate."
       ),
-      @ApiResponse(responseCode = "400", description = "Missing or invalid information for this request")
+      @ApiResponse(responseCode = "400", description = "Missing or invalid information for this request"),
+      @ApiResponse(responseCode = "500", description = "An internal error occurred.")
   })
   public Response addMultipleEvents(
       @Parameter(description = "The recurrence rule for the events", required = true)
@@ -1143,7 +1158,8 @@ public class SchedulerRestService {
           responseCode = "401",
           description = "You do not have permission to update the event. Maybe you need to authenticate."
       ),
-      @ApiResponse(responseCode = "400", description = "Data is missing or invalid")
+      @ApiResponse(responseCode = "400", description = "Data is missing or invalid"),
+      @ApiResponse(responseCode = "500", description = "An internal error occurred.")
   })
   public Response updateEvent(
       @Parameter(description = "ID of event to be updated", required = true)
@@ -1254,7 +1270,8 @@ public class SchedulerRestService {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "current event is in the body of response"),
-      @ApiResponse(responseCode = "204", description = "There is no current recording")
+      @ApiResponse(responseCode = "204", description = "There is no current recording"),
+      @ApiResponse(responseCode = "500", description = "An internal error occurred.")
   })
   public Response currentRecording(
       @Parameter(description = "The agent identifier", required = true)
@@ -1284,7 +1301,8 @@ public class SchedulerRestService {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "upcoming event is in the body of response"),
-      @ApiResponse(responseCode = "204", description = "There is no upcoming recording")
+      @ApiResponse(responseCode = "204", description = "There is no upcoming recording"),
+      @ApiResponse(responseCode = "500", description = "An internal error occurred.")
   })
   public Response upcomingRecording(
       @Parameter(description = "The agent identifier", required = true)
@@ -1313,7 +1331,8 @@ public class SchedulerRestService {
       description = "Get the number of scheduled events"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "The event count")
+      @ApiResponse(responseCode = "200", description = "The event count"),
+      @ApiResponse(responseCode = "500", description = "An internal error occurred.")
   })
   public Response eventCount() throws UnauthorizedException {
     try {
@@ -1334,7 +1353,8 @@ public class SchedulerRestService {
       description = "Searches recordings and returns result as XML or JSON"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "Search completed, results returned in body")
+      @ApiResponse(responseCode = "200", description = "Search completed, results returned in body"),
+      @ApiResponse(responseCode = "500", description = "An internal error occurred.")
   })
   public Response getEventsAsList(
       @Parameter(description = "The media type of the response [xml|json]", required = true)
@@ -1509,7 +1529,8 @@ public class SchedulerRestService {
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "{id} set to {state}"),
       @ApiResponse(responseCode = "400", description = "{id} or state {state} is empty or the {state} is not known"),
-      @ApiResponse(responseCode = "404", description = "Recording with {id} could not be found")
+      @ApiResponse(responseCode = "404", description = "Recording with {id} could not be found"),
+      @ApiResponse(responseCode = "500", description = "An internal error occurred.")
   })
   public Response updateRecordingState(
       @Parameter(description = "The ID of a given recording", required = true)
@@ -1547,7 +1568,8 @@ public class SchedulerRestService {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "Returns the state of the recording with the correct id"),
-      @ApiResponse(responseCode = "404", description = "The recording with the specified ID does not exist")
+      @ApiResponse(responseCode = "404", description = "The recording with the specified ID does not exist"),
+      @ApiResponse(responseCode = "500", description = "An internal error occurred.")
   })
   public Response getRecordingState(
       @Parameter(description = "The ID of a given recording", required = true)
@@ -1575,7 +1597,8 @@ public class SchedulerRestService {
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "{id} removed"),
       @ApiResponse(responseCode = "400", description = "{id} is empty"),
-      @ApiResponse(responseCode = "404", description = "Recording with {id} could not be found")
+      @ApiResponse(responseCode = "404", description = "Recording with {id} could not be found"),
+      @ApiResponse(responseCode = "500", description = "An internal error occurred.")
   })
   public Response removeRecording(
       @Parameter(description = "The ID of a given recording", required = true)
@@ -1602,7 +1625,8 @@ public class SchedulerRestService {
       description = "Return all registered recordings and their state"
   )
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "Returns all known recordings.")
+      @ApiResponse(responseCode = "200", description = "Returns all known recordings."),
+      @ApiResponse(responseCode = "500", description = "An internal error occurred.")
   })
   public Response getAllRecordings() {
     try {
@@ -1645,7 +1669,8 @@ public class SchedulerRestService {
           description = "DublinCore of current capture event is in the body of response"
       ),
       @ApiResponse(responseCode = "404", description = "There is no ongoing recording"),
-      @ApiResponse(responseCode = "503", description = "The agent is not ready to communicate")
+      @ApiResponse(responseCode = "503", description = "The agent is not ready to communicate"),
+      @ApiResponse(responseCode = "500", description = "An internal error occurred.")
   })
   public Response currentCapture(
       @Parameter(description = "The agent identifier", required = true)
@@ -1686,7 +1711,8 @@ public class SchedulerRestService {
           description = "DublinCore of the upcomfing capture event is in the body of response"
       ),
       @ApiResponse(responseCode = "404", description = "There is no upcoming recording"),
-      @ApiResponse(responseCode = "503", description = "The agent is not ready to communicate")
+      @ApiResponse(responseCode = "503", description = "The agent is not ready to communicate"),
+      @ApiResponse(responseCode = "500", description = "An internal error occurred.")
   })
   public Response upcomingCapture(
       @Parameter(description = "The agent identifier", required = true)
@@ -1729,7 +1755,8 @@ public class SchedulerRestService {
           description = "You do not have permission "
               + "to start this immediate capture. Maybe you need to authenticate."
       ),
-      @ApiResponse(responseCode = "503", description = "The agent is not ready to communicate")
+      @ApiResponse(responseCode = "503", description = "The agent is not ready to communicate"),
+      @ApiResponse(responseCode = "500", description = "An internal error occurred.")
   })
   public Response startCapture(
       @Parameter(description = "The agent identifier", required = true)
@@ -1861,7 +1888,8 @@ public class SchedulerRestService {
           description = "You do not have permission "
               + "to stop this immediate capture. Maybe you need to authenticate."
       ),
-      @ApiResponse(responseCode = "503", description = "The agent is not ready to communicate")
+      @ApiResponse(responseCode = "503", description = "The agent is not ready to communicate"),
+      @ApiResponse(responseCode = "500", description = "An internal error occurred.")
   })
   public Response stopCapture(
       @Parameter(description = "The agent identifier", required = true)
@@ -1945,7 +1973,8 @@ public class SchedulerRestService {
           description = "You do not have permission "
               + "to prolong this immediate capture. Maybe you need to authenticate."
       ),
-      @ApiResponse(responseCode = "503", description = "The agent is not ready to communicate")
+      @ApiResponse(responseCode = "503", description = "The agent is not ready to communicate"),
+      @ApiResponse(responseCode = "500", description = "An internal error occurred.")
   })
   public Response prolongCapture(
       @Parameter(description = "The agent identifier", required = true)
