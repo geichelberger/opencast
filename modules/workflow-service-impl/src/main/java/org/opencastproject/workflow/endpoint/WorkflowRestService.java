@@ -856,6 +856,7 @@ public class WorkflowRestService extends AbstractJobProducerEndpoint {
         .header("Content-Type", MediaType.APPLICATION_JSON).build();
   }
 
+  @POST
   @Path("/cleanup")
   @Operation(
       summary = "Clean up workflow instances",
