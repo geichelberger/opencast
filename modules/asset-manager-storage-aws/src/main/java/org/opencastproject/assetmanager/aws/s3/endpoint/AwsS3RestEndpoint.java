@@ -257,13 +257,10 @@ public class AwsS3RestEndpoint {
   )
   @ApiResponses({
       @ApiResponse(responseCode = "204", description = "restore of assets started"),
+      @ApiResponse(responseCode = "400", description = "The restore period is not greater than zero"),
       @ApiResponse(responseCode = "401", description = "The user is not authorized to access the media package"),
       @ApiResponse(responseCode = "404", description = "mediapackage not found or has no assets in S3"),
-      @ApiResponse(
-          responseCode = "500",
-          description = "An error occurred while restoring the assets. This includes an invalid restore period (it "
-              + "must be greater than zero), which is not answered with a bad request"
-      )
+      @ApiResponse(responseCode = "500", description = "An error occurred while restoring the assets")
   })
   public Response restoreAssets(
       @Parameter(description = "The media package indentifier.", required = true)
@@ -329,6 +326,8 @@ public class AwsS3RestEndpoint {
         throw new WebApplicationException(e, Response.Status.NOT_FOUND);
       }
       throw new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR);
+    } catch (WebApplicationException e) {
+      throw e;
     } catch (Exception e) {
       logger.error("Error calling archive REST method", e);
       if (e instanceof NotFoundException) {
