@@ -107,9 +107,10 @@ public class TextAnalysisRestEndpoint extends AbstractJobProducerEndpoint {
           responseCode = "200",
           description = "OK, The receipt to use when polling for the resulting mpeg7 catalog."
       ),
+      @ApiResponse(responseCode = "400", description = "The image is not an attachment."),
       @ApiResponse(
           responseCode = "500",
-          description = "The image cannot be parsed into an attachment or the text analysis job could not be created."
+          description = "The image cannot be parsed or the text analysis job could not be created."
       ),
       @ApiResponse(responseCode = "503", description = "The service is unavailable at the moment.")
   })
@@ -127,6 +128,8 @@ public class TextAnalysisRestEndpoint extends AbstractJobProducerEndpoint {
       }
       Job job = service.extract((Attachment) element);
       return Response.ok(new JaxbJob(job)).build();
+    } catch (WebApplicationException e) {
+      throw e;
     } catch (Exception e) {
       logger.info(e.getMessage(), e);
       return Response.serverError().build();
